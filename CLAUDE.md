@@ -26,6 +26,9 @@ python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --pres
 # 押し目買い型スクリーニング
 python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset pullback
 
+# 割安株 + 押し目フィルタ
+python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset value --with-pullback
+
 # 後方互換: --market も使用可能
 python3 .claude/skills/screen-stocks/scripts/run_screen.py --market japan --preset value
 

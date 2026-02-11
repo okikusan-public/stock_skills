@@ -133,7 +133,7 @@ def format_pullback_markdown(results: list[dict]) -> str:
         match_type = row.get("match_type", "full")
         match_str = "★完全一致" if match_type == "full" else "△部分一致"
 
-        score = _fmt_float(row.get("final_score"))
+        score = _fmt_float(row.get("final_score") or row.get("value_score"))
 
         lines.append(
             f"| {rank} | {label} | {price} | {per} | {pullback} | {rsi} | {vol_ratio} | {sma50} | {sma200} | {bounce_str} | {match_str} | {score} |"

@@ -192,6 +192,7 @@ class QueryScreener:
         top_n: int = 20,
         sort_field: str = "intradaymarketcap",
         sort_asc: bool = False,
+        with_pullback: bool = False,
     ) -> list[dict]:
         """Run EquityQuery-based screening and return scored results.
 
@@ -217,13 +218,20 @@ class QueryScreener:
             yf.screen() sort field.
         sort_asc : bool
             Sort ascending if True.
+        with_pullback : bool
+            When True, apply pullback-in-uptrend technical filter after
+            value scoring.  Only stocks that pass the pullback check are
+            returned, with additional technical indicator fields attached.
 
         Returns
         -------
         list[dict]
             Each dict contains: symbol, name, price, per, pbr,
             dividend_yield, roe, value_score, plus sector/industry/exchange.
-            Sorted by value_score descending.
+            When *with_pullback* is True, also includes pullback_pct, rsi,
+            volume_ratio, sma50, sma200, bounce_score, match_type.
+            Sorted by value_score descending (or match_type then value_score
+            when *with_pullback* is True).
         """
         # Resolve criteria
         if criteria is None:
@@ -259,6 +267,57 @@ class QueryScreener:
 
             normalized["value_score"] = score
             results.append(normalized)
+
+        # -----------------------------------------------------------
+        # Optional pullback-in-uptrend filter
+        # -----------------------------------------------------------
+        if with_pullback:
+            pullback_results: list[dict] = []
+            for stock in results:
+                symbol = stock.get("symbol")
+                if not symbol:
+                    continue
+
+                hist = self.yahoo_client.get_price_history(symbol)
+                if hist is None or hist.empty:
+                    continue
+
+                tech_result = detect_pullback_in_uptrend(hist)
+                if tech_result is None:
+                    continue
+
+                all_conditions = tech_result.get("all_conditions")
+                bounce_score = tech_result.get("bounce_score", 0)
+
+                if all_conditions:
+                    match_type = "full"
+                elif (
+                    bounce_score >= 30
+                    and tech_result.get("uptrend")
+                    and tech_result.get("is_pullback")
+                ):
+                    match_type = "partial"
+                else:
+                    continue
+
+                # Attach technical indicators to the stock dict
+                stock["pullback_pct"] = tech_result.get("pullback_pct")
+                stock["rsi"] = tech_result.get("rsi")
+                stock["volume_ratio"] = tech_result.get("volume_ratio")
+                stock["sma50"] = tech_result.get("sma50")
+                stock["sma200"] = tech_result.get("sma200")
+                stock["bounce_score"] = bounce_score
+                stock["match_type"] = match_type
+                pullback_results.append(stock)
+
+            # Sort: "full" first, then "partial"; within each group by value_score desc
+            pullback_results.sort(
+                key=lambda r: (
+                    0 if r.get("match_type") == "full" else 1,
+                    -(r.get("value_score") or 0),
+                ),
+            )
+            return pullback_results[:top_n]
 
         # Sort by value_score descending, take top N
         results.sort(key=lambda r: r["value_score"], reverse=True)

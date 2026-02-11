@@ -47,6 +47,8 @@ python3 /Users/kikuchihiroyuki/stock-skills/.claude/skills/screen-stocks/scripts
 | 「超割安」「ディープバリュー」 | deep-value |
 | 「クオリティ」「高品質」 | quality |
 | 「押し目」「pullback」 | pullback |
+| 「割安で押し目」「バリュー+押し目」 | value --with-pullback |
+| 「高配当で押し目」 | high-dividend --with-pullback |
 
 ### sector（--sector オプション）
 指定なしの場合は全セクターが対象。ユーザーが特定セクターに言及した場合に使用する。
@@ -89,6 +91,7 @@ python3 /Users/kikuchihiroyuki/stock-skills/.claude/skills/screen-stocks/scripts
 
 - `--mode query` (デフォルト): **EquityQuery方式**。yfinance の EquityQuery API を使い、銘柄リスト不要で条件に合う銘柄を直接検索する。全地域に対応。高速。
 - `--mode legacy`: **銘柄リスト方式**。従来のValueScreenerを使用。事前定義した銘柄リスト（日経225、S&P500等）を1銘柄ずつ取得・評価。japan/us/asean のみ対応。
+- `--with-pullback`: **押し目フィルタ追加**。任意のプリセット（value, high-dividend 等）にテクニカル押し目判定を追加適用する。`--preset pullback` との同時指定は不要（pullback プリセットが優先される）。出力は Pullback モードと同じ列形式。
 
 ## プリセット
 
@@ -132,4 +135,10 @@ python3 .../run_screen.py --region us --preset value --mode legacy
 
 # 日本株の押し目買い候補
 python3 .../run_screen.py --region japan --preset pullback
+
+# 日本の割安株 + 押し目フィルタ
+python3 .../run_screen.py --region japan --preset value --with-pullback
+
+# 米国の高配当株 + 押し目フィルタ
+python3 .../run_screen.py --region us --preset high-dividend --with-pullback
 ```

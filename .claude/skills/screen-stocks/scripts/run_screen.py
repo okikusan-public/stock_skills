@@ -112,15 +112,26 @@ def run_query_mode(args):
         region_name = REGION_NAMES.get(region_code, region_code.upper())
         sector_label = f" [{args.sector}]" if args.sector else ""
 
-        results = screener.screen(
-            region=region_code,
-            preset=args.preset,
-            sector=args.sector,
-            top_n=args.top,
-        )
-
-        print(f"\n## {region_name} - {args.preset}{sector_label} スクリーニング結果 (EquityQuery)\n")
-        print(format_query_markdown(results))
+        if args.with_pullback:
+            results = screener.screen(
+                region=region_code,
+                preset=args.preset,
+                sector=args.sector,
+                top_n=args.top,
+                with_pullback=True,
+            )
+            pullback_label = " + 押し目フィルタ"
+            print(f"\n## {region_name} - {args.preset}{sector_label}{pullback_label} スクリーニング結果 (EquityQuery)\n")
+            print(format_pullback_markdown(results))
+        else:
+            results = screener.screen(
+                region=region_code,
+                preset=args.preset,
+                sector=args.sector,
+                top_n=args.top,
+            )
+            print(f"\n## {region_name} - {args.preset}{sector_label} スクリーニング結果 (EquityQuery)\n")
+            print(format_query_markdown(results))
         print()
 
 
@@ -185,6 +196,12 @@ def main():
         help=f"Sector filter. Options: {', '.join(VALID_SECTORS)}",
     )
     parser.add_argument("--top", type=int, default=20)
+    parser.add_argument(
+        "--with-pullback",
+        action="store_true",
+        default=False,
+        help="任意プリセットにテクニカル押し目フィルタを追加適用",
+    )
     parser.add_argument(
         "--mode",
         default="query",
