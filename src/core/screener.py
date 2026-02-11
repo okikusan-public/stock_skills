@@ -9,7 +9,6 @@ import yaml
 from src.core.filters import apply_filters
 from src.core.indicators import calculate_value_score
 from src.core.query_builder import build_query
-from src.core.sharpe import compute_full_sharpe_score
 from src.core.technicals import detect_pullback_in_uptrend
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "screening_presets.yaml"
@@ -109,61 +108,6 @@ class ValueScreener:
 
         # Sort by value_score descending, take top N
         results.sort(key=lambda r: r["value_score"], reverse=True)
-        return results[:top_n]
-
-
-class SharpeScreener:
-    """Screen stocks using the Sharpe Ratio optimization framework."""
-
-    def __init__(self, yahoo_client, market):
-        self.yahoo_client = yahoo_client
-        self.market = market
-
-    def screen(
-        self,
-        symbols: Optional[list[str]] = None,
-        top_n: int = 20,
-    ) -> list[dict]:
-        """Run SR screening. Stocks with fewer than 3 conditions are excluded."""
-        if symbols is None:
-            symbols = self.market.get_default_symbols()
-
-        thresholds = self.market.get_thresholds()
-        # SR framework uses its own thresholds (KIK-330 spec)
-        thresholds["hv30_max"] = 0.25
-        thresholds["per_max"] = 15.0
-        thresholds["pbr_max"] = 1.5
-        rf = thresholds.get("rf", 0.005)
-
-        results: list[dict] = []
-
-        for symbol in symbols:
-            detail = self.yahoo_client.get_stock_detail(symbol)
-            if detail is None:
-                continue
-
-            sr_result = compute_full_sharpe_score(detail, thresholds, rf=rf)
-            if sr_result is None:
-                continue
-
-            results.append({
-                "symbol": detail.get("symbol", symbol),
-                "name": detail.get("name"),
-                "price": detail.get("price"),
-                "per": detail.get("per"),
-                "pbr": detail.get("pbr"),
-                "dividend_yield": detail.get("dividend_yield"),
-                "roe": detail.get("roe"),
-                "eps_growth": detail.get("eps_growth"),
-                "hv30": sr_result["hv30"],
-                "expected_return": sr_result["expected_return"],
-                "adjusted_sr": sr_result["adjusted_sr"],
-                "conditions_passed": sr_result["conditions_passed"],
-                "condition_details": sr_result["condition_details"],
-                "final_score": sr_result["final_score"],
-            })
-
-        results.sort(key=lambda r: r["final_score"], reverse=True)
         return results[:top_n]
 
 
@@ -327,7 +271,7 @@ class PullbackScreener:
     Three-step pipeline:
       Step 1: EquityQuery for fundamental filtering (PER<20, ROE>8%, EPS growth>5%)
       Step 2: Technical filter - detect pullback in uptrend
-      Step 3: 5-condition SR check (reuse SharpeScreener logic where possible)
+      Step 3: Scoring (value_score from Step 1)
     """
 
     # Default fundamental criteria for pullback screening
@@ -427,40 +371,12 @@ class PullbackScreener:
             return []
 
         # ---------------------------------------------------------------
-        # Step 3: SR calculation (optional enrichment)
+        # Step 3: Scoring (value_score from Step 1)
         # ---------------------------------------------------------------
         results: list[dict] = []
         for stock in technical_passed:
-            symbol = stock["symbol"]
-
-            adjusted_sr: Optional[float] = None
-            conditions_passed: Optional[int] = None
-
-            try:
-                detail = self.yahoo_client.get_stock_detail(symbol)
-                if detail is not None:
-                    # Use default thresholds for SR evaluation
-                    thresholds = {
-                        "hv30_max": 0.25,
-                        "per_max": 15.0,
-                        "pbr_max": 1.5,
-                    }
-                    rf = 0.005
-                    sr_result = compute_full_sharpe_score(detail, thresholds, rf=rf)
-                    if sr_result is not None:
-                        adjusted_sr = sr_result.get("adjusted_sr")
-                        conditions_passed = sr_result.get("conditions_passed")
-            except Exception:
-                pass
-
-            # Determine final_score: SR score if available, else value_score
-            if adjusted_sr is not None:
-                final_score = adjusted_sr
-            else:
-                final_score = stock.get("value_score", 0.0)
-
             results.append({
-                "symbol": symbol,
+                "symbol": stock["symbol"],
                 "name": stock.get("name"),
                 "price": stock.get("price"),
                 "per": stock.get("per"),
@@ -473,10 +389,8 @@ class PullbackScreener:
                 "volume_ratio": stock.get("volume_ratio"),
                 "sma50": stock.get("sma50"),
                 "sma200": stock.get("sma200"),
-                # SR (may be None)
-                "adjusted_sr": adjusted_sr,
-                "conditions_passed": conditions_passed,
-                "final_score": final_score,
+                # Score
+                "final_score": stock.get("value_score", 0.0),
             })
 
         # Sort by final_score descending

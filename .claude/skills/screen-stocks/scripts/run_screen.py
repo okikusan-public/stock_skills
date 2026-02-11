@@ -3,7 +3,7 @@
 
 Supports two modes:
   --mode query  (default): Uses yfinance EquityQuery -- no symbol list needed.
-  --mode legacy          : Uses the original ValueScreener / SharpeScreener
+  --mode legacy          : Uses the original ValueScreener
                            with predefined symbol lists per market.
 """
 
@@ -14,8 +14,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from src.data import yahoo_client
-from src.core.screener import ValueScreener, SharpeScreener, QueryScreener, PullbackScreener
-from src.output.formatter import format_markdown, format_sharpe_markdown, format_query_markdown, format_pullback_markdown
+from src.core.screener import ValueScreener, QueryScreener, PullbackScreener
+from src.output.formatter import format_markdown, format_query_markdown, format_pullback_markdown
 from src.markets.japan import JapanMarket
 from src.markets.us import USMarket
 from src.markets.asean import ASEANMarket
@@ -125,7 +125,7 @@ def run_query_mode(args):
 
 
 def run_legacy_mode(args):
-    """Run screening using the original ValueScreener / SharpeScreener."""
+    """Run screening using the original ValueScreener."""
     # Map region to legacy market names
     region_to_market = {
         "japan": "japan",
@@ -153,16 +153,10 @@ def run_legacy_mode(args):
     for market_name, market_cls in markets_to_run:
         market = market_cls()
 
-        if args.preset == "sharpe-ratio":
-            screener = SharpeScreener(client, market)
-            results = screener.screen(top_n=args.top)
-            print(f"\n## {market.name} - シャープレシオ最適化 スクリーニング結果\n")
-            print(format_sharpe_markdown(results))
-        else:
-            screener = ValueScreener(client, market)
-            results = screener.screen(preset=args.preset, top_n=args.top)
-            print(f"\n## {market.name} - {args.preset} スクリーニング結果\n")
-            print(format_markdown(results))
+        screener = ValueScreener(client, market)
+        results = screener.screen(preset=args.preset, top_n=args.top)
+        print(f"\n## {market.name} - {args.preset} スクリーニング結果\n")
+        print(format_markdown(results))
         print()
 
 
@@ -183,7 +177,7 @@ def main():
     parser.add_argument(
         "--preset",
         default="value",
-        choices=["value", "high-dividend", "growth-value", "deep-value", "quality", "sharpe-ratio", "pullback"],
+        choices=["value", "high-dividend", "growth-value", "deep-value", "quality", "pullback"],
     )
     parser.add_argument(
         "--sector",
@@ -221,11 +215,6 @@ def main():
                 print(f"  - {s}")
             sys.exit(1)
         args.sector = matched
-
-    # sharpe-ratio preset is only available in legacy mode
-    if args.preset == "sharpe-ratio" and args.mode == "query":
-        print("Note: sharpe-ratio preset requires legacy mode. Switching to --mode legacy.")
-        args.mode = "legacy"
 
     # pullback preset always uses query mode (needs EquityQuery + technical analysis)
     if args.preset == "pullback" and args.mode == "legacy":

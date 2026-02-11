@@ -102,36 +102,6 @@ def format_query_markdown(results: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def format_sharpe_markdown(results: list[dict]) -> str:
-    """Format Sharpe Ratio screening results as a Markdown table."""
-    if not results:
-        return "該当する銘柄が見つかりませんでした。（3条件以上を満たす銘柄なし）"
-
-    lines = [
-        "| 順位 | 銘柄 | 株価 | PER | HV30 | 期待リターン | 調整SR | 条件数 | スコア |",
-        "|---:|:-----|-----:|----:|-----:|-----------:|------:|------:|------:|",
-    ]
-
-    for rank, row in enumerate(results, start=1):
-        symbol = row.get("symbol", "-")
-        name = row.get("name") or ""
-        label = f"{symbol} {name}".strip() if name else symbol
-
-        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
-        per = _fmt_float(row.get("per"))
-        hv30 = _fmt_pct(row.get("hv30"))
-        expected_return = _fmt_pct(row.get("expected_return"))
-        adj_sr = _fmt_float(row.get("adjusted_sr"))
-        cond = f"{row.get('conditions_passed', 0)}/4"
-        score = _fmt_float(row.get("final_score"))
-
-        lines.append(
-            f"| {rank} | {label} | {price} | {per} | {hv30} | {expected_return} | {adj_sr} | {cond} | {score} |"
-        )
-
-    return "\n".join(lines)
-
-
 def format_pullback_markdown(results: list[dict]) -> str:
     """Format pullback screening results as a Markdown table."""
     if not results:

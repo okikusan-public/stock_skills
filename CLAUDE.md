@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # スクリーニング実行（EquityQuery方式 - デフォルト）
 python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset value --top 10
 # region: japan / us / asean / sg / th / my / id / ph / hk / kr / tw / cn / all
-# preset: value / high-dividend / growth-value / deep-value / quality / sharpe-ratio / pullback
+# preset: value / high-dividend / growth-value / deep-value / quality / pullback
 # sector (optional): Technology / Financial Services / Healthcare / Consumer Cyclical / Industrials
 #                     Communication Services / Consumer Defensive / Energy / Basic Materials
 #                     Real Estate / Utilities
@@ -22,9 +22,6 @@ python3 .claude/skills/screen-stocks/scripts/run_screen.py --region us --preset 
 
 # Legacy モード（銘柄リスト方式、japan/us/asean のみ）
 python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset value --mode legacy
-
-# シャープレシオ最適化（自動的に legacy モード）
-python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset sharpe-ratio
 
 # 押し目買い型スクリーニング
 python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset pullback
@@ -75,9 +72,8 @@ Core Layer (src/core/)     Market Layer (src/markets/)
   │                        │
   ├─ screener.py           ├─ base.py    … 抽象基底クラス Market
   │   ValueScreener +      ├─ japan.py   … .T suffix, get_region()="jp"
-  │   SharpeScreener +     ├─ us.py      … get_region()="us"
-  │   QueryScreener +      └─ asean.py   … get_region()=["sg","th",...]
-  │   PullbackScreener
+  │   QueryScreener +      ├─ us.py      … get_region()="us"
+  │   PullbackScreener     └─ asean.py   … get_region()=["sg","th",...]
   │
   ├─ query_builder.py      Config Layer (config/)
   │   build_query() →       ├─ screening_presets.yaml
@@ -90,7 +86,7 @@ Core Layer (src/core/)     Market Layer (src/markets/)
   │   calculate_value_score() → 0-100点
   │
   ├─ sharpe.py
-  │   compute_full_sharpe_score() → SR最適化
+  │   calculate_hv() / calculate_upside_downside_vol()
   │
   ├─ concentration.py
   │   compute_hhi() / analyze_concentration()
@@ -114,8 +110,8 @@ Data Layer (src/data/)     Output Layer (src/output/)
   └─ yahoo_client.py         ├─ formatter.py
       get_stock_info()        │   format_markdown()
       get_stock_detail()      │   format_query_markdown()
-      screen_stocks()         │   format_sharpe_markdown()
-      get_price_history()     │   format_pullback_markdown()
+      screen_stocks()         │   format_pullback_markdown()
+      get_price_history()     │
       24時間TTLのJSONキャッシュ│
                               ├─ stress_formatter.py (Team 3)
                               │   format_stress_report()
@@ -124,7 +120,7 @@ Data Layer (src/data/)     Output Layer (src/output/)
                                   format_snapshot() / format_structure_analysis()
 ```
 
-## Four Screening Engines
+## Three Screening Engines
 
 ### QueryScreener（EquityQuery方式 - デフォルト）
 yfinance の EquityQuery API を使い、銘柄リストなしで Yahoo Finance のスクリーナーに直接条件を送信。`query_builder.build_query()` で region/exchange/sector/criteria を EquityQuery に変換し、`yahoo_client.screen_stocks()` で実行。結果は `_normalize_quote()` で正規化後、`calculate_value_score()` でスコア付け。対応地域は約60（jp, us, sg, th, my, id, ph, hk, kr, tw, cn 等）。`--mode query` (デフォルト) で使用。
@@ -132,18 +128,8 @@ yfinance の EquityQuery API を使い、銘柄リストなしで Yahoo Finance 
 ### ValueScreener（バリュースコア方式 - Legacy）
 `config/screening_presets.yaml` の criteria で `apply_filters()` → `calculate_value_score()` の順に処理。スコアは100点満点: PER(25) + PBR(25) + 配当利回り(20) + ROE(15) + 売上成長率(15)。`get_stock_info()` の基本データのみ使用。`--mode legacy` で使用。
 
-### SharpeScreener（シャープレシオ最適化 - Legacy）
-preset が `sharpe-ratio` の場合に使用。`get_stock_detail()` で取得した拡張データ（price_history, 財務諸表）を使い、5条件フレームワークで評価:
-1. **低ボラティリティ**: HV30 < 25%
-2. **割安**: PER < 15 かつ PBR < 1.5
-3. **財務安定性**: 自己資本比率 > 40%、営業CF > 純利益、FCF > 0、debt/EBITDA < 3
-4. **EPS成長**: EPS成長率 > 5%、売上成長率 > 0%、ROE > 8%
-5. カタリスト（未実装）
-
-3条件以上パスで採用（3条件: ×0.8、4条件以上: ×1.0）。final_score = adjusted_sr × multiplier。
-
 ### PullbackScreener（押し目買い型）
-3段パイプライン: EquityQuery(ファンダ) → テクニカル判定(detect_pullback_in_uptrend) → SR計算。
+2段パイプライン: EquityQuery(ファンダ) → テクニカル判定(detect_pullback_in_uptrend)。value_score でスコアリング。
 上昇トレンド中の一時調整（-5%〜-20%）を検出。3条件: (1)株価>200日MA＋50日MA>200日MA、
 (2)60日高値から-5%〜-20%、(3)RSI30-40反転＋出来高低下 or BB下限タッチ。`--preset pullback` で使用。
 
@@ -151,16 +137,16 @@ preset が `sharpe-ratio` の場合に使用。`get_stock_detail()` で取得し
 
 2つのレベルがある:
 - **`get_stock_info(symbol)`**: `ticker.info` のみ。バリュースクリーニング用。キャッシュは `{symbol}.json`。
-- **`get_stock_detail(symbol)`**: `get_stock_info` + price_history(6ヶ月) + balance_sheet + cashflow + income_stmt。SR スクリーニング用。キャッシュは `{symbol}_detail.json`。
+- **`get_stock_detail(symbol)`**: `get_stock_info` + price_history(6ヶ月) + balance_sheet + cashflow + income_stmt。拡張分析用。キャッシュは `{symbol}_detail.json`。
 
 ## Key Design Decisions
 
 - **yahoo_client はモジュール関数**（クラスではない）。`from src.data import yahoo_client` で import し、`yahoo_client.get_stock_info(symbol)` のように使う。
 - **配当利回りの正規化**: yfinance v1.1.0 は `dividendYield` をパーセント値（例: 2.56）で返すことがある。`_normalize_ratio()` が値 > 1 の場合に 100 で割って比率に変換する。
-- **フィールド名のエイリアス**: indicators.py / sharpe.py は yfinance 生キー（`trailingPE`, `priceToBook`）と正規化済みキー（`per`, `pbr`）の両方を `or` で対応する。
+- **フィールド名のエイリアス**: indicators.py は yfinance 生キー（`trailingPE`, `priceToBook`）と正規化済みキー（`per`, `pbr`）の両方を `or` で対応する。
 - **Market クラス**: 各市場は `format_ticker()`、`get_default_symbols()`、`get_thresholds()`、`get_region()`、`get_exchanges()` を提供。`get_thresholds()` は `rf`（無リスク金利）も含む（日本:0.5%, 米国:4%, ASEAN:3%）。
 - **キャッシュ**: `data/cache/` に銘柄ごとのJSONファイル。TTL 24時間。API呼び出しの間に1秒のディレイ。
-- **プリセット**: `config/screening_presets.yaml` で定義。`sharpe-ratio` プリセットは `mode: "sharpe"` を持ち、run_screen.py が SharpeScreener に切り替える。
+- **プリセット**: `config/screening_presets.yaml` で定義。
 
 ## Development Rules
 

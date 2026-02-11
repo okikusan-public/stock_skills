@@ -35,10 +35,6 @@ presets:
       min_roe: 0.15
       min_dividend_yield: 0.02
 
-  sharpe-ratio:
-    description: "シャープレシオ最適化（5条件フレームワーク）"
-    mode: "sharpe"
-
   pullback:
     description: "押し目買い型（上昇トレンド中の一時調整）"
     mode: "pullback"

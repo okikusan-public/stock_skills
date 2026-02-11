@@ -46,7 +46,6 @@ python3 /Users/kikuchihiroyuki/stock-skills/.claude/skills/screen-stocks/scripts
 | 「成長」「グロース」 | growth-value |
 | 「超割安」「ディープバリュー」 | deep-value |
 | 「クオリティ」「高品質」 | quality |
-| 「シャープレシオ」「SR」 | sharpe-ratio |
 | 「押し目」「pullback」 | pullback |
 
 ### sector（--sector オプション）
@@ -89,9 +88,7 @@ python3 /Users/kikuchihiroyuki/stock-skills/.claude/skills/screen-stocks/scripts
 ## スクリーニングモード
 
 - `--mode query` (デフォルト): **EquityQuery方式**。yfinance の EquityQuery API を使い、銘柄リスト不要で条件に合う銘柄を直接検索する。全地域に対応。高速。
-- `--mode legacy`: **銘柄リスト方式**。従来のValueScreener/SharpeScreenerを使用。事前定義した銘柄リスト（日経225、S&P500等）を1銘柄ずつ取得・評価。japan/us/asean のみ対応。sharpe-ratio プリセットはこのモードのみ。
-
-sharpe-ratio プリセットが指定された場合は自動的に legacy モードに切り替わる。
+- `--mode legacy`: **銘柄リスト方式**。従来のValueScreenerを使用。事前定義した銘柄リスト（日経225、S&P500等）を1銘柄ずつ取得・評価。japan/us/asean のみ対応。
 
 ## プリセット
 
@@ -100,7 +97,6 @@ sharpe-ratio プリセットが指定された場合は自動的に legacy モ�
 - `growth-value` : 成長バリュー（成長性＋割安度）
 - `deep-value` : ディープバリュー（非常に低いPER/PBR）
 - `quality` : クオリティバリュー（高ROE＋割安）
-- `sharpe-ratio` : シャープレシオ最適化（5条件フレームワーク。legacy モード専用。実行に時間がかかります）
 - `pullback` : 押し目買い型（上昇トレンド中の一時調整でエントリー。EquityQuery→テクニカル→SR の3段パイプライン。実行に時間がかかります）
 
 ## 出力
@@ -112,9 +108,6 @@ sharpe-ratio プリセットが指定された場合は自動的に legacy モ�
 
 ### Legacy モードの出力列
 順位 / 銘柄 / 株価 / PER / PBR / 配当利回り / ROE / スコア
-
-### Sharpe Ratio モードの出力列
-順位 / 銘柄 / 株価 / PER / HV30 / 期待リターン / 調整SR / 条件数 / スコア
 
 ### Pullback モードの出力列
 順位 / 銘柄 / 株価 / PER / 押し目% / RSI / 出来高比 / SMA50 / SMA200 / スコア
@@ -133,9 +126,6 @@ python3 .../run_screen.py --region hk --preset value
 
 # ASEAN の成長バリュー株（sg, th, my, id, ph を順次実行）
 python3 .../run_screen.py --region asean --preset growth-value
-
-# 日本株のシャープレシオ最適化（自動的に legacy モード）
-python3 .../run_screen.py --region japan --preset sharpe-ratio
 
 # Legacy モードで米国株をスクリーニング
 python3 .../run_screen.py --region us --preset value --mode legacy
