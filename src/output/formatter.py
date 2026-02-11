@@ -108,8 +108,8 @@ def format_pullback_markdown(results: list[dict]) -> str:
         return "押し目条件に合致する銘柄が見つかりませんでした。（上昇トレンド中の押し目銘柄なし）"
 
     lines = [
-        "| 順位 | 銘柄 | 株価 | PER | 押し目% | RSI | 出来高比 | SMA50 | SMA200 | スコア |",
-        "|---:|:-----|-----:|----:|------:|----:|-------:|------:|-------:|------:|",
+        "| 順位 | 銘柄 | 株価 | PER | 押し目% | RSI | 出来高比 | SMA50 | SMA200 | スコア | 一致度 | 総合スコア |",
+        "|---:|:-----|-----:|----:|------:|----:|-------:|------:|-------:|------:|:------:|------:|",
     ]
 
     for rank, row in enumerate(results, start=1):
@@ -124,10 +124,19 @@ def format_pullback_markdown(results: list[dict]) -> str:
         vol_ratio = _fmt_float(row.get("volume_ratio"))
         sma50 = _fmt_float(row.get("sma50"), decimals=0) if row.get("sma50") is not None else "-"
         sma200 = _fmt_float(row.get("sma200"), decimals=0) if row.get("sma200") is not None else "-"
+
+        # Bounce score
+        bounce_score = row.get("bounce_score")
+        bounce_str = f"{bounce_score:.0f}点" if bounce_score is not None else "-"
+
+        # Match type
+        match_type = row.get("match_type", "full")
+        match_str = "★完全一致" if match_type == "full" else "△部分一致"
+
         score = _fmt_float(row.get("final_score"))
 
         lines.append(
-            f"| {rank} | {label} | {price} | {per} | {pullback} | {rsi} | {vol_ratio} | {sma50} | {sma200} | {score} |"
+            f"| {rank} | {label} | {price} | {per} | {pullback} | {rsi} | {vol_ratio} | {sma50} | {sma200} | {bounce_str} | {match_str} | {score} |"
         )
 
     return "\n".join(lines)

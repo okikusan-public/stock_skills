@@ -356,7 +356,18 @@ class PullbackScreener:
             if tech_result is None:
                 continue
 
-            if not tech_result.get("all_conditions"):
+            all_conditions = tech_result.get("all_conditions")
+            bounce_score = tech_result.get("bounce_score", 0)
+
+            if all_conditions:
+                match_type = "full"
+            elif (
+                bounce_score >= 30
+                and tech_result.get("uptrend")
+                and tech_result.get("is_pullback")
+            ):
+                match_type = "partial"
+            else:
                 continue
 
             # Attach technical indicators to the stock dict
@@ -365,6 +376,8 @@ class PullbackScreener:
             stock["volume_ratio"] = tech_result.get("volume_ratio")
             stock["sma50"] = tech_result.get("sma50")
             stock["sma200"] = tech_result.get("sma200")
+            stock["bounce_score"] = bounce_score
+            stock["match_type"] = match_type
             technical_passed.append(stock)
 
         if not technical_passed:
@@ -389,10 +402,20 @@ class PullbackScreener:
                 "volume_ratio": stock.get("volume_ratio"),
                 "sma50": stock.get("sma50"),
                 "sma200": stock.get("sma200"),
-                # Score
-                "final_score": stock.get("value_score", 0.0),
+                # Bounce / match info
+                "bounce_score": stock.get("bounce_score"),
+                "match_type": stock.get("match_type", "full"),
+                # SR (may be None)
+                "adjusted_sr": adjusted_sr,
+                "conditions_passed": conditions_passed,
+                "final_score": final_score,
             })
 
-        # Sort by final_score descending
-        results.sort(key=lambda r: r.get("final_score") or 0.0, reverse=True)
+        # Sort: "full" matches first, then "partial"; within each group by final_score descending
+        results.sort(
+            key=lambda r: (
+                0 if r.get("match_type") == "full" else 1,
+                -(r.get("final_score") or 0.0),
+            ),
+        )
         return results[:top_n]
