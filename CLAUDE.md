@@ -9,8 +9,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# スクリーニング実行
-python3 .claude/skills/screen-stocks/scripts/run_screen.py --market japan --preset value --top 10
+# スクリーニング実行（EquityQuery方式 - デフォルト）
+python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset value --top 10
+# region: japan / us / asean / sg / th / my / id / ph / hk / kr / tw / cn / all
+# preset: value / high-dividend / growth-value / deep-value / quality / sharpe-ratio
+# sector (optional): Technology / Financial Services / Healthcare / Consumer Cyclical / Industrials
+#                     Communication Services / Consumer Defensive / Energy / Basic Materials
+#                     Real Estate / Utilities
+
+# セクター指定の例
+python3 .claude/skills/screen-stocks/scripts/run_screen.py --region us --preset high-dividend --sector Technology
+
+# Legacy モード（銘柄リスト方式、japan/us/asean のみ）
+python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset value --mode legacy
+
+# シャープレシオ最適化（自動的に legacy モード）
+python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset sharpe-ratio
+
+# 後方互換: --market も使用可能
+python3 .claude/skills/screen-stocks/scripts/run_screen.py --market japan --preset value
 
 # 個別銘柄レポート
 python3 .claude/skills/stock-report/scripts/generate_report.py 7203.T
@@ -19,6 +36,7 @@ python3 .claude/skills/stock-report/scripts/generate_report.py 7203.T
 python3 .claude/skills/watchlist/scripts/manage_watchlist.py list
 python3 .claude/skills/watchlist/scripts/manage_watchlist.py add my-list 7203.T AAPL
 python3 .claude/skills/watchlist/scripts/manage_watchlist.py show my-list
+python3 .claude/skills/watchlist/scripts/manage_watchlist.py remove my-list 7203.T
 
 # 依存インストール
 pip install -r requirements.txt
@@ -34,38 +52,74 @@ Skills Layer (.claude/skills/*/SKILL.md)
       │
 Script Layer (.claude/skills/*/scripts/*.py)
   → エントリーポイント。CLIでも直接実行可能
+  → sys.path.insert で project root を追加して src/ を import する
       │
   ┌───┴────────────────────┐
   │                        │
 Core Layer (src/core/)     Market Layer (src/markets/)
   │                        │
   ├─ screener.py           ├─ base.py    … 抽象基底クラス Market
-  │   ValueScreener が     ├─ japan.py   … .T suffix, Nikkei225
-  │   全体を統合           ├─ us.py      … suffix なし, S&P500
-  │                        └─ asean.py   … .SI/.BK/.KL/.JK/.PS
+  │   ValueScreener +      ├─ japan.py   … .T suffix, get_region()="jp"
+  │   SharpeScreener +     ├─ us.py      … get_region()="us"
+  │   QueryScreener        └─ asean.py   … get_region()=["sg","th",...]
+  │
+  ├─ query_builder.py      Config Layer (config/)
+  │   build_query() →       ├─ screening_presets.yaml
+  │   EquityQuery 構築      └─ exchanges.yaml … 取引所ナレッジ
+  │
   ├─ filters.py
   │   apply_filters()
   │
-  └─ indicators.py
-      calculate_value_score() → 0-100点
+  ├─ indicators.py
+  │   calculate_value_score() → 0-100点
+  │
+  └─ sharpe.py
+      compute_full_sharpe_score() → SR最適化
       │
-Data Layer (src/data/)
-  └─ yahoo_client.py
-      get_stock_info() / get_multiple_stocks()
-      24時間TTLのJSONキャッシュ (data/cache/)
+Data Layer (src/data/)     Output Layer (src/output/)
+  └─ yahoo_client.py         └─ formatter.py
+      get_stock_info()            format_markdown()
+      get_stock_detail()          format_query_markdown()
+      screen_stocks()             format_sharpe_markdown()
+      24時間TTLのJSONキャッシュ
 ```
+
+## Three Screening Engines
+
+### QueryScreener（EquityQuery方式 - デフォルト）
+yfinance の EquityQuery API を使い、銘柄リストなしで Yahoo Finance のスクリーナーに直接条件を送信。`query_builder.build_query()` で region/exchange/sector/criteria を EquityQuery に変換し、`yahoo_client.screen_stocks()` で実行。結果は `_normalize_quote()` で正規化後、`calculate_value_score()` でスコア付け。対応地域は約60（jp, us, sg, th, my, id, ph, hk, kr, tw, cn 等）。`--mode query` (デフォルト) で使用。
+
+### ValueScreener（バリュースコア方式 - Legacy）
+`config/screening_presets.yaml` の criteria で `apply_filters()` → `calculate_value_score()` の順に処理。スコアは100点満点: PER(25) + PBR(25) + 配当利回り(20) + ROE(15) + 売上成長率(15)。`get_stock_info()` の基本データのみ使用。`--mode legacy` で使用。
+
+### SharpeScreener（シャープレシオ最適化 - Legacy）
+preset が `sharpe-ratio` の場合に使用。`get_stock_detail()` で取得した拡張データ（price_history, 財務諸表）を使い、5条件フレームワークで評価:
+1. **低ボラティリティ**: HV30 < 25%
+2. **割安**: PER < 15 かつ PBR < 1.5
+3. **財務安定性**: 自己資本比率 > 40%、営業CF > 純利益、FCF > 0、debt/EBITDA < 3
+4. **EPS成長**: EPS成長率 > 5%、売上成長率 > 0%、ROE > 8%
+5. カタリスト（未実装）
+
+3条件以上パスで採用（3条件: ×0.8、4条件以上: ×1.0）。final_score = adjusted_sr × multiplier。
+
+## yahoo_client のデータ取得パターン
+
+2つのレベルがある:
+- **`get_stock_info(symbol)`**: `ticker.info` のみ。バリュースクリーニング用。キャッシュは `{symbol}.json`。
+- **`get_stock_detail(symbol)`**: `get_stock_info` + price_history(6ヶ月) + balance_sheet + cashflow + income_stmt。SR スクリーニング用。キャッシュは `{symbol}_detail.json`。
 
 ## Key Design Decisions
 
 - **yahoo_client はモジュール関数**（クラスではない）。`from src.data import yahoo_client` で import し、`yahoo_client.get_stock_info(symbol)` のように使う。
 - **配当利回りの正規化**: yfinance v1.1.0 は `dividendYield` をパーセント値（例: 2.56）で返すことがある。`_normalize_ratio()` が値 > 1 の場合に 100 で割って比率に変換する。
-- **スクリーニングプリセット**: `config/screening_presets.yaml` に5種類定義。各プリセットは `max_per`、`max_pbr`、`min_dividend_yield`、`min_roe`、`min_revenue_growth` の組み合わせ。
-- **Market クラス**: 各市場は `format_ticker()`（取引所サフィックスの付与）、`get_default_symbols()`（デフォルト銘柄リスト）、`get_thresholds()`（市場固有の閾値）を提供する。
+- **フィールド名のエイリアス**: indicators.py / sharpe.py は yfinance 生キー（`trailingPE`, `priceToBook`）と正規化済みキー（`per`, `pbr`）の両方を `or` で対応する。
+- **Market クラス**: 各市場は `format_ticker()`、`get_default_symbols()`、`get_thresholds()`、`get_region()`、`get_exchanges()` を提供。`get_thresholds()` は `rf`（無リスク金利）も含む（日本:0.5%, 米国:4%, ASEAN:3%）。
 - **キャッシュ**: `data/cache/` に銘柄ごとのJSONファイル。TTL 24時間。API呼び出しの間に1秒のディレイ。
+- **プリセット**: `config/screening_presets.yaml` で定義。`sharpe-ratio` プリセットは `mode: "sharpe"` を持ち、run_screen.py が SharpeScreener に切り替える。
 
 ## Development Rules
 
-- Python 3.10+
+- Python 3.10+、依存は yfinance, pyyaml, numpy
 - データ取得は必ず `src/data/yahoo_client.py` 経由（直接 yfinance を呼ばない）
 - 新しい市場を追加する場合は `src/markets/base.py` の `Market` を継承
-- `data/cache/`、`data/watchlists/` は gitignore 済み
+- `data/cache/`、`data/watchlists/`、`data/screening_results/` は gitignore 済み

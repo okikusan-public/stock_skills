@@ -4,10 +4,30 @@ from .base import Market
 
 
 class JapanMarket(Market):
-    """Tokyo Stock Exchange (.T suffix)."""
+    """Tokyo Stock Exchange (.T suffix).
+
+    EquityQuery region: ``jp``
+    EquityQuery exchange: ``JPX`` (東証プライム・スタンダード・グロース)
+    """
 
     name = "日本株"
     SUFFIX = ".T"
+
+    # -- EquityQuery support ------------------------------------------------
+
+    def get_region(self) -> str:
+        """Return 'jp' for yfinance EquityQuery."""
+        return "jp"
+
+    def get_exchanges(self) -> list[str]:
+        """Return JPX as the primary exchange.
+
+        FKA (福岡) and SAP (札幌) are available but rarely needed for
+        mainstream screening.  Callers may override if needed.
+        """
+        return ["JPX"]
+
+    # -- Ticker formatting --------------------------------------------------
 
     def format_ticker(self, code: str) -> str:
         """Convert a stock code to a TSE ticker.
@@ -21,6 +41,8 @@ class JapanMarket(Market):
         if code.isdigit() and len(code) == 4:
             return f"{code}{self.SUFFIX}"
         return f"{code}{self.SUFFIX}"
+
+    # -- Default symbol list (fallback) ------------------------------------
 
     def get_default_symbols(self) -> list[str]:
         """Major Nikkei 225 constituents (approx. 25 symbols)."""
@@ -60,6 +82,8 @@ class JapanMarket(Market):
             "6301.T",  # Komatsu
             "7751.T",  # Canon
         ]
+
+    # -- Thresholds --------------------------------------------------------
 
     def get_thresholds(self) -> dict:
         """Japanese market specific thresholds."""

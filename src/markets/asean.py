@@ -3,7 +3,7 @@
 from .base import Market
 
 
-# Exchange suffix mapping
+# Exchange suffix mapping (kept for format_ticker backward compatibility)
 EXCHANGE_SUFFIXES = {
     "SGX": ".SI",   # Singapore Exchange
     "SET": ".BK",   # Stock Exchange of Thailand
@@ -12,11 +12,68 @@ EXCHANGE_SUFFIXES = {
     "PSE": ".PS",   # Philippine Stock Exchange
 }
 
+# Mapping from legacy exchange name to EquityQuery region code
+_REGION_MAP = {
+    "SGX": "sg",
+    "SET": "th",
+    "KLSE": "my",
+    "IDX": "id",
+    "PSE": "ph",
+}
+
+# Mapping from legacy exchange name to EquityQuery exchange code
+_EXCHANGE_CODE_MAP = {
+    "SGX": "SES",
+    "SET": "SET",
+    "KLSE": "KLS",
+    "IDX": "JKT",
+    "PSE": "PHP",
+}
+
 
 class ASEANMarket(Market):
-    """ASEAN equities across multiple exchanges."""
+    """ASEAN equities across multiple exchanges.
+
+    EquityQuery regions: ``sg``, ``th``, ``my``, ``id``, ``ph``
+    EquityQuery exchanges: ``SES``, ``SET``, ``KLS``, ``JKT``, ``PHP``
+    """
 
     name = "ASEAN株"
+
+    # -- EquityQuery support ------------------------------------------------
+
+    def get_region(self) -> list[str]:
+        """Return all ASEAN region codes for yfinance EquityQuery.
+
+        Returns a list because ASEAN spans multiple yfinance regions:
+        sg (Singapore), th (Thailand), my (Malaysia), id (Indonesia),
+        ph (Philippines).
+        """
+        return ["sg", "th", "my", "id", "ph"]
+
+    def get_exchanges(self) -> list[str]:
+        """Return all ASEAN exchange codes for yfinance EquityQuery.
+
+        SES = Singapore Exchange, SET = Stock Exchange of Thailand,
+        KLS = Bursa Malaysia, JKT = Indonesia Stock Exchange,
+        PHP = Philippine Stock Exchange.
+        """
+        return ["SES", "SET", "KLS", "JKT", "PHP"]
+
+    def get_equity_query(self) -> dict:
+        """Return a base EquityQuery filter dict for ASEAN markets.
+
+        Overrides the base implementation to provide multi-region support.
+        The ``region`` key contains a list of region codes and ``exchanges``
+        contains the corresponding exchange codes.  The caller / EquityQuery
+        builder should OR these together.
+        """
+        return {
+            "region": self.get_region(),
+            "exchanges": self.get_exchanges(),
+        }
+
+    # -- Ticker formatting --------------------------------------------------
 
     def format_ticker(self, code: str) -> str:
         """Format a ticker, adding exchange suffix if not already present.
@@ -42,7 +99,7 @@ class ASEANMarket(Market):
         return code
 
     # ------------------------------------------------------------------
-    # Default symbols per country
+    # Default symbols per country (fallback)
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -116,6 +173,8 @@ class ASEANMarket(Market):
             + self._indonesia_symbols()
             + self._philippines_symbols()
         )
+
+    # -- Thresholds --------------------------------------------------------
 
     def get_thresholds(self) -> dict:
         """ASEAN market specific thresholds."""

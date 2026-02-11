@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import yfinance as yf
+from yfinance import EquityQuery
 
 
 CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "cache"
@@ -347,3 +348,50 @@ def get_stock_detail(symbol: str) -> Optional[dict]:
     except Exception as e:
         print(f"[yahoo_client] Error fetching detail for {symbol}: {e}")
         return None
+
+
+# ---------------------------------------------------------------------------
+# EquityQuery-based screening via yf.screen()
+# ---------------------------------------------------------------------------
+
+def screen_stocks(
+    query: EquityQuery,
+    size: int = 250,
+    sort_field: str = "intradaymarketcap",
+    sort_asc: bool = False,
+) -> list[dict]:
+    """Screen stocks using yfinance EquityQuery + yf.screen().
+
+    Parameters
+    ----------
+    query : EquityQuery
+        Pre-built EquityQuery object containing all screening conditions.
+    size : int
+        Maximum number of results to request (max 250 for yf.screen).
+    sort_field : str
+        Field to sort results by (default: market cap descending).
+    sort_asc : bool
+        Sort ascending if True, descending if False.
+
+    Returns
+    -------
+    list[dict]
+        List of quote dicts returned by yf.screen(). Each dict contains
+        raw Yahoo Finance fields such as 'symbol', 'shortName',
+        'regularMarketPrice', 'trailingPE', 'priceToBook',
+        'dividendYield', 'returnOnEquity', etc.
+        Returns an empty list on error.
+    """
+    try:
+        response = yf.screen(query, size=size, sortField=sort_field, sortAsc=sort_asc)
+        if response is None:
+            print("[yahoo_client] yf.screen() returned None")
+            return []
+        quotes = response.get("quotes", [])
+        if not isinstance(quotes, list):
+            print(f"[yahoo_client] Unexpected quotes type: {type(quotes)}")
+            return []
+        return quotes
+    except Exception as e:
+        print(f"[yahoo_client] Error in screen_stocks: {e}")
+        return []

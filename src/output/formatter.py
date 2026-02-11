@@ -58,6 +58,50 @@ def format_markdown(results: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def format_query_markdown(results: list[dict]) -> str:
+    """Format EquityQuery screening results as a Markdown table.
+
+    Includes sector column since QueryScreener results span diverse sectors.
+
+    Parameters
+    ----------
+    results : list[dict]
+        Each dict should contain: symbol, name, price, per, pbr,
+        dividend_yield, roe, value_score, sector.
+
+    Returns
+    -------
+    str
+        A Markdown-formatted table string.
+    """
+    if not results:
+        return "該当する銘柄が見つかりませんでした。"
+
+    lines = [
+        "| 順位 | 銘柄 | セクター | 株価 | PER | PBR | 配当利回り | ROE | スコア |",
+        "|---:|:-----|:---------|-----:|----:|----:|---------:|----:|------:|",
+    ]
+
+    for rank, row in enumerate(results, start=1):
+        symbol = row.get("symbol", "-")
+        name = row.get("name") or ""
+        label = f"{symbol} {name}".strip() if name else symbol
+        sector = row.get("sector") or "-"
+
+        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
+        per = _fmt_float(row.get("per"))
+        pbr = _fmt_float(row.get("pbr"))
+        div_yield = _fmt_pct(row.get("dividend_yield"))
+        roe = _fmt_pct(row.get("roe"))
+        score = _fmt_float(row.get("value_score"))
+
+        lines.append(
+            f"| {rank} | {label} | {sector} | {price} | {per} | {pbr} | {div_yield} | {roe} | {score} |"
+        )
+
+    return "\n".join(lines)
+
+
 def format_sharpe_markdown(results: list[dict]) -> str:
     """Format Sharpe Ratio screening results as a Markdown table."""
     if not results:

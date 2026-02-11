@@ -1,0 +1,193 @@
+# 取引所ナレッジ: yfinance EquityQuery 用の地域・取引所マッピング
+#
+# region:        yfinance EquityQuery で指定する地域コード
+# region_name:   表示用の地域名（日本語）
+# exchanges:     yfinance EquityQuery の exchange フィールドで利用可能な取引所コード
+# currency:      主要通貨コード
+# thresholds:    スクリーニングのデフォルト閾値
+#   per_max:            PER 上限
+#   pbr_max:            PBR 上限
+#   dividend_yield_min: 配当利回り下限（比率）
+#   roe_min:            ROE 下限（比率）
+#   rf:                 無リスク金利（長期国債利回り目安）
+
+regions:
+  jp:
+    region_name: "日本"
+    exchanges:
+      - code: "JPX"
+        name: "東京証券取引所（プライム・スタンダード・グロース）"
+      - code: "FKA"
+        name: "福岡証券取引所"
+      - code: "SAP"
+        name: "札幌証券取引所"
+    currency: "JPY"
+    ticker_suffix: ".T"
+    thresholds:
+      per_max: 15.0
+      pbr_max: 1.0
+      dividend_yield_min: 0.025
+      roe_min: 0.08
+      rf: 0.005
+
+  us:
+    region_name: "米国"
+    exchanges:
+      - code: "NMS"
+        name: "NASDAQ Global Select Market"
+      - code: "NYQ"
+        name: "New York Stock Exchange"
+      - code: "ASE"
+        name: "NYSE American (旧AMEX)"
+      - code: "NGM"
+        name: "NASDAQ Global Market"
+      - code: "NCM"
+        name: "NASDAQ Capital Market"
+      - code: "PCX"
+        name: "NYSE Arca"
+      - code: "PNK"
+        name: "OTC Pink Sheets"
+    currency: "USD"
+    ticker_suffix: ""
+    thresholds:
+      per_max: 20.0
+      pbr_max: 3.0
+      dividend_yield_min: 0.02
+      roe_min: 0.10
+      rf: 0.04
+
+  sg:
+    region_name: "シンガポール"
+    exchanges:
+      - code: "SES"
+        name: "Singapore Exchange"
+    currency: "SGD"
+    ticker_suffix: ".SI"
+    thresholds:
+      per_max: 15.0
+      pbr_max: 1.5
+      dividend_yield_min: 0.03
+      roe_min: 0.08
+      rf: 0.03
+
+  th:
+    region_name: "タイ"
+    exchanges:
+      - code: "SET"
+        name: "Stock Exchange of Thailand"
+    currency: "THB"
+    ticker_suffix: ".BK"
+    thresholds:
+      per_max: 15.0
+      pbr_max: 1.5
+      dividend_yield_min: 0.03
+      roe_min: 0.08
+      rf: 0.025
+
+  my:
+    region_name: "マレーシア"
+    exchanges:
+      - code: "KLS"
+        name: "Bursa Malaysia"
+    currency: "MYR"
+    ticker_suffix: ".KL"
+    thresholds:
+      per_max: 15.0
+      pbr_max: 1.5
+      dividend_yield_min: 0.03
+      roe_min: 0.08
+      rf: 0.035
+
+  id:
+    region_name: "インドネシア"
+    exchanges:
+      - code: "JKT"
+        name: "Indonesia Stock Exchange (IDX)"
+    currency: "IDR"
+    ticker_suffix: ".JK"
+    thresholds:
+      per_max: 15.0
+      pbr_max: 1.5
+      dividend_yield_min: 0.03
+      roe_min: 0.08
+      rf: 0.065
+
+  ph:
+    region_name: "フィリピン"
+    exchanges:
+      - code: "PHP"
+        name: "Philippine Stock Exchange (メインボード)"
+      - code: "PHS"
+        name: "Philippine Stock Exchange (スモールボード)"
+    currency: "PHP"
+    ticker_suffix: ".PS"
+    thresholds:
+      per_max: 15.0
+      pbr_max: 1.5
+      dividend_yield_min: 0.03
+      roe_min: 0.08
+      rf: 0.055
+
+  # --- 将来拡張用 ---
+
+  hk:
+    region_name: "香港"
+    exchanges:
+      - code: "HKG"
+        name: "Hong Kong Stock Exchange"
+    currency: "HKD"
+    ticker_suffix: ".HK"
+    thresholds:
+      per_max: 12.0
+      pbr_max: 1.0
+      dividend_yield_min: 0.03
+      roe_min: 0.08
+      rf: 0.035
+
+  kr:
+    region_name: "韓国"
+    exchanges:
+      - code: "KSC"
+        name: "Korea Exchange (KOSPI)"
+      - code: "KOE"
+        name: "Korea Exchange (KOSDAQ)"
+    currency: "KRW"
+    ticker_suffix: ".KS"
+    thresholds:
+      per_max: 12.0
+      pbr_max: 1.0
+      dividend_yield_min: 0.025
+      roe_min: 0.08
+      rf: 0.03
+
+  tw:
+    region_name: "台湾"
+    exchanges:
+      - code: "TAI"
+        name: "Taiwan Stock Exchange (TWSE)"
+      - code: "TWO"
+        name: "Taipei Exchange (TPEx)"
+    currency: "TWD"
+    ticker_suffix: ".TW"
+    thresholds:
+      per_max: 15.0
+      pbr_max: 2.0
+      dividend_yield_min: 0.03
+      roe_min: 0.08
+      rf: 0.01
+
+  cn:
+    region_name: "中国"
+    exchanges:
+      - code: "SHH"
+        name: "Shanghai Stock Exchange"
+      - code: "SHZ"
+        name: "Shenzhen Stock Exchange"
+    currency: "CNY"
+    ticker_suffix: ".SS"
+    thresholds:
+      per_max: 15.0
+      pbr_max: 1.5
+      dividend_yield_min: 0.02
+      roe_min: 0.08
+      rf: 0.025
