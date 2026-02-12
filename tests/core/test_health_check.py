@@ -195,15 +195,17 @@ class TestCheckChangeQuality:
         assert result["passed_count"] < 3
 
     def test_empty_detail(self):
+        # KIK-357: Empty dict is detected as ETF → quality_label="対象外"
         result = check_change_quality({})
         assert result["change_score"] == 0
-        assert result["quality_label"] == "複数悪化"
+        assert result["quality_label"] == "対象外"
+        assert result["is_etf"] is True
 
     def test_result_keys(self):
         result = check_change_quality(_good_stock_detail())
         expected_keys = {
             "change_score", "quality_pass", "passed_count",
-            "indicators", "earnings_penalty", "quality_label",
+            "indicators", "earnings_penalty", "quality_label", "is_etf",
         }
         assert set(result.keys()) == expected_keys
 
@@ -240,7 +242,8 @@ class TestComputeAlertLevel:
         assert result["level"] == ALERT_EXIT
         assert result["emoji"] == "\U0001f6a8"
 
-    def test_exit_trend_collapse(self):
+    def test_dead_cross_good_fundamentals_is_caution(self):
+        """KIK-357: Dead cross + good fundamentals → CAUTION (not EXIT)."""
         trend = {
             "trend": "下降",
             "price_above_sma50": False,
@@ -250,8 +253,8 @@ class TestComputeAlertLevel:
         }
         change = {"quality_label": "良好"}
         result = compute_alert_level(trend, change)
-        assert result["level"] == ALERT_EXIT
-        assert "トレンド崩壊" in result["reasons"][0]
+        assert result["level"] == ALERT_CAUTION
+        assert "CAUTION" in result["reasons"][0]
 
     def test_caution_sma_approaching_plus_quality_down(self):
         trend = {
@@ -439,3 +442,132 @@ class TestFormatHealthCheck:
         result = format_health_check(data)
         assert "撤退" in result
         assert "exit" in result
+
+
+# ===================================================================
+# _is_etf tests (KIK-357)
+# ===================================================================
+
+class TestIsEtf:
+
+    def test_empty_dict_is_etf(self):
+        from src.core.health_check import _is_etf
+        assert _is_etf({}) is True
+
+    def test_quote_type_etf(self):
+        from src.core.health_check import _is_etf
+        assert _is_etf({"quoteType": "ETF"}) is True
+
+    def test_stock_with_sector_not_etf(self):
+        from src.core.health_check import _is_etf
+        assert _is_etf({"sector": "Technology", "net_income_stmt": 100}) is False
+
+    def test_partial_data_not_etf(self):
+        from src.core.health_check import _is_etf
+        # Having sector only is enough to not be ETF
+        assert _is_etf({"sector": "Healthcare"}) is False
+
+
+# ===================================================================
+# ETF alert behavior tests (KIK-357 Bug 1)
+# ===================================================================
+
+class TestETFAlertBehavior:
+
+    def test_etf_quality_label_is_excluded(self):
+        result = check_change_quality({})
+        assert result["quality_label"] == "対象外"
+        assert result["is_etf"] is True
+
+    def test_etf_with_uptrend_no_alert(self):
+        trend = {
+            "trend": "上昇",
+            "price_above_sma50": True,
+            "dead_cross": False,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+        }
+        change = {"quality_label": "対象外"}
+        result = compute_alert_level(trend, change)
+        assert result["level"] == ALERT_NONE
+
+    def test_etf_dead_cross_is_caution_not_exit(self):
+        trend = {
+            "trend": "下降",
+            "price_above_sma50": False,
+            "dead_cross": True,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+        }
+        change = {"quality_label": "対象外"}
+        result = compute_alert_level(trend, change)
+        assert result["level"] == ALERT_CAUTION
+
+    def test_etf_sma50_break_is_early_warning(self):
+        trend = {
+            "trend": "横ばい",
+            "price_above_sma50": False,
+            "dead_cross": False,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+            "current_price": 98.0,
+            "sma50": 100.0,
+        }
+        change = {"quality_label": "対象外"}
+        result = compute_alert_level(trend, change)
+        assert result["level"] == ALERT_EARLY_WARNING
+
+
+# ===================================================================
+# Dead cross with good fundamentals tests (KIK-357 Bug 2)
+# ===================================================================
+
+class TestDeadCrossWithGoodFundamentals:
+
+    def test_dead_cross_good_fundamentals_is_caution(self):
+        trend = {
+            "trend": "下降",
+            "price_above_sma50": False,
+            "dead_cross": True,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+        }
+        change = {"quality_label": "良好"}
+        result = compute_alert_level(trend, change)
+        assert result["level"] == ALERT_CAUTION
+
+    def test_dead_cross_one_indicator_down_is_exit(self):
+        trend = {
+            "trend": "下降",
+            "price_above_sma50": False,
+            "dead_cross": True,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+        }
+        change = {"quality_label": "1指標↓"}
+        result = compute_alert_level(trend, change)
+        assert result["level"] == ALERT_EXIT
+
+    def test_dead_cross_multiple_deterioration_is_exit(self):
+        trend = {
+            "trend": "下降",
+            "price_above_sma50": False,
+            "dead_cross": True,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+        }
+        change = {"quality_label": "複数悪化"}
+        result = compute_alert_level(trend, change)
+        assert result["level"] == ALERT_EXIT
+
+    def test_dead_cross_etf_is_caution(self):
+        trend = {
+            "trend": "下降",
+            "price_above_sma50": False,
+            "dead_cross": True,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+        }
+        change = {"quality_label": "対象外"}
+        result = compute_alert_level(trend, change)
+        assert result["level"] == ALERT_CAUTION

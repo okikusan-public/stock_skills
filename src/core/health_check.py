@@ -112,6 +112,20 @@ def check_trend_health(hist: Optional[pd.DataFrame]) -> dict:
     }
 
 
+def _is_etf(stock_detail: dict) -> bool:
+    """Return True if stock_detail looks like an ETF (lacks fundamental data)."""
+    if stock_detail.get("quoteType") == "ETF":
+        return True
+    info = stock_detail.get("info", stock_detail)
+    has_sector = info.get("sector") is not None
+    has_net_income = stock_detail.get("net_income_stmt") is not None
+    has_operating_cf = stock_detail.get("operating_cashflow") is not None
+    has_revenue_hist = stock_detail.get("revenue_history") is not None
+    if not has_sector and not has_net_income and not has_operating_cf and not has_revenue_hist:
+        return True
+    return False
+
+
 def check_change_quality(stock_detail: dict) -> dict:
     """Evaluate change quality (alpha signal) of a holding.
 
@@ -129,6 +143,17 @@ def check_change_quality(stock_detail: dict) -> dict:
         Keys: change_score, quality_pass, passed_count, indicators,
         earnings_penalty, quality_label.
     """
+    if _is_etf(stock_detail):
+        return {
+            "change_score": 0,
+            "quality_pass": False,
+            "passed_count": 0,
+            "indicators": {},
+            "earnings_penalty": 0,
+            "quality_label": "対象外",
+            "is_etf": True,
+        }
+
     from src.core.alpha import compute_change_score
 
     result = compute_change_score(stock_detail)
@@ -154,6 +179,7 @@ def check_change_quality(stock_detail: dict) -> dict:
         },
         "earnings_penalty": result.get("earnings_penalty", 0),
         "quality_label": quality_label,
+        "is_etf": False,
     }
 
 
@@ -177,39 +203,62 @@ def compute_alert_level(trend_health: dict, change_quality: dict) -> dict:
     price_above_sma50 = trend_health.get("price_above_sma50", True)
     sma50_approaching = trend_health.get("sma50_approaching_sma200", False)
 
-    # --- EXIT ---
-    if dead_cross and quality_label == "複数悪化":
-        level = ALERT_EXIT
-        reasons.append("デッドクロス + 変化スコア複数悪化")
-    elif dead_cross and trend == "下降":
-        level = ALERT_EXIT
-        reasons.append("トレンド崩壊（デッドクロス）")
+    if quality_label == "対象外":
+        # ETF: evaluate technical conditions only (no quality data)
+        if not price_above_sma50:
+            level = ALERT_EARLY_WARNING
+            sma50_val = trend_health.get("sma50", 0)
+            price_val = trend_health.get("current_price", 0)
+            reasons.append(f"SMA50を下回り（現在{price_val}、SMA50={sma50_val}）")
+        if dead_cross:
+            level = ALERT_CAUTION
+            reasons.append("デッドクロス")
+        if rsi_drop:
+            if level == ALERT_NONE:
+                level = ALERT_EARLY_WARNING
+            rsi_val = trend_health.get("rsi", 0)
+            reasons.append(f"RSI急低下（{rsi_val}）")
+    else:
+        # --- EXIT ---
+        # KIK-357: EXIT requires technical collapse AND fundamental deterioration.
+        # Dead cross + good fundamentals = CAUTION (not EXIT).
+        if dead_cross and quality_label == "複数悪化":
+            level = ALERT_EXIT
+            reasons.append("デッドクロス + 変化スコア複数悪化")
+        elif dead_cross and trend == "下降":
+            if quality_label == "良好":
+                level = ALERT_CAUTION
+                reasons.append("デッドクロス（ファンダメンタル良好のためCAUTION）")
+            else:
+                # quality_label is "1指標↓" — technical + fundamental confirm
+                level = ALERT_EXIT
+                reasons.append("トレンド崩壊（デッドクロス + ファンダ悪化）")
 
-    # --- CAUTION ---
-    elif sma50_approaching and quality_label in ("1指標↓", "複数悪化"):
-        level = ALERT_CAUTION
-        if quality_label == "複数悪化":
+        # --- CAUTION ---
+        elif sma50_approaching and quality_label in ("1指標↓", "複数悪化"):
+            level = ALERT_CAUTION
+            if quality_label == "複数悪化":
+                reasons.append("変化スコア複数悪化")
+            else:
+                reasons.append("変化スコア1指標悪化")
+            reasons.append("SMA50がSMA200に接近")
+        elif quality_label == "複数悪化":
+            level = ALERT_CAUTION
             reasons.append("変化スコア複数悪化")
-        else:
-            reasons.append("変化スコア1指標悪化")
-        reasons.append("SMA50がSMA200に接近")
-    elif quality_label == "複数悪化":
-        level = ALERT_CAUTION
-        reasons.append("変化スコア複数悪化")
 
-    # --- EARLY WARNING ---
-    elif not price_above_sma50:
-        level = ALERT_EARLY_WARNING
-        sma50_val = trend_health.get("sma50", 0)
-        price_val = trend_health.get("current_price", 0)
-        reasons.append(f"SMA50を下回り（現在{price_val}、SMA50={sma50_val}）")
-    elif rsi_drop:
-        level = ALERT_EARLY_WARNING
-        rsi_val = trend_health.get("rsi", 0)
-        reasons.append(f"RSI急低下（{rsi_val}）")
-    elif quality_label == "1指標↓":
-        level = ALERT_EARLY_WARNING
-        reasons.append("変化スコア1指標悪化")
+        # --- EARLY WARNING ---
+        elif not price_above_sma50:
+            level = ALERT_EARLY_WARNING
+            sma50_val = trend_health.get("sma50", 0)
+            price_val = trend_health.get("current_price", 0)
+            reasons.append(f"SMA50を下回り（現在{price_val}、SMA50={sma50_val}）")
+        elif rsi_drop:
+            level = ALERT_EARLY_WARNING
+            rsi_val = trend_health.get("rsi", 0)
+            reasons.append(f"RSI急低下（{rsi_val}）")
+        elif quality_label == "1指標↓":
+            level = ALERT_EARLY_WARNING
+            reasons.append("変化スコア1指標悪化")
 
     level_map = {
         ALERT_NONE: ("", "なし"),
