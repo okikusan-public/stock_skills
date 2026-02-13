@@ -210,13 +210,13 @@ class TestEstimateFromHistory:
             "dividend_yield": 0.0,
         }
         result = _estimate_from_history(detail)
-        # Optimistic capped at 50%
-        assert result["optimistic"] == 0.50
+        # Optimistic capped at 30%
+        assert result["optimistic"] == 0.30
         # Spread preserved: all 3 scenarios different
         assert result["optimistic"] > result["base"]
         assert result["base"] > result["pessimistic"]
         # Base shifted down from cap to make room for spread
-        assert result["base"] < 0.50
+        assert result["base"] < 0.30
 
     def test_moderate_growth_cagr(self):
         """CAGR for moderate growth produces reasonable estimate."""

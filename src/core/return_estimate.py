@@ -154,11 +154,12 @@ def _estimate_from_history(stock_detail: dict) -> dict:
     monthly_std = math.sqrt(variance)
     annual_std = monthly_std * math.sqrt(12)
 
-    # Scenarios: base ± 1 standard deviation, capped at ±50%
+    # Scenarios: base ± 1 standard deviation, capped at ±30%
+    _CAP = 0.30
     spread = max(0.05, annual_std) if annual_std > 0 else 0.05
-    base = max(-0.50, min(0.50, cagr))
-    optimistic = min(0.50, base + spread)
-    pessimistic = max(-0.50, base - spread)
+    base = max(-_CAP, min(_CAP, cagr))
+    optimistic = min(_CAP, base + spread)
+    pessimistic = max(-_CAP, base - spread)
 
     # If base is at cap, shift down to make room for spread
     if optimistic == base:
