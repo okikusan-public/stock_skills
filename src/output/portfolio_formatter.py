@@ -550,3 +550,135 @@ def format_trade_result(result: dict, action: str) -> str:
 
     lines.append("")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# format_return_estimate (KIK-359)
+# ---------------------------------------------------------------------------
+
+def format_return_estimate(estimate: dict) -> str:
+    """Format portfolio return estimation as a Markdown report.
+
+    Parameters
+    ----------
+    estimate : dict
+        Output from return_estimate.estimate_portfolio_return().
+        Expected keys:
+        - "positions": list[dict] with per-stock estimates
+        - "portfolio": {"optimistic": float, "base": float, "pessimistic": float}
+        - "total_value_jpy": float
+        - "fx_rates": dict
+
+    Returns
+    -------
+    str
+        Markdown-formatted return estimation report.
+    """
+    lines: list[str] = []
+
+    portfolio = estimate.get("portfolio", {})
+    positions = estimate.get("positions", [])
+    total_value = estimate.get("total_value_jpy", 0)
+
+    if not positions:
+        lines.append("## \u63a8\u5b9a\u5229\u56de\u308a\uff0812\u30f6\u6708\uff09")
+        lines.append("")
+        lines.append("\u4fdd\u6709\u9298\u67c4\u304c\u3042\u308a\u307e\u305b\u3093\u3002")
+        return "\n".join(lines)
+
+    # --- Portfolio summary ---
+    lines.append("## \u63a8\u5b9a\u5229\u56de\u308a\uff0812\u30f6\u6708\uff09")
+    lines.append("")
+
+    lines.append("| \u30b7\u30ca\u30ea\u30aa | \u5229\u56de\u308a | \u640d\u76ca\u984d |")
+    lines.append("|:---------|------:|------:|")
+
+    for label, key in [
+        ("\u697d\u89b3", "optimistic"),
+        ("\u30d9\u30fc\u30b9", "base"),
+        ("\u60b2\u89b3", "pessimistic"),
+    ]:
+        ret = portfolio.get(key)
+        if ret is not None:
+            pnl_amount = ret * total_value if total_value else 0
+            lines.append(
+                f"| {label} | {_fmt_pct_sign(ret)} | {_fmt_jpy(pnl_amount)} |"
+            )
+        else:
+            lines.append(f"| {label} | - | - |")
+
+    lines.append("")
+    lines.append(f"\u7dcf\u8a55\u4fa1\u984d: {_fmt_jpy(total_value)}")
+    lines.append("")
+
+    # --- Per-stock details ---
+    for pos in positions:
+        symbol = pos.get("symbol", "-")
+        base_ret = pos.get("base")
+        method = pos.get("method", "")
+        currency = pos.get("currency", "USD")
+
+        # Header
+        base_str = _fmt_pct_sign(base_ret) if base_ret is not None else "-"
+        lines.append(f"### {symbol} \u671f\u5f85\u30ea\u30bf\u30fc\u30f3: {base_str}\uff08\u30d9\u30fc\u30b9\uff09")
+        lines.append("")
+
+        # Quantitative section
+        if method == "analyst":
+            target_mean = pos.get("target_mean")
+            analyst_count = pos.get("analyst_count")
+            forward_per = pos.get("forward_per")
+
+            target_str = _fmt_currency_value(target_mean, currency) if target_mean else "-"
+            count_str = f"{analyst_count}\u540d" if analyst_count else "-"
+            fpe_str = f"{forward_per:.1f}x" if forward_per else "-"
+            confidence = "\u53c2\u8003\u5024" if (analyst_count or 0) < 5 else ""
+            confidence_suffix = f" \u203b{confidence}" if confidence else ""
+
+            lines.append(
+                f"\u3010\u5b9a\u91cf\u3011\u30a2\u30ca\u30ea\u30b9\u30c8\u76ee\u6a19 {target_str}"
+                f"\uff08{count_str}\uff09"
+                f"\u3001Forward PER {fpe_str}"
+                f"{confidence_suffix}"
+            )
+        else:
+            data_months = pos.get("data_months", 0)
+            lines.append(
+                f"\u3010\u5b9a\u91cf\u3011\u904e\u53bb\u30ea\u30bf\u30fc\u30f3\u5206\u5e03"
+                f"\uff08{data_months}\u30f6\u6708\u5206\uff09"
+            )
+
+        # News section
+        news = pos.get("news", [])
+        if news:
+            lines.append("\u3010\u30cb\u30e5\u30fc\u30b9\u3011")
+            for item in news[:5]:
+                title = item.get("title", "")
+                publisher = item.get("publisher", "")
+                if title:
+                    pub_str = f" ({publisher})" if publisher else ""
+                    lines.append(f"  - {title}{pub_str}")
+
+        # X Sentiment section
+        x_sentiment = pos.get("x_sentiment")
+        if x_sentiment and (x_sentiment.get("positive") or x_sentiment.get("negative")):
+            lines.append("\u3010X \u30bb\u30f3\u30c1\u30e1\u30f3\u30c8\u3011")
+            for factor in (x_sentiment.get("positive") or [])[:3]:
+                lines.append(f"  \u25b2 {factor}")
+            for factor in (x_sentiment.get("negative") or [])[:3]:
+                lines.append(f"  \u25bc {factor}")
+
+        # 3-scenario summary
+        opt = pos.get("optimistic")
+        base_r = pos.get("base")
+        pess = pos.get("pessimistic")
+        if opt is not None and base_r is not None and pess is not None:
+            lines.append(
+                f"  \u2192 \u60b2\u89b3 {_fmt_pct_sign(pess)} / "
+                f"\u30d9\u30fc\u30b9 {_fmt_pct_sign(base_r)} / "
+                f"\u697d\u89b3 {_fmt_pct_sign(opt)}"
+            )
+
+        lines.append("")
+
+    return "\n".join(lines)

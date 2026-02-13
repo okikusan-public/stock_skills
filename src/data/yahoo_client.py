@@ -403,10 +403,23 @@ def get_stock_detail(symbol: str) -> Optional[dict]:
         # --- Additional info fields ---
         total_debt: Optional[float] = None
         ebitda: Optional[float] = None
+        target_high_price: Optional[float] = None
+        target_low_price: Optional[float] = None
+        target_mean_price: Optional[float] = None
+        number_of_analyst_opinions: Optional[int] = None
+        recommendation_mean: Optional[float] = None
+        forward_eps: Optional[float] = None
         try:
             info = ticker.info
             total_debt = _safe_get(info, "totalDebt")
             ebitda = _safe_get(info, "ebitda")
+            target_high_price = _safe_get(info, "targetHighPrice")
+            target_low_price = _safe_get(info, "targetLowPrice")
+            target_mean_price = _safe_get(info, "targetMeanPrice")
+            number_of_analyst_opinions_val = _safe_get(info, "numberOfAnalystOpinions")
+            number_of_analyst_opinions = int(number_of_analyst_opinions_val) if number_of_analyst_opinions_val is not None else None
+            recommendation_mean = _safe_get(info, "recommendationMean")
+            forward_eps = _safe_get(info, "forwardEps")
         except Exception:
             pass
 
@@ -420,6 +433,13 @@ def get_stock_detail(symbol: str) -> Optional[dict]:
             "fcf": fcf,
             "total_debt": total_debt,
             "ebitda": ebitda,
+            # Analyst fields (KIK-359)
+            "target_high_price": target_high_price,
+            "target_low_price": target_low_price,
+            "target_mean_price": target_mean_price,
+            "number_of_analyst_opinions": number_of_analyst_opinions,
+            "recommendation_mean": recommendation_mean,
+            "forward_eps": forward_eps,
             "eps_current": eps_current,
             "eps_previous": eps_previous,
             "eps_growth": eps_growth,
@@ -566,3 +586,57 @@ def get_price_history(symbol: str, period: str = "1y") -> Optional[pd.DataFrame]
     except Exception as e:
         print(f"[yahoo_client] Error fetching price history for {symbol}: {e}")
         return None
+
+
+# ---------------------------------------------------------------------------
+# News
+# ---------------------------------------------------------------------------
+
+def get_stock_news(symbol: str, count: int = 10) -> list[dict]:
+    """Fetch recent news for a stock symbol.
+
+    Returns a list of news items with title, publisher, link, and publish time.
+    No caching is applied because news freshness is important.
+
+    Parameters
+    ----------
+    symbol : str
+        Stock ticker symbol (e.g. "AAPL", "7203.T").
+    count : int
+        Maximum number of news items to return (default 10).
+
+    Returns
+    -------
+    list[dict]
+        Each dict contains: title, publisher, link, publish_time (ISO format str).
+        Returns an empty list on error.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        raw_news = ticker.news
+        if not raw_news:
+            return []
+
+        results = []
+        for item in raw_news[:count]:
+            content = item.get("content", item)  # yfinance wraps in "content" sometimes
+            if isinstance(content, dict):
+                publish_time = content.get("pubDate") or content.get("providerPublishTime")
+            else:
+                publish_time = item.get("providerPublishTime")
+
+            # Handle providerPublishTime as unix timestamp
+            if isinstance(publish_time, (int, float)):
+                publish_time = datetime.fromtimestamp(publish_time).isoformat()
+
+            news_item = {
+                "title": content.get("title", "") if isinstance(content, dict) else item.get("title", ""),
+                "publisher": content.get("provider", {}).get("displayName", "") if isinstance(content, dict) else item.get("publisher", ""),
+                "link": content.get("canonicalUrl", {}).get("url", "") if isinstance(content, dict) else item.get("link", ""),
+                "publish_time": str(publish_time) if publish_time else "",
+            }
+            results.append(news_item)
+        return results
+    except Exception as e:
+        print(f"[yahoo_client] Error fetching news for {symbol}: {e}")
+        return []

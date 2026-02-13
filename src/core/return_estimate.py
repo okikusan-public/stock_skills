@@ -1,0 +1,354 @@
+"""Portfolio return estimation with 3 scenarios (KIK-359).
+
+Estimates portfolio returns across optimistic/base/pessimistic scenarios
+using two methods:
+- Stocks with analyst coverage: target price-based returns
+- ETFs (no analyst coverage): historical percentile-based returns
+
+Optionally integrates Grok API sentiment data when XAI_API_KEY is set.
+"""
+
+import math
+from typing import Optional
+
+
+def _is_etf(stock_detail: dict) -> bool:
+    """Check if a symbol is likely an ETF (no analyst coverage)."""
+    # ETFs typically have no analyst target prices
+    if stock_detail.get("target_mean_price") is not None:
+        return False
+    # quoteType from yfinance info
+    quote_type = stock_detail.get("quoteType", "")
+    if quote_type == "ETF":
+        return True
+    # No sector is a strong ETF signal
+    if not stock_detail.get("sector"):
+        return True
+    return False
+
+
+def _estimate_from_analyst(stock_detail: dict) -> dict:
+    """Estimate returns from analyst target prices.
+
+    Formula:
+        scenario_return = (target_price - current_price) / current_price + dividend_yield
+
+    Returns
+    -------
+    dict
+        {"optimistic": float, "base": float, "pessimistic": float,
+         "method": "analyst", "analyst_count": int|None,
+         "target_high": float|None, "target_mean": float|None, "target_low": float|None,
+         "recommendation_mean": float|None, "forward_per": float|None}
+    """
+    price = stock_detail.get("price")
+    if not price or price <= 0:
+        return _empty_estimate("analyst")
+
+    target_high = stock_detail.get("target_high_price")
+    target_mean = stock_detail.get("target_mean_price")
+    target_low = stock_detail.get("target_low_price")
+    dividend_yield = stock_detail.get("dividend_yield") or 0.0
+
+    optimistic = None
+    base = None
+    pessimistic = None
+
+    if target_high is not None:
+        optimistic = (target_high - price) / price + dividend_yield
+    if target_mean is not None:
+        base = (target_mean - price) / price + dividend_yield
+    if target_low is not None:
+        pessimistic = (target_low - price) / price + dividend_yield
+
+    # Fallback: if some targets are missing, use available ones
+    if base is None and optimistic is not None and pessimistic is not None:
+        base = (optimistic + pessimistic) / 2
+    if optimistic is None and base is not None:
+        optimistic = base * 1.5 if base > 0 else base * 0.5
+    if pessimistic is None and base is not None:
+        pessimistic = base * 0.5 if base > 0 else base * 1.5
+
+    analyst_count_val = stock_detail.get("number_of_analyst_opinions")
+    analyst_count = int(analyst_count_val) if analyst_count_val is not None else None
+
+    return {
+        "optimistic": optimistic,
+        "base": base,
+        "pessimistic": pessimistic,
+        "method": "analyst",
+        "analyst_count": analyst_count,
+        "target_high": target_high,
+        "target_mean": target_mean,
+        "target_low": target_low,
+        "recommendation_mean": stock_detail.get("recommendation_mean"),
+        "forward_per": stock_detail.get("forward_per"),
+    }
+
+
+def _estimate_from_history(stock_detail: dict) -> dict:
+    """Estimate returns from historical price data (for ETFs).
+
+    Uses monthly returns from price_history to compute percentile-based
+    scenarios, annualized.
+
+    Formula:
+        optimistic = 75th percentile monthly return * 12 + dividend_yield
+        base       = 50th percentile (median) monthly return * 12 + dividend_yield
+        pessimistic = 25th percentile monthly return * 12 + dividend_yield
+
+    Returns
+    -------
+    dict
+        {"optimistic": float, "base": float, "pessimistic": float,
+         "method": "historical", ...}
+    """
+    price_history = stock_detail.get("price_history")
+    dividend_yield = stock_detail.get("dividend_yield") or 0.0
+
+    if not price_history or len(price_history) < 22:
+        # Not enough data (need at least ~1 month of daily prices)
+        return _empty_estimate("historical")
+
+    # Compute monthly returns (~21 trading days per month)
+    monthly_returns = []
+    step = 21
+    for i in range(step, len(price_history), step):
+        prev = price_history[i - step]
+        curr = price_history[i]
+        if prev > 0:
+            monthly_returns.append((curr - prev) / prev)
+
+    if not monthly_returns:
+        return _empty_estimate("historical")
+
+    # Sort for percentile calculation
+    sorted_returns = sorted(monthly_returns)
+    n = len(sorted_returns)
+
+    def percentile(p: float) -> float:
+        """Compute p-th percentile (0-100)."""
+        idx = (p / 100.0) * (n - 1)
+        lower = int(math.floor(idx))
+        upper = min(lower + 1, n - 1)
+        frac = idx - lower
+        return sorted_returns[lower] * (1 - frac) + sorted_returns[upper] * frac
+
+    # Annualize monthly returns (multiply by 12)
+    p75 = percentile(75) * 12
+    p50 = percentile(50) * 12
+    p25 = percentile(25) * 12
+
+    return {
+        "optimistic": p75 + dividend_yield,
+        "base": p50 + dividend_yield,
+        "pessimistic": p25 + dividend_yield,
+        "method": "historical",
+        "analyst_count": None,
+        "target_high": None,
+        "target_mean": None,
+        "target_low": None,
+        "recommendation_mean": None,
+        "forward_per": None,
+        "data_months": n,
+    }
+
+
+def _empty_estimate(method: str) -> dict:
+    """Return an empty estimate dict."""
+    return {
+        "optimistic": None,
+        "base": None,
+        "pessimistic": None,
+        "method": method,
+        "analyst_count": None,
+        "target_high": None,
+        "target_mean": None,
+        "target_low": None,
+        "recommendation_mean": None,
+        "forward_per": None,
+    }
+
+
+def estimate_stock_return(
+    symbol: str,
+    stock_detail: dict,
+    news: Optional[list] = None,
+    x_sentiment: Optional[dict] = None,
+) -> dict:
+    """Estimate return for a single stock/ETF.
+
+    Parameters
+    ----------
+    symbol : str
+        Ticker symbol.
+    stock_detail : dict
+        Output from yahoo_client.get_stock_detail().
+    news : list, optional
+        News items from yahoo_client.get_stock_news().
+    x_sentiment : dict, optional
+        Sentiment data from grok_client.search_x_sentiment().
+
+    Returns
+    -------
+    dict
+        {
+            "symbol": str,
+            "name": str,
+            "price": float,
+            "currency": str,
+            "optimistic": float|None,
+            "base": float|None,
+            "pessimistic": float|None,
+            "method": "analyst"|"historical",
+            "analyst_count": int|None,
+            "target_high": float|None,
+            "target_mean": float|None,
+            "target_low": float|None,
+            "recommendation_mean": float|None,
+            "forward_per": float|None,
+            "dividend_yield": float|None,
+            "news": list,
+            "x_sentiment": dict|None,
+        }
+    """
+    if _is_etf(stock_detail):
+        estimate = _estimate_from_history(stock_detail)
+    else:
+        estimate = _estimate_from_analyst(stock_detail)
+
+    return {
+        "symbol": symbol,
+        "name": stock_detail.get("name") or "",
+        "price": stock_detail.get("price"),
+        "currency": stock_detail.get("currency") or "USD",
+        "dividend_yield": stock_detail.get("dividend_yield"),
+        **estimate,
+        "news": news or [],
+        "x_sentiment": x_sentiment,
+    }
+
+
+def estimate_portfolio_return(csv_path: str, yahoo_client_module) -> dict:
+    """Estimate returns for the entire portfolio.
+
+    Fetches detailed data for each position, computes per-stock estimates,
+    and calculates a weighted average for the portfolio.
+
+    Parameters
+    ----------
+    csv_path : str
+        Path to portfolio CSV.
+    yahoo_client_module
+        The yahoo_client module (for get_stock_detail, get_stock_news).
+
+    Returns
+    -------
+    dict
+        {
+            "positions": list[dict],  # per-stock estimates
+            "portfolio": {
+                "optimistic": float|None,
+                "base": float|None,
+                "pessimistic": float|None,
+            },
+            "total_value_jpy": float,
+            "fx_rates": dict,
+        }
+    """
+    from src.core.portfolio_manager import load_portfolio, get_fx_rates, _infer_currency
+
+    # Optional: Grok API
+    try:
+        from src.data import grok_client
+        use_grok = grok_client.is_available()
+    except ImportError:
+        use_grok = False
+
+    portfolio = load_portfolio(csv_path)
+    if not portfolio:
+        return {
+            "positions": [],
+            "portfolio": {"optimistic": None, "base": None, "pessimistic": None},
+            "total_value_jpy": 0.0,
+            "fx_rates": {"JPY": 1.0},
+        }
+
+    # Fetch FX rates
+    fx_rates = get_fx_rates(yahoo_client_module)
+
+    # Process each position
+    position_estimates = []
+    for pos in portfolio:
+        symbol = pos["symbol"]
+
+        # Get detailed stock data (includes analyst fields)
+        stock_detail = yahoo_client_module.get_stock_detail(symbol)
+        if stock_detail is None:
+            continue
+
+        # Get news
+        news = yahoo_client_module.get_stock_news(symbol)
+
+        # Get X sentiment (if available)
+        x_sentiment = None
+        if use_grok:
+            company_name = stock_detail.get("name") or ""
+            try:
+                x_sentiment = grok_client.search_x_sentiment(symbol, company_name)
+            except Exception:
+                pass
+
+        # Estimate returns
+        estimate = estimate_stock_return(symbol, stock_detail, news, x_sentiment)
+
+        # Add position weight info
+        price = stock_detail.get("price") or 0
+        shares = pos["shares"]
+        market_currency = stock_detail.get("currency") or _infer_currency(symbol)
+        fx_rate = fx_rates.get(market_currency, 1.0)
+        value_jpy = price * shares * fx_rate
+
+        estimate["shares"] = shares
+        estimate["cost_price"] = pos["cost_price"]
+        estimate["cost_currency"] = pos.get("cost_currency", "JPY")
+        estimate["value_jpy"] = round(value_jpy, 0)
+
+        position_estimates.append(estimate)
+
+    # Calculate portfolio-level weighted average returns
+    total_value_jpy = sum(e.get("value_jpy", 0) for e in position_estimates)
+
+    portfolio_optimistic = 0.0
+    portfolio_base = 0.0
+    portfolio_pessimistic = 0.0
+    has_valid = False
+
+    for est in position_estimates:
+        if total_value_jpy <= 0:
+            break
+        weight = est.get("value_jpy", 0) / total_value_jpy
+
+        if est.get("optimistic") is not None:
+            portfolio_optimistic += est["optimistic"] * weight
+            has_valid = True
+        if est.get("base") is not None:
+            portfolio_base += est["base"] * weight
+        if est.get("pessimistic") is not None:
+            portfolio_pessimistic += est["pessimistic"] * weight
+
+    if not has_valid:
+        portfolio_return = {"optimistic": None, "base": None, "pessimistic": None}
+    else:
+        portfolio_return = {
+            "optimistic": round(portfolio_optimistic, 4),
+            "base": round(portfolio_base, 4),
+            "pessimistic": round(portfolio_pessimistic, 4),
+        }
+
+    return {
+        "positions": position_estimates,
+        "portfolio": portfolio_return,
+        "total_value_jpy": round(total_value_jpy, 0),
+        "fx_rates": fx_rates,
+    }
