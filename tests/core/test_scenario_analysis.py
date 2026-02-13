@@ -576,3 +576,117 @@ class TestMatchTargetKIK354:
     def test_non_tech_excludes_tech(self):
         assert _match_target("非テック株", "Technology", "USD", "US") is False
         assert _match_target("非テック株", "Communication Services", "USD", "US") is False
+
+
+# ===================================================================
+# KIK-358: ETF asset class matching
+# ===================================================================
+
+
+class TestETFAssetClassMapping:
+    """Tests for ETF asset class detection (KIK-358)."""
+
+    def test_gldm_is_gold(self):
+        from src.core.scenario_analysis import _get_etf_asset_class
+        assert _get_etf_asset_class("GLDM", {}) == "金・安全資産"
+
+    def test_tlt_is_bond(self):
+        from src.core.scenario_analysis import _get_etf_asset_class
+        assert _get_etf_asset_class("TLT", {}) == "長期債"
+
+    def test_jepi_is_equity_income(self):
+        from src.core.scenario_analysis import _get_etf_asset_class
+        assert _get_etf_asset_class("JEPI", {}) == "株式インカム"
+
+    def test_regular_stock_returns_none(self):
+        from src.core.scenario_analysis import _get_etf_asset_class
+        assert _get_etf_asset_class("AAPL", {}) is None
+
+    def test_unknown_etf_falls_back_to_equity_income(self):
+        from src.core.scenario_analysis import _get_etf_asset_class
+        assert _get_etf_asset_class("XYZ", {"quoteType": "ETF"}) == "株式インカム"
+
+    def test_match_target_gold_etf(self):
+        assert _match_target("金・安全資産", None, "USD", "US", etf_asset_class="金・安全資産") is True
+
+    def test_match_target_bond_etf(self):
+        assert _match_target("長期債", None, "USD", "US", etf_asset_class="長期債") is True
+
+    def test_match_target_equity_income_as_cyclical(self):
+        """株式インカムETF should also match シクリカル株."""
+        assert _match_target("シクリカル株", None, "USD", "US", etf_asset_class="株式インカム") is True
+
+    def test_match_target_no_etf_class_no_match(self):
+        """Without etf_asset_class, 金・安全資産 should not match sector=None."""
+        assert _match_target("金・安全資産", None, "USD", "US") is False
+
+
+class TestETFScenarioImpact:
+    """Tests for ETF scenario impact calculations (KIK-358)."""
+
+    def _make_etf(self, symbol, **overrides):
+        base = {
+            "symbol": symbol,
+            "name": symbol,
+            "sector": None,
+            "price": 50.0,
+            "beta": 0.5,
+            "currency": "USD",
+            "country": "US",
+            "quoteType": "ETF",
+        }
+        base.update(overrides)
+        return base
+
+    def test_gldm_positive_in_tech_crash(self):
+        """GLDM (gold) should have positive impact in tech_crash (金・安全資産 +6%)."""
+        stock = self._make_etf("GLDM", beta=0.1)
+        scenario = SCENARIOS["tech_crash"]
+        result = compute_stock_scenario_impact(stock, {}, scenario)
+        # Should match 金・安全資産 +6%, not fallback to base_shock
+        assert result["direct_impact"] > 0
+
+    def test_tlt_negative_in_inflation(self):
+        """TLT (bonds) should be negatively impacted in inflation_resurgence (長期債 -10%)."""
+        stock = self._make_etf("TLT", beta=0.2)
+        scenario = SCENARIOS["inflation_resurgence"]
+        result = compute_stock_scenario_impact(stock, {}, scenario)
+        # Should match 長期債 -10%
+        assert result["direct_impact"] < -0.05
+
+    def test_jepi_matches_cyclical_in_recession(self):
+        """JEPI (equity income) should match シクリカル株 in us_recession."""
+        stock = self._make_etf("JEPI", beta=0.66)
+        scenario = SCENARIOS["us_recession"]
+        result = compute_stock_scenario_impact(stock, {}, scenario)
+        # Should match シクリカル株 -35%, adjusted by beta
+        assert result["direct_impact"] < -0.15
+
+    def test_etfs_not_all_same_impact(self):
+        """GLDM, JEPI, TLT should NOT all have the same impact in recession."""
+        gldm = self._make_etf("GLDM", beta=0.1)
+        jepi = self._make_etf("JEPI", beta=0.66)
+        tlt = self._make_etf("TLT", beta=0.2)
+        scenario = SCENARIOS["us_recession"]
+
+        r_gldm = compute_stock_scenario_impact(gldm, {}, scenario)
+        r_jepi = compute_stock_scenario_impact(jepi, {}, scenario)
+        r_tlt = compute_stock_scenario_impact(tlt, {}, scenario)
+
+        # They should NOT all be the same (the original bug)
+        impacts = {r_gldm["direct_impact"], r_jepi["direct_impact"], r_tlt["direct_impact"]}
+        assert len(impacts) > 1, "ETFs should have different impacts based on asset class"
+
+    def test_gldm_less_negative_than_equity_in_yen_appreciation(self):
+        """GLDM (gold) should be less negative than equity ETF in yen_appreciation.
+
+        Both match 全外貨資産 (-13%), but GLDM also matches 金・安全資産 (+5%)
+        which partially offsets the forex loss.
+        """
+        gldm = self._make_etf("GLDM", beta=0.1)
+        jepi = self._make_etf("JEPI", beta=0.66)
+        scenario = SCENARIOS["yen_appreciation"]
+        r_gldm = compute_stock_scenario_impact(gldm, {}, scenario)
+        r_jepi = compute_stock_scenario_impact(jepi, {}, scenario)
+        # Gold benefit should make GLDM less negative than equity ETF
+        assert r_gldm["direct_impact"] > r_jepi["direct_impact"]

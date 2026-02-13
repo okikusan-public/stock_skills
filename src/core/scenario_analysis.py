@@ -261,6 +261,41 @@ _SUFFIX_TO_REGION = {
     ".PS": "Philippines",
 }
 
+# ETF → 資産クラスマッピング（ティッカーベース）
+_ETF_ASSET_CLASS = {
+    # 金・安全資産
+    "GLDM": "金・安全資産",
+    "GLD": "金・安全資産",
+    "IAU": "金・安全資産",
+    "SGOL": "金・安全資産",
+    # 長期債
+    "TLT": "長期債",
+    "IEF": "長期債",
+    "BND": "長期債",
+    "AGG": "長期債",
+    "VGLT": "長期債",
+    # 株式インカム
+    "JEPI": "株式インカム",
+    "JEPQ": "株式インカム",
+    "SCHD": "株式インカム",
+    "VYM": "株式インカム",
+    "HDV": "株式インカム",
+    "SPYD": "株式インカム",
+}
+
+
+def _get_etf_asset_class(symbol: str, stock_info: dict) -> Optional[str]:
+    """Return the ETF asset class if the symbol is a known ETF, else None."""
+    # Strip suffix for lookup (e.g., "1326.T" -> not in mapping, just use symbol)
+    base_symbol = symbol.split(".")[0] if "." in symbol else symbol
+    asset_class = _ETF_ASSET_CLASS.get(base_symbol)
+    if asset_class:
+        return asset_class
+    # quoteType fallback
+    if stock_info.get("quoteType") == "ETF":
+        return "株式インカム"  # Default ETF class (conservative equity)
+    return None
+
 
 def _infer_currency(symbol: str, stock_info: dict) -> str:
     """銘柄の通貨を推定する。stock_info['currency'] があればそちら優先。"""
@@ -333,6 +368,7 @@ def _match_target(
     sector: Optional[str],
     currency: str,
     region: str,
+    etf_asset_class: Optional[str] = None,
 ) -> bool:
     """シナリオのtargetが銘柄の属性にマッチするか判定。"""
     # 地域ベースのマッチング
@@ -360,6 +396,17 @@ def _match_target(
         if sector_list is None:
             return True
         return sector in sector_list if sector else False
+
+    # ETF資産クラスマッチング（KIK-358）
+    # 非株式ETF（金・債券）は自分の資産クラスのみマッチ
+    if etf_asset_class:
+        if etf_asset_class in ("金・安全資産", "長期債"):
+            return target == etf_asset_class
+        if target == etf_asset_class:
+            return True
+        # 株式インカムETFはシクリカル株としても反応する
+        if etf_asset_class == "株式インカム" and target == "シクリカル株":
+            return True
 
     # 非テック株: テクノロジー・通信以外の全セクター
     if target == "非テック株":
@@ -413,6 +460,7 @@ def compute_stock_scenario_impact(
     region = _infer_region(symbol, stock_info)
     price = _safe_float(stock_info.get("price"))
     beta = _safe_float(stock_info.get("beta"), default=1.0)
+    etf_asset_class = _get_etf_asset_class(symbol, stock_info)
 
     effects = scenario.get("effects", {})
     base_shock = _safe_float(scenario.get("base_shock"))
@@ -431,7 +479,7 @@ def compute_stock_scenario_impact(
             target = effect.get("target", "")
             impact = _safe_float(effect.get("impact"))
             reason = effect.get("reason", "")
-            if _match_target(target, sector, currency, region):
+            if _match_target(target, sector, currency, region, etf_asset_class):
                 matched_impacts.append(impact)
                 sign = "+" if impact >= 0 else ""
                 causal_chain.append(
