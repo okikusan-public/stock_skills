@@ -20,6 +20,8 @@ SCENARIOS = {
                 {"target": "輸出企業", "impact": +0.06, "reason": "円安メリット"},
                 {"target": "内需企業", "impact": -0.07, "reason": "コスト増"},
                 {"target": "銀行", "impact": +0.06, "reason": "利ザヤ改善"},
+                {"target": "金・安全資産", "impact": +0.03, "reason": "リスク回避で一部資金流入"},
+                {"target": "長期債", "impact": -0.10, "reason": "債券安（トリプル安の一角）"},
             ],
             "currency": {"usd_jpy_change": +15, "impact_on_foreign": +0.097},
             "offset": ["輸出企業の円安メリット", "銀行の金利上昇メリット"],
@@ -38,6 +40,8 @@ SCENARIOS = {
             ],
             "secondary": [
                 {"target": "全外貨資産", "impact": -0.05, "reason": "介入→急反転リスク(165→158)"},
+                {"target": "金・安全資産", "impact": +0.03, "reason": "ドル高でも金価格は底堅い"},
+                {"target": "長期債", "impact": -0.03, "reason": "金利差拡大で債券価格下落"},
             ],
             "currency": {"usd_jpy_change": +10, "impact_on_foreign": +0.065},
             "offset": ["輸出企業メリット"],
@@ -57,6 +61,8 @@ SCENARIOS = {
                 {"target": "日本輸出株", "impact": -0.15, "reason": "需要減"},
                 {"target": "ASEAN株", "impact": -0.10, "reason": "資金引き揚げ"},
                 {"target": "ディフェンシブ株", "impact": -0.05, "reason": "相対的に耐性"},
+                {"target": "金・安全資産", "impact": +0.08, "reason": "安全資産需要（リスク回避）"},
+                {"target": "長期債", "impact": +0.10, "reason": "利下げ期待で債券価格上昇"},
             ],
             "currency": {"usd_jpy_change": -10, "impact_on_foreign": -0.065},
             "offset": ["ディフェンシブ銘柄", "円高で外貨建て資産のヘッジ効果"],
@@ -76,6 +82,8 @@ SCENARIOS = {
             "secondary": [
                 {"target": "高配当株", "impact": -0.05, "reason": "債券との比較劣後"},
                 {"target": "円建て外貨資産", "impact": -0.05, "reason": "円高"},
+                {"target": "金・安全資産", "impact": -0.02, "reason": "金利上昇で機会コスト増"},
+                {"target": "長期債", "impact": -0.05, "reason": "金利上昇で債券価格下落"},
             ],
             "currency": {"usd_jpy_change": -8, "impact_on_foreign": -0.052},
             "offset": ["銀行セクター上昇", "円高で輸入コスト低下"],
@@ -94,6 +102,8 @@ SCENARIOS = {
             "secondary": [
                 {"target": "ASEAN株", "impact": +0.05, "reason": "サプライチェーン移転先"},
                 {"target": "防衛関連", "impact": +0.08, "reason": "地政学リスク"},
+                {"target": "金・安全資産", "impact": +0.08, "reason": "地政学リスクで安全資産需要"},
+                {"target": "長期債", "impact": +0.03, "reason": "質への逃避（国債需要）"},
             ],
             "currency": {"usd_jpy_change": -3, "impact_on_foreign": -0.02},
             "offset": ["ASEANへの生産移転メリット", "防衛関連上昇"],
@@ -113,6 +123,7 @@ SCENARIOS = {
                 {"target": "エネルギー株", "impact": +0.10, "reason": "原油高"},
                 {"target": "素材株", "impact": +0.05, "reason": "資源価格上昇"},
                 {"target": "消費関連", "impact": -0.08, "reason": "購買力低下"},
+                {"target": "金・安全資産", "impact": +0.08, "reason": "インフレヘッジ需要"},
             ],
             "currency": {"usd_jpy_change": +5, "impact_on_foreign": +0.032},
             "offset": ["コモディティ関連の上昇", "インフレヘッジ資産"],
@@ -132,6 +143,7 @@ SCENARIOS = {
                 {"target": "非テック株", "impact": -0.08, "reason": "リスクオフ波及"},
                 {"target": "ディフェンシブ株", "impact": -0.03, "reason": "質への逃避で相対的に耐性"},
                 {"target": "金・安全資産", "impact": +0.06, "reason": "安全資産需要"},
+                {"target": "長期債", "impact": +0.05, "reason": "質への逃避で国債需要"},
             ],
             "currency": {"usd_jpy_change": -8, "impact_on_foreign": -0.052},
             "offset": ["ディフェンシブ銘柄の耐性", "金・債券への資金逃避", "円高による外貨資産圧縮"],
@@ -150,6 +162,7 @@ SCENARIOS = {
             "secondary": [
                 {"target": "日本内需株", "impact": +0.04, "reason": "輸入コスト減"},
                 {"target": "金・安全資産", "impact": +0.05, "reason": "ドル安で金価格上昇"},
+                {"target": "長期債", "impact": +0.03, "reason": "利下げ環境で債券需要"},
             ],
             "currency": {"usd_jpy_change": -20, "impact_on_foreign": -0.131},
             "offset": ["内需企業の輸入コスト低下", "日本国内消費改善"],
@@ -371,6 +384,25 @@ def _match_target(
     etf_asset_class: Optional[str] = None,
 ) -> bool:
     """シナリオのtargetが銘柄の属性にマッチするか判定。"""
+    # 通貨ベースのマッチング（ETF含む全銘柄に適用）
+    if target in ("円建て", "円建て外貨資産") and currency == "JPY":
+        return True
+    if target == "全外貨資産" and currency != "JPY":
+        return True
+
+    # ETF資産クラスマッチング（KIK-358）
+    # 非株式ETF（金・債券）は自分の資産クラスのみマッチ
+    # 地域マッチングより先に判定し、"米国株全般" 等への誤マッチを防ぐ
+    if etf_asset_class:
+        if etf_asset_class in ("金・安全資産", "長期債"):
+            return target == etf_asset_class
+        if target == etf_asset_class:
+            return True
+        # 株式インカムETFはシクリカル株としても反応する
+        if etf_asset_class == "株式インカム" and target == "シクリカル株":
+            return True
+        # 株式インカムETFは地域マッチングにもフォールスルー
+
     # 地域ベースのマッチング
     if target == "日本株全般" and region == "Japan":
         return True
@@ -382,10 +414,6 @@ def _match_target(
         return True
     if target == "中国関連株" and region in ("China", "Hong Kong"):
         return True
-    if target in ("円建て", "円建て外貨資産") and currency == "JPY":
-        return True
-    if target == "全外貨資産" and currency != "JPY":
-        return True
     if target in ("日本輸出株", "輸出企業") and region == "Japan":
         sector_list = _TARGET_TO_SECTORS.get(target)
         if sector_list is None:
@@ -396,17 +424,6 @@ def _match_target(
         if sector_list is None:
             return True
         return sector in sector_list if sector else False
-
-    # ETF資産クラスマッチング（KIK-358）
-    # 非株式ETF（金・債券）は自分の資産クラスのみマッチ
-    if etf_asset_class:
-        if etf_asset_class in ("金・安全資産", "長期債"):
-            return target == etf_asset_class
-        if target == etf_asset_class:
-            return True
-        # 株式インカムETFはシクリカル株としても反応する
-        if etf_asset_class == "株式インカム" and target == "シクリカル株":
-            return True
 
     # 非テック株: テクノロジー・通信以外の全セクター
     if target == "非テック株":
