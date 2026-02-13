@@ -11,6 +11,7 @@ from src.core.health_check import (
     ALERT_EARLY_WARNING,
     ALERT_CAUTION,
     ALERT_EXIT,
+    _is_etf,
     check_trend_health,
     check_change_quality,
     compute_alert_level,
@@ -466,6 +467,46 @@ class TestIsEtf:
         from src.core.health_check import _is_etf
         # Having sector only is enough to not be ETF
         assert _is_etf({"sector": "Healthcare"}) is False
+
+
+# ===================================================================
+# _is_etf falsy value tests (KIK-357)
+# ===================================================================
+
+class TestIsEtfFalsyValues:
+    """KIK-357: _is_etf() must detect falsy values ([], 0, '') as missing data."""
+
+    def test_empty_list_revenue_history(self):
+        """revenue_history=[] should be treated as missing -> ETF."""
+        detail = {"revenue_history": [], "net_income_stmt": None, "operating_cashflow": None}
+        assert _is_etf(detail) is True
+
+    def test_zero_operating_cashflow(self):
+        """operating_cashflow=0 should be treated as missing -> ETF."""
+        detail = {"revenue_history": None, "net_income_stmt": None, "operating_cashflow": 0}
+        assert _is_etf(detail) is True
+
+    def test_empty_string_sector(self):
+        """sector='' should be treated as missing -> ETF."""
+        detail = {"info": {"sector": ""}, "revenue_history": None, "net_income_stmt": None, "operating_cashflow": None}
+        assert _is_etf(detail) is True
+
+    def test_mixed_falsy_values(self):
+        """Mix of None, [], 0 -> all falsy -> ETF."""
+        detail = {"revenue_history": [], "net_income_stmt": None, "operating_cashflow": 0, "info": {"sector": ""}}
+        assert _is_etf(detail) is True
+
+    def test_non_empty_list_is_not_etf(self):
+        """revenue_history=[100] is truthy -> has data -> not ETF."""
+        detail = {"revenue_history": [100, 200], "net_income_stmt": None, "operating_cashflow": None}
+        assert _is_etf(detail) is False
+
+    def test_check_change_quality_with_empty_list_etf(self):
+        """ETF with revenue_history=[] should return quality_label='対象外'."""
+        detail = {"revenue_history": [], "net_income_stmt": None, "operating_cashflow": None}
+        result = check_change_quality(detail)
+        assert result["quality_label"] == "対象外"
+        assert result["is_etf"] is True
 
 
 # ===================================================================

@@ -117,10 +117,10 @@ def _is_etf(stock_detail: dict) -> bool:
     if stock_detail.get("quoteType") == "ETF":
         return True
     info = stock_detail.get("info", stock_detail)
-    has_sector = info.get("sector") is not None
-    has_net_income = stock_detail.get("net_income_stmt") is not None
-    has_operating_cf = stock_detail.get("operating_cashflow") is not None
-    has_revenue_hist = stock_detail.get("revenue_history") is not None
+    has_sector = bool(info.get("sector"))
+    has_net_income = bool(stock_detail.get("net_income_stmt"))
+    has_operating_cf = bool(stock_detail.get("operating_cashflow"))
+    has_revenue_hist = bool(stock_detail.get("revenue_history"))
     if not has_sector and not has_net_income and not has_operating_cf and not has_revenue_hist:
         return True
     return False
