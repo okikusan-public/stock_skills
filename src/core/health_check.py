@@ -10,6 +10,8 @@ Alert levels:
   - exit: dead cross / multiple indicator deterioration / trend collapse
 """
 
+import math
+
 import numpy as np
 import pandas as pd
 from typing import Optional
@@ -228,10 +230,20 @@ def check_long_term_suitability(stock_detail: dict) -> dict:
             "summary": "ETF",
         }
 
-    roe = stock_detail.get("roe")
-    eps_growth = stock_detail.get("eps_growth")
-    dividend_yield = stock_detail.get("dividend_yield")
-    per = stock_detail.get("per")
+    def _finite_or_none(v):
+        """Return v if finite number, else None."""
+        if v is None:
+            return None
+        try:
+            f = float(v)
+            return None if (math.isnan(f) or math.isinf(f)) else f
+        except (TypeError, ValueError):
+            return None
+
+    roe = _finite_or_none(stock_detail.get("roe"))
+    eps_growth = _finite_or_none(stock_detail.get("eps_growth"))
+    dividend_yield = _finite_or_none(stock_detail.get("dividend_yield"))
+    per = _finite_or_none(stock_detail.get("per"))
 
     # --- ROE classification ---
     if roe is not None and roe >= _LT_ROE_HIGH:
