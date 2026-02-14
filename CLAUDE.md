@@ -38,6 +38,9 @@ python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py sell --symbol AA
 python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py analyze
 python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py health
 python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py forecast
+python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py rebalance
+python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py rebalance --strategy defensive
+python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py rebalance --reduce-sector Technology --additional-cash 1000000
 python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py list
 
 # テスト
@@ -59,7 +62,7 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
   ├─ stock-report/generate_report.py
   ├─ watchlist/manage_watchlist.py
   ├─ stress-test/run_stress_test.py
-  └─ stock-portfolio/run_portfolio.py … snapshot/buy/sell/analyze/health/forecast/list
+  └─ stock-portfolio/run_portfolio.py … snapshot/buy/sell/analyze/health/forecast/rebalance/list
       │
       │  sys.path.insert で project root を追加して src/ を import
       ▼
@@ -78,6 +81,7 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
   │  shock_sensitivity.py ─ ショック感応度スコア                  │
   │  scenario_analysis.py ─ シナリオ分析(8シナリオ+ETF資産クラス)  │
   │  recommender.py ─ ルールベース推奨アクション                   │
+  │  rebalancer.py ─ リスク制約付きリバランス提案エンジン            │
   │  portfolio_manager.py ─ CSV ベースのポートフォリオ管理         │
   │  portfolio_bridge.py ─ ポートフォリオCSV→ストレステスト連携     │
   └─────────────────────────────────────────────────────────┘
@@ -146,6 +150,15 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
 - **Xセンチメント**: Grok API（`grok-4-1-fast-non-reasoning` + X Search）で銘柄のXポストを分析。`XAI_API_KEY` 未設定時はスキップ（グレースフルデグレード）。
 - **`grok_client.py`**: `is_available()` で `XAI_API_KEY` 環境変数を確認。`search_x_sentiment()` でポジティブ/ネガティブ要因を返す。
 
+## Rebalance (KIK-363)
+
+`/stock-portfolio rebalance` でリスク制約付きリバランス提案を生成。forecast/health/concentration/correlationの4データソースを統合。
+
+- **3戦略**: defensive（max_single_ratio=10%, sector_hhi<0.20）、balanced（15%, 0.25）、aggressive（25%, 0.35）
+- **アクション生成**: (1) sell: health=EXIT or base<-10%, (2) reduce: overweight/相関集中/指定セクター・通貨, (3) increase: 正リターン+制約内
+- **CLIオプション**: `--strategy`, `--reduce-sector`, `--reduce-currency`, `--max-single-ratio`, `--max-sector-hhi`, `--max-region-hhi`, `--additional-cash`, `--min-dividend-yield`
+- **出力**: before/after比較テーブル + アクション一覧（売り/減らす/増やす）+ 制約条件表示
+
 ## Key Design Decisions
 
 - **yahoo_client はモジュール関数**。`from src.data import yahoo_client` → `yahoo_client.get_stock_info(symbol)`。クラスではないため monkeypatch でモック容易。
@@ -159,7 +172,7 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
 
 ## Testing
 
-- `python3 -m pytest tests/ -q` で全テスト実行（約640テスト、~1秒）
+- `python3 -m pytest tests/ -q` で全テスト実行（約740テスト、~1秒）
 - `tests/conftest.py` に共通フィクスチャ: `stock_info_data`, `stock_detail_data`, `price_history_df`, `mock_yahoo_client`
 - `tests/fixtures/` に JSON/CSV テストデータ（Toyota 7203.T ベース）
 - `mock_yahoo_client` は monkeypatch で yahoo_client モジュール関数をモック。`return_value` を設定して使用
