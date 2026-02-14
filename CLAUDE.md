@@ -12,6 +12,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # スクリーニング実行（EquityQuery方式 - デフォルト）
 python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset value --top 10
 
+# Xトレンド銘柄スクリーニング（Grok API、XAI_API_KEY 必須）
+python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset trending --top 10
+python3 .claude/skills/screen-stocks/scripts/run_screen.py --region us --preset trending --theme "AI" --top 10
+
 # 個別銘柄レポート
 python3 .claude/skills/stock-report/scripts/generate_report.py 7203.T
 

@@ -46,3 +46,7 @@ presets:
   alpha:
     description: "アルファシグナル（割安＋変化の質＋押し目）"
     mode: "alpha"
+
+  trending:
+    description: "Xトレンド銘柄（SNSで話題の銘柄をファンダメンタルズ評価）"
+    mode: "trending"

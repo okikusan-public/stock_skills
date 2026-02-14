@@ -17,6 +17,7 @@
 | 買った、購入、〇〇株買った | `/stock-portfolio buy` | 銘柄・株数・価格を文脈から抽出 |
 | 売った、売却、〇〇手放した | `/stock-portfolio sell` | 銘柄・株数を文脈から抽出 |
 | ウォッチ、監視、気になる銘柄 | `/watchlist` | add/show/list を文脈から判定 |
+| トレンド、話題の株、Xで話題、SNSで注目、バズ、Twitterで人気 | `/screen-stocks --preset trending` | region と theme を文脈から推定 |
 | リサーチ、深掘り、詳しく調べて、最新情報、ニュース、業界動向、マーケット概況、相場 | `/market-research` | stock/industry/market を文脈から推定。ティッカーや企業名があれば stock、業界名やテーマがあれば industry、マーケットや指数名があれば market |
 
 ## region 推定ルール
@@ -43,6 +44,7 @@
 | 超割安、ディープバリュー | deep-value |
 | 品質、クオリティ | quality |
 | 押し目、調整中 | pullback |
+| トレンド、話題、X、Twitter、SNS | trending |
 | 指定なし | alpha（デフォルト） |
 
 ## 複合意図の処理

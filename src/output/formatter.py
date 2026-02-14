@@ -208,3 +208,57 @@ def format_alpha_markdown(results: list[dict]) -> str:
     lines.append("**判定**: ◎=優秀(20+) ○=良好(15+) △=普通(10+) ×=不足(<10)")
 
     return "\n".join(lines)
+
+
+def format_trending_markdown(results: list[dict], market_context: str = "") -> str:
+    """Format trending stock screening results as a Markdown table."""
+    if not results:
+        return "X上でトレンド中の銘柄が見つかりませんでした。"
+
+    lines = []
+
+    if market_context:
+        lines.append(f"> **X市場センチメント**: {market_context}")
+        lines.append("")
+
+    lines.append(
+        "| 順位 | 銘柄 | 話題の理由 | 株価 | PER | PBR | 配当利回り | ROE | スコア | 判定 |"
+    )
+    lines.append(
+        "|---:|:-----|:---------|-----:|----:|----:|---------:|----:|------:|:----:|"
+    )
+
+    for rank, row in enumerate(results, start=1):
+        symbol = row.get("symbol", "-")
+        name = row.get("name") or ""
+        label = f"{symbol} {name}".strip() if name else symbol
+
+        reason = row.get("trending_reason") or "-"
+        if len(reason) > 40:
+            reason = reason[:37] + "..."
+
+        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
+        per = _fmt_float(row.get("per"))
+        pbr = _fmt_float(row.get("pbr"))
+        div_yield = _fmt_pct(row.get("dividend_yield"))
+        roe = _fmt_pct(row.get("roe"))
+        score = _fmt_float(row.get("value_score"))
+
+        classification = row.get("classification", "")
+        if "割安" in classification:
+            cls_str = "🟢割安"
+        elif "適正" in classification:
+            cls_str = "🟡適正"
+        else:
+            cls_str = "🔴割高"
+
+        lines.append(
+            f"| {rank} | {label} | {reason} | {price} | {per} | {pbr} "
+            f"| {div_yield} | {roe} | {score} | {cls_str} |"
+        )
+
+    lines.append("")
+    lines.append("**判定基準**: 🟢割安(スコア60+) / 🟡適正(スコア30-59) / 🔴割高(スコア30未満)")
+    lines.append("**データソース**: X (Twitter) トレンド → Yahoo Finance ファンダメンタルズ")
+
+    return "\n".join(lines)

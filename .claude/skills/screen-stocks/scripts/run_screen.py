@@ -14,8 +14,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from src.data import yahoo_client
-from src.core.screener import ValueScreener, QueryScreener, PullbackScreener, AlphaScreener
-from src.output.formatter import format_markdown, format_query_markdown, format_pullback_markdown, format_alpha_markdown
+from src.core.screener import ValueScreener, QueryScreener, PullbackScreener, AlphaScreener, TrendingScreener
+from src.output.formatter import format_markdown, format_query_markdown, format_pullback_markdown, format_alpha_markdown, format_trending_markdown
 from src.markets.japan import JapanMarket
 from src.markets.us import USMarket
 from src.markets.asean import ASEANMarket
@@ -91,6 +91,42 @@ VALID_SECTORS = [
 ]
 
 
+def run_trending_mode(args):
+    """Run trending stock screening using Grok X search."""
+    try:
+        from src.data import grok_client as gc
+        if not gc.is_available():
+            print("Error: trending preset requires XAI_API_KEY environment variable.")
+            print("Set: export XAI_API_KEY=your-api-key")
+            sys.exit(1)
+    except ImportError:
+        print("Error: grok_client module not available.")
+        sys.exit(1)
+
+    region_key = args.region.lower()
+    first_region = REGION_EXPAND.get(region_key, [region_key])[0]
+    region_name = REGION_NAMES.get(first_region, region_key.upper())
+    theme_label = f" [{args.theme}]" if args.theme else ""
+
+    print(f"\n## {region_name} - Xトレンド銘柄{theme_label} スクリーニング結果\n")
+    print("Step 1: X (Twitter) でトレンド銘柄を検索中...")
+
+    screener = TrendingScreener(yahoo_client, gc)
+    results, market_context = screener.screen(
+        region=region_key, theme=args.theme, top_n=args.top,
+    )
+
+    print(f"Step 2: {len(results)}銘柄のファンダメンタルズを取得・スコアリング完了\n")
+    print(format_trending_markdown(results, market_context))
+
+    if HAS_HISTORY and results:
+        try:
+            save_screening(preset="trending", region=region_key, results=results)
+        except Exception as e:
+            print(f"Warning: 履歴保存失敗: {e}", file=sys.stderr)
+    print()
+
+
 def run_query_mode(args):
     """Run screening using EquityQuery (default mode)."""
     region_key = args.region.lower()
@@ -98,6 +134,11 @@ def run_query_mode(args):
     if regions is None:
         # Treat as raw 2-letter region code
         regions = [region_key]
+
+    # trending preset uses TrendingScreener (Grok-based)
+    if args.preset == "trending":
+        run_trending_mode(args)
+        return
 
     # pullback preset uses PullbackScreener
     if args.preset == "pullback":
@@ -232,12 +273,17 @@ def main():
     parser.add_argument(
         "--preset",
         default="value",
-        choices=["value", "high-dividend", "growth-value", "deep-value", "quality", "pullback", "alpha"],
+        choices=["value", "high-dividend", "growth-value", "deep-value", "quality", "pullback", "alpha", "trending"],
     )
     parser.add_argument(
         "--sector",
         default=None,
         help=f"Sector filter. Options: {', '.join(VALID_SECTORS)}",
+    )
+    parser.add_argument(
+        "--theme",
+        default=None,
+        help="Theme filter for trending preset (e.g., AI, semiconductor, EV)",
     )
     parser.add_argument("--top", type=int, default=20)
     parser.add_argument(
@@ -284,6 +330,10 @@ def main():
 
     if args.preset == "alpha" and args.mode == "legacy":
         print("Note: alpha preset requires query mode. Switching to --mode query.")
+        args.mode = "query"
+
+    if args.preset == "trending" and args.mode == "legacy":
+        print("Note: trending preset requires query mode. Switching to --mode query.")
         args.mode = "query"
 
     if args.mode == "query":

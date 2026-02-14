@@ -48,6 +48,7 @@ python3 /Users/kikuchihiroyuki/stock-skills/.claude/skills/screen-stocks/scripts
 | 「クオリティ」「高品質」 | quality |
 | 「押し目」「pullback」 | pullback |
 | 「アルファ」「alpha」「割安＋変化」 | alpha |
+| 「トレンド」「trending」「話題」「Xで話題」「SNSで注目」 | trending [--theme "テーマ"] |
 | 「割安で押し目」「バリュー+押し目」 | value --with-pullback |
 | 「高配当で押し目」 | high-dividend --with-pullback |
 
@@ -103,6 +104,7 @@ python3 /Users/kikuchihiroyuki/stock-skills/.claude/skills/screen-stocks/scripts
 - `quality` : クオリティバリュー（高ROE＋割安）
 - `pullback` : 押し目買い型（上昇トレンド中の一時調整でエントリー。EquityQuery→テクニカル→SR の3段パイプライン。実行に時間がかかります）
 - `alpha` : アルファシグナル（割安＋変化の質＋押し目の3軸統合。EquityQuery→変化の質→押し目判定→2軸スコアリングの4段パイプライン。実行に時間がかかります）
+- `trending` : Xトレンド銘柄（Grok API でX上の話題銘柄を発見→Yahoo Financeでファンダメンタルズ評価。`--theme` でテーマ絞り込み可。XAI_API_KEY 必須）
 
 ## 出力
 
@@ -119,6 +121,9 @@ python3 /Users/kikuchihiroyuki/stock-skills/.claude/skills/screen-stocks/scripts
 
 ### Alpha モードの出力列
 順位 / 銘柄 / 株価 / PER / PBR / 割安 / 変化 / 総合 / 押し目 / ア / 加速 / FCF / ROE趨勢
+
+### Trending モードの出力列
+順位 / 銘柄 / 話題の理由 / 株価 / PER / PBR / 配当利回り / ROE / スコア / 判定
 
 ## 実行例
 
@@ -152,4 +157,13 @@ python3 .../run_screen.py --region japan --preset value --with-pullback
 
 # 米国の高配当株 + 押し目フィルタ
 python3 .../run_screen.py --region us --preset high-dividend --with-pullback
+
+# X (Twitter) で話題の日本株
+python3 .../run_screen.py --region japan --preset trending
+
+# X で話題のAI関連米国株
+python3 .../run_screen.py --region us --preset trending --theme "AI"
+
+# X で話題の半導体関連銘柄
+python3 .../run_screen.py --region japan --preset trending --theme "半導体"
 ```

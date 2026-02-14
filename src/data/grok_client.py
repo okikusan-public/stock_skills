@@ -57,6 +57,12 @@ EMPTY_MARKET = {
     "raw_response": "",
 }
 
+EMPTY_TRENDING = {
+    "stocks": [],
+    "market_context": "",
+    "raw_response": "",
+}
+
 
 # ---------------------------------------------------------------------------
 # Public helpers
@@ -296,6 +302,66 @@ def _build_industry_prompt(industry_or_theme: str) -> str:
     )
 
 
+def _build_trending_prompt(region: str = "japan", theme: Optional[str] = None) -> str:
+    """Build the prompt for discovering trending stocks on X."""
+    _REGION_DESC = {
+        "japan": ("日本株", "Tokyo Stock Exchange", ".T"),
+        "jp": ("日本株", "Tokyo Stock Exchange", ".T"),
+        "us": ("米国株", "US stock exchanges (NYSE/NASDAQ)", ""),
+        "asean": ("ASEAN株", "Singapore/Thailand/Malaysia/Indonesia/Philippines exchanges",
+                  ".SI/.BK/.KL/.JK/.PS"),
+        "sg": ("シンガポール株", "Singapore Exchange", ".SI"),
+        "th": ("タイ株", "Stock Exchange of Thailand", ".BK"),
+        "hk": ("香港株", "Hong Kong Stock Exchange", ".HK"),
+        "kr": ("韓国株", "Korea Exchange", ".KS"),
+        "tw": ("台湾株", "Taiwan Stock Exchange", ".TW"),
+    }
+    label, exchange, suffix = _REGION_DESC.get(region, _REGION_DESC["japan"])
+
+    theme_part = f"\nFocus specifically on the theme/sector: {theme}" if theme else ""
+
+    if suffix:
+        suffix_inst = (
+            f"Use Yahoo Finance ticker format with suffix '{suffix}' "
+            f"(e.g., 7203{suffix.split('/')[0]} for Toyota)."
+        )
+    else:
+        suffix_inst = "Use standard Yahoo Finance ticker symbols (e.g., AAPL, MSFT)."
+
+    if region in ("japan", "jp"):
+        return (
+            f"X（Twitter）上で今、投資家の間で話題になっている{label}を検索してください。"
+            f"{theme_part}\n\n"
+            f"決算サプライズ、新製品発表、規制変更、業界トレンドなどで注目されている"
+            f"銘柄を10〜20件見つけてください。\n"
+            f"各銘柄について、ティッカーシンボルと話題の理由を提供してください。\n\n"
+            f"重要: {suffix_inst}\n"
+            f"Yahoo Finance で検索可能な実在のティッカーのみを返してください。\n\n"
+            f"JSON形式で回答:\n"
+            f'{{\n'
+            f'  "stocks": [\n'
+            f'    {{"ticker": "シンボル", "name": "企業名", "reason": "話題の理由"}}\n'
+            f'  ],\n'
+            f'  "market_context": "X上の市場センチメント概要"\n'
+            f'}}'
+        )
+    return (
+        f"Search X (Twitter) for stocks that are currently trending or heavily discussed "
+        f"among investors in the {label} ({exchange}) market.{theme_part}\n\n"
+        f"Find 10-20 stocks getting significant attention on X right now. "
+        f"For each stock, provide the ticker symbol and a brief reason WHY it is trending.\n\n"
+        f"IMPORTANT: {suffix_inst}\n"
+        f"Return ONLY valid, real ticker symbols that can be looked up on Yahoo Finance.\n\n"
+        f"Respond in JSON format:\n"
+        f'{{\n'
+        f'  "stocks": [\n'
+        f'    {{"ticker": "SYMBOL", "name": "Company Name", "reason": "Why it is trending"}}\n'
+        f'  ],\n'
+        f'  "market_context": "Brief summary of the current market mood on X"\n'
+        f'}}'
+    )
+
+
 def _build_market_prompt(market_or_index: str) -> str:
     """Build the prompt for market research."""
     return (
@@ -524,5 +590,56 @@ def search_market(
         result["upcoming_events"] = parsed["upcoming_events"]
     if isinstance(parsed.get("sector_rotation"), list):
         result["sector_rotation"] = parsed["sector_rotation"]
+
+    return result
+
+
+def search_trending_stocks(
+    region: str = "japan",
+    theme: Optional[str] = None,
+    timeout: int = 30,
+) -> dict:
+    """Search X for currently trending stocks in a specific market region.
+
+    Parameters
+    ----------
+    region : str
+        Market region (japan/us/asean/sg/hk/kr/tw).
+    theme : str | None
+        Optional theme/sector filter (AI/semiconductor/EV/etc).
+    timeout : int
+        Request timeout in seconds.
+
+    Returns
+    -------
+    dict
+        Keys: stocks (list of {ticker, name, reason}),
+              market_context (str), raw_response (str).
+    """
+    raw_text = _call_grok_api(_build_trending_prompt(region, theme), timeout)
+    if not raw_text:
+        return dict(EMPTY_TRENDING)
+
+    result = dict(EMPTY_TRENDING)
+    result["raw_response"] = raw_text
+
+    parsed = _parse_json_response(raw_text)
+    if not parsed:
+        return result
+
+    stocks_raw = parsed.get("stocks")
+    if isinstance(stocks_raw, list):
+        validated = []
+        for item in stocks_raw:
+            if isinstance(item, dict) and isinstance(item.get("ticker"), str):
+                validated.append({
+                    "ticker": item["ticker"].strip(),
+                    "name": item.get("name", "") if isinstance(item.get("name"), str) else "",
+                    "reason": item.get("reason", "") if isinstance(item.get("reason"), str) else "",
+                })
+        result["stocks"] = validated
+
+    if isinstance(parsed.get("market_context"), str):
+        result["market_context"] = parsed["market_context"]
 
     return result
