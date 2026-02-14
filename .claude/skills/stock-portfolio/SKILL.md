@@ -76,6 +76,21 @@ CLIオプション:
 - `--additional-cash AMOUNT` (円, 例: 1000000)
 - `--min-dividend-yield YIELD` (例: 0.03)
 
+### simulate -- 複利シミュレーション
+
+現在のポートフォリオを基に、複利計算で将来の資産推移をシミュレーションする。forecast の期待リターン + 配当再投資 + 毎月積立を複利で計算し、楽観/ベース/悲観の3シナリオで表示。
+
+```bash
+python3 .../run_portfolio.py simulate [options]
+```
+
+CLIオプション:
+- `--years N` (シミュレーション年数, デフォルト: 10)
+- `--monthly-add AMOUNT` (月額積立額, 円, デフォルト: 0)
+- `--target AMOUNT` (目標額, 円, 例: 15000000)
+- `--reinvest-dividends` (配当再投資する, デフォルト: ON)
+- `--no-reinvest-dividends` (配当再投資しない)
+
 ### list -- 保有銘柄一覧
 
 portfolio.csv の内容をそのまま表示する。
@@ -96,6 +111,7 @@ python3 .../run_portfolio.py list
 | 「構造分析」「偏りを調べて」「集中度」「HHI」 | analyze |
 | 「ヘルスチェック」「健全性チェック」「利確判断」「損切り判断」 | health |
 | 「リバランス」「偏りを直したい」「配分調整」「リスクを抑えたい」 | rebalance |
+| 「5年後にいくらになる？」「シミュレーション」「複利」 | simulate |
 | 「一覧」「リスト」「CSV」 | list |
 
 ### buy コマンドの自然言語変換例
@@ -126,6 +142,16 @@ python3 .../run_portfolio.py list
 | 「円安ヘッジしたい」 | `rebalance --reduce-currency USD` |
 | 「100万円追加投入したい」 | `rebalance --additional-cash 1000000` |
 
+### simulate コマンドの自然言語変換例
+
+| ユーザー入力 | 変換結果 |
+|:-----------|:--------|
+| 「5年後にいくらになる？」 | `simulate --years 5` |
+| 「月10万追加して3年後に2000万いける？」 | `simulate --years 3 --monthly-add 100000 --target 20000000` |
+| 「複利でシミュレーション」 | `simulate --years 10` |
+| 「配当再投資しなかったら？」 | `simulate --years 5 --no-reinvest-dividends` |
+| 「老後資金のシミュレーション」 | `simulate --years 20 --monthly-add 100000` |
+
 ## 制約事項
 
 - 日本株: 100株単位（単元株）
@@ -154,6 +180,12 @@ python3 .../run_portfolio.py list
 - 売却候補（銘柄・株数・理由）
 - 購入候補（銘柄・株数・理由・配当利回り）
 - リバランス後のHHI予測値
+
+### simulate の出力項目
+- 年次推移テーブル（年/評価額/累計投入/運用益/配当累計）
+- 3シナリオ比較（楽観/ベース/悲観の最終年）
+- 目標達成分析（到達年/必要積立額）
+- 配当再投資の複利効果
 
 ## 実行例
 

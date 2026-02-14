@@ -12,6 +12,7 @@
 | 健全性、利確、損切り、まだ持つべき？、アラート | `/stock-portfolio health` | |
 | 期待値、利回り、今後の見通し、予想、見通し | `/stock-portfolio forecast` | |
 | リバランス、配分、バランス、偏り、集中 | `/stock-portfolio rebalance` | 戦略を文脈から推定 |
+| シミュレーション、複利、〇年後、将来、積立、老後、目標額 | `/stock-portfolio simulate` | years/monthly-add/target を文脈から推定 |
 | 〇〇を調べて、〇〇の分析、〇〇ってどう？ | `/stock-report` | ティッカーシンボルを推定（例: トヨタ → 7203.T） |
 | 買った、購入、〇〇株買った | `/stock-portfolio buy` | 銘柄・株数・価格を文脈から抽出 |
 | 売った、売却、〇〇手放した | `/stock-portfolio sell` | 銘柄・株数を文脈から抽出 |
@@ -75,4 +76,11 @@
 → 2. /stock-portfolio health（健全性）
 → 3. /stock-portfolio forecast（見通し）
 → 4. 問題があれば /stock-portfolio rebalance で改善案提示
+```
+
+### パターン5: 診断 → シミュレーション
+```
+「PFの見通しを確認して、5年後のシミュレーションも見たい」
+→ 1. /stock-portfolio forecast を実行
+→ 2. /stock-portfolio simulate --years 5 で将来推移を表示
 ```

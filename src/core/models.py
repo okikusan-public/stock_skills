@@ -6,7 +6,7 @@ these classes are used internally and provide to_dict() for conversion.
 """
 
 from dataclasses import asdict, dataclass, field
-from typing import Optional
+from typing import Optional, Union
 
 
 @dataclass
@@ -189,3 +189,74 @@ class RebalanceAction:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+@dataclass
+class YearlySnapshot:
+    """1年分のシミュレーション結果 (KIK-366)."""
+
+    year: int
+    value: float
+    cumulative_input: float
+    capital_gain: float
+    cumulative_dividends: float
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class SimulationResult:
+    """複利シミュレーション結果 (KIK-366)."""
+
+    scenarios: dict[str, list[YearlySnapshot]]
+    target: Optional[float]
+    target_year_base: Optional[float]
+    target_year_optimistic: Optional[float]
+    target_year_pessimistic: Optional[float]
+    required_monthly: Optional[float]
+    dividend_effect: float
+    dividend_effect_pct: float
+
+    years: int = 0
+    monthly_add: float = 0.0
+    reinvest_dividends: bool = True
+    current_value: float = 0.0
+    portfolio_return_base: Union[float, None] = None
+    dividend_yield: float = 0.0
+
+    def to_dict(self) -> dict:
+        result = {
+            "scenarios": {
+                key: [s.to_dict() for s in snapshots]
+                for key, snapshots in self.scenarios.items()
+            },
+            "target": self.target,
+            "target_year_base": self.target_year_base,
+            "target_year_optimistic": self.target_year_optimistic,
+            "target_year_pessimistic": self.target_year_pessimistic,
+            "required_monthly": self.required_monthly,
+            "dividend_effect": self.dividend_effect,
+            "dividend_effect_pct": self.dividend_effect_pct,
+            "years": self.years,
+            "monthly_add": self.monthly_add,
+            "reinvest_dividends": self.reinvest_dividends,
+            "current_value": self.current_value,
+            "portfolio_return_base": self.portfolio_return_base,
+            "dividend_yield": self.dividend_yield,
+        }
+        return result
+
+    @classmethod
+    def empty(cls) -> "SimulationResult":
+        """シミュレーション不可時の空結果。"""
+        return cls(
+            scenarios={},
+            target=None,
+            target_year_base=None,
+            target_year_optimistic=None,
+            target_year_pessimistic=None,
+            required_monthly=None,
+            dividend_effect=0.0,
+            dividend_effect_pct=0.0,
+        )

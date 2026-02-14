@@ -89,6 +89,20 @@ try:
 except ImportError:
     HAS_REBALANCE_FORMATTER = False
 
+# KIK-366: Simulator module
+try:
+    from src.core.simulator import simulate_portfolio
+    HAS_SIMULATOR = True
+except ImportError:
+    HAS_SIMULATOR = False
+
+# KIK-366: Simulation formatter
+try:
+    from src.output.portfolio_formatter import format_simulation
+    HAS_SIMULATION_FORMATTER = True
+except ImportError:
+    HAS_SIMULATION_FORMATTER = False
+
 # Correlation module (for high-correlation pairs)
 try:
     from src.core.correlation import (
@@ -685,6 +699,64 @@ def cmd_rebalance(
 
 
 # ---------------------------------------------------------------------------
+# Command: simulate (KIK-366)
+# ---------------------------------------------------------------------------
+
+def cmd_simulate(
+    csv_path: str,
+    years: int = 10,
+    monthly_add: float = 0.0,
+    target: Optional[float] = None,
+    reinvest_dividends: bool = True,
+) -> None:
+    """Run compound interest simulation."""
+    if not HAS_SIMULATOR:
+        print("Error: simulator モジュールが見つかりません。")
+        sys.exit(1)
+    if not HAS_RETURN_ESTIMATE:
+        print("Error: return_estimate モジュールが見つかりません。")
+        sys.exit(1)
+
+    print("シミュレーション実行中（forecast データ取得）...\n")
+
+    # 1. forecast データ取得
+    forecast_result = estimate_portfolio_return(csv_path, yahoo_client)
+    positions = forecast_result.get("positions", [])
+    if not positions:
+        print("ポートフォリオにデータがありません。")
+        return
+
+    portfolio_returns = forecast_result.get("portfolio", {})
+    total_value_jpy = forecast_result.get("total_value_jpy", 0)
+
+    # 2. 加重平均配当利回り算出
+    weighted_div_yield = 0.0
+    if total_value_jpy > 0:
+        for pos in positions:
+            dy = pos.get("dividend_yield") or 0.0
+            value = pos.get("value_jpy") or 0
+            weighted_div_yield += dy * (value / total_value_jpy)
+
+    # 3. シミュレーション実行
+    result = simulate_portfolio(
+        current_value=total_value_jpy,
+        returns=portfolio_returns,
+        dividend_yield=weighted_div_yield,
+        years=years,
+        monthly_add=monthly_add,
+        reinvest_dividends=reinvest_dividends,
+        target=target,
+    )
+
+    # 4. 出力
+    if HAS_SIMULATION_FORMATTER:
+        print(format_simulation(result))
+    else:
+        # Fallback: JSON 出力
+        print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+
+
+# ---------------------------------------------------------------------------
 # Main: argparse with subcommands
 # ---------------------------------------------------------------------------
 
@@ -766,6 +838,31 @@ def main():
         help="増加候補の最低配当利回り (例: 0.03)",
     )
 
+    # simulate (KIK-366)
+    simulate_parser = subparsers.add_parser("simulate", help="複利シミュレーション")
+    simulate_parser.add_argument(
+        "--years", type=int, default=10,
+        help="シミュレーション年数 (デフォルト: 10)",
+    )
+    simulate_parser.add_argument(
+        "--monthly-add", type=float, default=0.0,
+        help="月額積立額 (円, デフォルト: 0)",
+    )
+    simulate_parser.add_argument(
+        "--target", type=float, default=None,
+        help="目標額 (円, 例: 15000000)",
+    )
+    simulate_parser.add_argument(
+        "--reinvest-dividends", action="store_true", default=True,
+        dest="reinvest_dividends",
+        help="配当再投資する (デフォルト: ON)",
+    )
+    simulate_parser.add_argument(
+        "--no-reinvest-dividends", action="store_false",
+        dest="reinvest_dividends",
+        help="配当再投資しない",
+    )
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -807,6 +904,14 @@ def main():
             max_region_hhi=args.max_region_hhi,
             additional_cash=args.additional_cash,
             min_dividend_yield=args.min_dividend_yield,
+        )
+    elif args.command == "simulate":
+        cmd_simulate(
+            csv_path=csv_path,
+            years=args.years,
+            monthly_add=args.monthly_add,
+            target=args.target,
+            reinvest_dividends=args.reinvest_dividends,
         )
     else:
         parser.print_help()

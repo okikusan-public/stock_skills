@@ -693,6 +693,207 @@ def format_return_estimate(estimate: dict) -> str:
 # Rebalance proposal (KIK-363)
 # ---------------------------------------------------------------------------
 
+def _fmt_k(value: Optional[float]) -> str:
+    """Format a value in K (thousands) notation, e.g. 10000000 -> '¥10,000K'."""
+    if value is None:
+        return "-"
+    k = value / 1000
+    if k < 0:
+        return f"-\u00a5{abs(k):,.0f}K"
+    return f"\u00a5{k:,.0f}K"
+
+
+# ---------------------------------------------------------------------------
+# format_simulation (KIK-366)
+# ---------------------------------------------------------------------------
+
+def format_simulation(result) -> str:
+    """Format compound interest simulation results as Markdown.
+
+    Parameters
+    ----------
+    result : SimulationResult or dict
+        Output from simulator.simulate_portfolio().
+
+    Returns
+    -------
+    str
+        Markdown-formatted simulation report.
+    """
+    # Support both SimulationResult and dict
+    if hasattr(result, "to_dict"):
+        d = result.to_dict()
+    else:
+        d = result
+
+    scenarios = d.get("scenarios", {})
+    years = d.get("years", 0)
+    monthly_add = d.get("monthly_add", 0.0)
+    reinvest_dividends = d.get("reinvest_dividends", True)
+    target = d.get("target")
+
+    lines: list[str] = []
+
+    # Empty scenarios
+    if not scenarios:
+        lines.append("## \u8907\u5229\u30b7\u30df\u30e5\u30ec\u30fc\u30b7\u30e7\u30f3")
+        lines.append("")
+        lines.append(
+            "\u63a8\u5b9a\u30ea\u30bf\u30fc\u30f3\u304c\u53d6\u5f97\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002"
+            "\u5148\u306b /stock-portfolio forecast \u3092\u5b9f\u884c\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
+        )
+        return "\n".join(lines)
+
+    # Header
+    if monthly_add > 0:
+        add_str = f"\u6708{monthly_add:,.0f}\u5186\u7a4d\u7acb"
+    else:
+        add_str = "\u7a4d\u7acb\u306a\u3057"
+    lines.append(f"## {years}\u5e74\u30b7\u30df\u30e5\u30ec\u30fc\u30b7\u30e7\u30f3\uff08{add_str}\uff09")
+    lines.append("")
+
+    # Base scenario table
+    base_snapshots = scenarios.get("base", [])
+    if base_snapshots:
+        base_return = d.get("portfolio_return_base")
+        if base_return is not None:
+            ret_str = f"{base_return * 100:+.2f}%"
+        else:
+            ret_str = "-"
+        lines.append(f"### \u30d9\u30fc\u30b9\u30b7\u30ca\u30ea\u30aa\uff08\u5e74\u5229 {ret_str}\uff09")
+        lines.append("")
+        lines.append("| \u5e74 | \u8a55\u4fa1\u984d | \u7d2f\u8a08\u6295\u5165 | \u904b\u7528\u76ca | \u914d\u5f53\u7d2f\u8a08 |")
+        lines.append("|----|--------|----------|--------|----------|")
+
+        for snap in base_snapshots:
+            yr = snap.get("year", 0) if isinstance(snap, dict) else snap.year
+            value = snap.get("value", 0) if isinstance(snap, dict) else snap.value
+            cum_input = snap.get("cumulative_input", 0) if isinstance(snap, dict) else snap.cumulative_input
+            cap_gain = snap.get("capital_gain", 0) if isinstance(snap, dict) else snap.capital_gain
+            cum_div = snap.get("cumulative_dividends", 0) if isinstance(snap, dict) else snap.cumulative_dividends
+
+            if yr == 0:
+                lines.append(
+                    f"| {yr} | {_fmt_k(value)} | {_fmt_k(cum_input)} | - | - |"
+                )
+            else:
+                lines.append(
+                    f"| {yr} | {_fmt_k(value)} | {_fmt_k(cum_input)} "
+                    f"| {_fmt_k(cap_gain)} | {_fmt_k(cum_div)} |"
+                )
+
+        lines.append("")
+
+    # Scenario comparison (final year)
+    scenario_labels = {
+        "optimistic": "\u697d\u89b3",
+        "base": "\u30d9\u30fc\u30b9",
+        "pessimistic": "\u60b2\u89b3",
+    }
+    returns_map = d.get("scenarios", {})
+    portfolio_return_base = d.get("portfolio_return_base")
+
+    # Get return rates from the original returns dict if available
+    # We infer from the data we have
+    has_comparison = len(scenarios) > 1 or (len(scenarios) == 1 and "base" in scenarios)
+    if has_comparison:
+        lines.append(
+            "### \u30b7\u30ca\u30ea\u30aa\u6bd4\u8f03\uff08\u6700\u7d42\u5e74\uff09"
+        )
+        lines.append("")
+        lines.append("| \u30b7\u30ca\u30ea\u30aa | \u6700\u7d42\u8a55\u4fa1\u984d | \u904b\u7528\u76ca |")
+        lines.append("|:---------|----------:|-------:|")
+
+        for key in ["optimistic", "base", "pessimistic"]:
+            snaps = scenarios.get(key)
+            if not snaps:
+                continue
+            last = snaps[-1]
+            value = last.get("value", 0) if isinstance(last, dict) else last.value
+            cap_gain = last.get("capital_gain", 0) if isinstance(last, dict) else last.capital_gain
+            label = scenario_labels.get(key, key)
+            lines.append(
+                f"| {label} | {_fmt_k(value)} | {_fmt_k(cap_gain)} |"
+            )
+
+        lines.append("")
+
+    # Target analysis
+    if target is not None:
+        lines.append("### \u76ee\u6a19\u9054\u6210\u5206\u6790")
+        lines.append("")
+        lines.append(f"- \u76ee\u6a19\u984d: {_fmt_k(target)}")
+
+        target_year_base = d.get("target_year_base")
+        target_year_opt = d.get("target_year_optimistic")
+        target_year_pess = d.get("target_year_pessimistic")
+
+        if target_year_base is not None:
+            lines.append(
+                f"- \u30d9\u30fc\u30b9\u30b7\u30ca\u30ea\u30aa: "
+                f"**{target_year_base:.1f}\u5e74\u3067\u9054\u6210\u898b\u8fbc\u307f**"
+            )
+        else:
+            lines.append(
+                "- \u30d9\u30fc\u30b9\u30b7\u30ca\u30ea\u30aa: \u671f\u9593\u5185\u672a\u9054"
+            )
+
+        if target_year_opt is not None:
+            lines.append(
+                f"- \u697d\u89b3\u30b7\u30ca\u30ea\u30aa: "
+                f"{target_year_opt:.1f}\u5e74\u3067\u9054\u6210\u898b\u8fbc\u307f"
+            )
+        elif "optimistic" in scenarios:
+            lines.append(
+                "- \u697d\u89b3\u30b7\u30ca\u30ea\u30aa: \u671f\u9593\u5185\u672a\u9054"
+            )
+
+        if target_year_pess is not None:
+            lines.append(
+                f"- \u60b2\u89b3\u30b7\u30ca\u30ea\u30aa: "
+                f"{target_year_pess:.1f}\u5e74\u3067\u9054\u6210\u898b\u8fbc\u307f"
+            )
+        elif "pessimistic" in scenarios:
+            lines.append(
+                "- \u60b2\u89b3\u30b7\u30ca\u30ea\u30aa: \u671f\u9593\u5185\u672a\u9054"
+            )
+
+        required_monthly = d.get("required_monthly")
+        if required_monthly is not None and required_monthly > 0:
+            lines.append("")
+            lines.append(
+                f"- \u76ee\u6a19\u9054\u6210\u306b\u5fc5\u8981\u306a\u6708\u984d\u7a4d\u7acb: "
+                f"\u00a5{required_monthly:,.0f}"
+            )
+
+        lines.append("")
+
+    # Dividend reinvestment effect
+    dividend_effect = d.get("dividend_effect", 0)
+    dividend_effect_pct = d.get("dividend_effect_pct", 0)
+
+    lines.append(
+        "### \u914d\u5f53\u518d\u6295\u8cc7\u306e\u52b9\u679c"
+    )
+    lines.append("")
+
+    if not reinvest_dividends:
+        lines.append("- \u914d\u5f53\u518d\u6295\u8cc7: OFF")
+    else:
+        lines.append(
+            f"- \u914d\u5f53\u518d\u6295\u8cc7\u306b\u3088\u308b\u8907\u5229\u52b9\u679c: "
+            f"+{_fmt_k(dividend_effect)}"
+        )
+        lines.append(
+            f"- \u914d\u5f53\u306a\u3057\u6bd4: "
+            f"+{dividend_effect_pct * 100:.1f}%"
+        )
+
+    lines.append("")
+
+    return "\n".join(lines)
+
+
 _ACTION_LABELS = {
     "sell": "売り",
     "reduce": "減らす",
