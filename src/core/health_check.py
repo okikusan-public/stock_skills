@@ -58,6 +58,9 @@ def check_trend_health(hist: Optional[pd.DataFrame]) -> dict:
         "current_price": float("nan"),
         "sma50": float("nan"),
         "sma200": float("nan"),
+        "cross_signal": "none",
+        "days_since_cross": None,
+        "cross_date": None,
     }
 
     if hist is None or not isinstance(hist, pd.DataFrame):
@@ -82,6 +85,32 @@ def check_trend_health(hist: Optional[pd.DataFrame]) -> dict:
     price_above_sma200 = current_price > current_sma200
     sma50_above_sma200 = current_sma50 > current_sma200
     dead_cross = not sma50_above_sma200
+
+    # --- Cross event detection (lookback 60 trading days) ---
+    _CROSS_LOOKBACK = 60
+    cross_signal = "none"
+    days_since_cross = None
+    cross_date = None
+
+    max_scan = min(_CROSS_LOOKBACK, len(sma50) - 201)
+    for i in range(max(0, max_scan)):
+        idx = -1 - i
+        prev_idx = idx - 1
+        cur_above = sma50.iloc[idx] > sma200.iloc[idx]
+        prev_above = sma50.iloc[prev_idx] > sma200.iloc[prev_idx]
+
+        if cur_above and not prev_above:
+            cross_signal = "golden_cross"
+            days_since_cross = i
+            idx_val = hist.index[idx]
+            cross_date = str(idx_val.date()) if hasattr(idx_val, "date") else str(idx_val)
+            break
+        elif not cur_above and prev_above:
+            cross_signal = "death_cross"
+            days_since_cross = i
+            idx_val = hist.index[idx]
+            cross_date = str(idx_val.date()) if hasattr(idx_val, "date") else str(idx_val)
+            break
 
     # SMA50 approaching SMA200 (gap < 2%)
     sma_gap = (
@@ -118,6 +147,9 @@ def check_trend_health(hist: Optional[pd.DataFrame]) -> dict:
         "current_price": round(current_price, 2),
         "sma50": round(current_sma50, 2),
         "sma200": round(current_sma200, 2),
+        "cross_signal": cross_signal,
+        "days_since_cross": days_since_cross,
+        "cross_date": cross_date,
     }
 
 
@@ -364,6 +396,9 @@ def compute_alert_level(trend_health: dict, change_quality: dict) -> dict:
     rsi_drop = trend_health.get("rsi_drop", False)
     price_above_sma50 = trend_health.get("price_above_sma50", True)
     sma50_approaching = trend_health.get("sma50_approaching_sma200", False)
+    cross_signal = trend_health.get("cross_signal", "none")
+    days_since_cross = trend_health.get("days_since_cross")
+    cross_date = trend_health.get("cross_date")
 
     if quality_label == "対象外":
         # ETF: evaluate technical conditions only (no quality data)
@@ -421,6 +456,19 @@ def compute_alert_level(trend_health: dict, change_quality: dict) -> dict:
         elif quality_label == "1指標↓":
             level = ALERT_EARLY_WARNING
             reasons.append("変化スコア1指標悪化")
+
+    # Recent death cross event: add date context to reasons
+    if cross_signal == "death_cross" and days_since_cross is not None and days_since_cross <= 10:
+        reasons.append(f"デッドクロス発生（{days_since_cross}日前、{cross_date}）")
+
+    # Recent golden cross: positive signal -> early warning if no other alert
+    if cross_signal == "golden_cross" and days_since_cross is not None and days_since_cross <= 20:
+        if level == ALERT_NONE:
+            level = ALERT_EARLY_WARNING
+        reasons.append(
+            f"ゴールデンクロス発生（{days_since_cross}日前、{cross_date}）"
+            "- 上昇トレンド転換の可能性"
+        )
 
     level_map = {
         ALERT_NONE: ("", "なし"),
