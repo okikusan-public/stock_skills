@@ -182,6 +182,83 @@ def calculate_shareholder_return_history(stock: dict) -> list[dict]:
     return results
 
 
+def assess_return_stability(history: list[dict]) -> dict:
+    """Assess shareholder return stability from multi-year history.
+
+    Takes the output of ``calculate_shareholder_return_history()`` and
+    classifies stability as one of:
+
+    - ``temporary``: Latest year surged (>=2x previous) — likely one-off
+    - ``increasing``: Rates rising year-over-year
+    - ``decreasing``: Rates falling year-over-year
+    - ``stable``: All years >= 5%
+    - ``mixed``: None of the above patterns
+    - ``unknown``: Insufficient data (< 2 years with rates)
+
+    Returns dict with keys: stability, label, latest_rate, avg_rate.
+    """
+    rates = [
+        e.get("total_return_rate")
+        for e in history
+        if e.get("total_return_rate") is not None
+    ]
+
+    if len(rates) < 2:
+        return {
+            "stability": "unknown",
+            "label": "❓ データ不足",
+            "latest_rate": rates[0] if rates else None,
+            "avg_rate": rates[0] if rates else None,
+        }
+
+    latest = rates[0]
+    prev = rates[1]
+    avg_rate = sum(rates) / len(rates)
+
+    # Temporary: latest surged >= 2x previous AND is genuinely high (>= 8%)
+    if prev > 0 and latest / prev >= 2.0 and latest >= 0.08:
+        return {
+            "stability": "temporary",
+            "label": "⚠️ 一時的高還元",
+            "latest_rate": latest,
+            "avg_rate": avg_rate,
+        }
+
+    # Increasing: all years non-decreasing (latest first order)
+    if all(rates[i] >= rates[i + 1] for i in range(len(rates) - 1)):
+        return {
+            "stability": "increasing",
+            "label": "📈 増加傾向",
+            "latest_rate": latest,
+            "avg_rate": avg_rate,
+        }
+
+    # Decreasing: all years non-increasing
+    if all(rates[i] <= rates[i + 1] for i in range(len(rates) - 1)):
+        return {
+            "stability": "decreasing",
+            "label": "📉 減少傾向",
+            "latest_rate": latest,
+            "avg_rate": avg_rate,
+        }
+
+    # Stable: all >= 5%
+    if all(r >= 0.05 for r in rates):
+        return {
+            "stability": "stable",
+            "label": "✅ 安定高還元",
+            "latest_rate": latest,
+            "avg_rate": avg_rate,
+        }
+
+    return {
+        "stability": "mixed",
+        "label": "➡️ 変動あり",
+        "latest_rate": latest,
+        "avg_rate": avg_rate,
+    }
+
+
 def calculate_shareholder_return(stock: dict) -> dict:
     """Calculate total shareholder return rate.
 

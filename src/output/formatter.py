@@ -210,6 +210,34 @@ def format_alpha_markdown(results: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def format_shareholder_return_markdown(results: list[dict]) -> str:
+    """Format shareholder-return screening results as Markdown table."""
+    if not results:
+        return "_該当銘柄なし_"
+    lines = []
+    lines.append("| # | 銘柄 | セクター | PER | ROE | 配当利回り | 自社株買い | 総還元率 | 安定度 |")
+    lines.append("|--:|:-----|:--------|----:|----:|----------:|---------:|--------:|:------|")
+    for i, s in enumerate(results, 1):
+        name = s.get("name", s.get("symbol", "?"))
+        symbol = s.get("symbol", "")
+        sector = s.get("sector", "-")
+        per = s.get("per") or s.get("trailingPE")
+        roe = s.get("roe") or s.get("returnOnEquity")
+        div_yield = s.get("dividend_yield_trailing") or s.get("dividend_yield")
+        buyback = s.get("buyback_yield")
+        total_sr = s.get("total_shareholder_return")
+        stability_label = s.get("return_stability_label", "-")
+
+        per_str = f"{per:.1f}" if per else "-"
+        roe_str = f"{roe*100:.1f}%" if roe else "-"
+        div_str = f"{div_yield*100:.2f}%" if div_yield else "-"
+        bb_str = f"{buyback*100:.2f}%" if buyback else "-"
+        sr_str = f"**{total_sr*100:.2f}%**" if total_sr else "-"
+
+        lines.append(f"| {i} | {name} ({symbol}) | {sector} | {per_str} | {roe_str} | {div_str} | {bb_str} | {sr_str} | {stability_label} |")
+    return "\n".join(lines)
+
+
 def format_trending_markdown(results: list[dict], market_context: str = "") -> str:
     """Format trending stock screening results as a Markdown table."""
     if not results:

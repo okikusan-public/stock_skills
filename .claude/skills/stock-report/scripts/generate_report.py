@@ -22,6 +22,12 @@ except ImportError:
     HAS_SHAREHOLDER_HISTORY = False
 
 try:
+    from src.core.indicators import assess_return_stability
+    HAS_RETURN_STABILITY = True
+except ImportError:
+    HAS_RETURN_STABILITY = False
+
+try:
     from src.data.history_store import save_report as history_save_report
     HAS_HISTORY = True
 except ImportError:
@@ -161,6 +167,16 @@ def main():
                     trend = "➡️ 横ばい"
                 print()
                 print(f"- **トレンド**: {trend}")
+
+                # KIK-383: Return stability assessment
+                if HAS_RETURN_STABILITY:
+                    stability = assess_return_stability(sr_hist)
+                    stab_label = stability.get("label", "")
+                    avg_rate = stability.get("avg_rate")
+                    if avg_rate is not None:
+                        print(f"- **安定度**: {stab_label}（3年平均: {avg_rate*100:.2f}%）")
+                    else:
+                        print(f"- **安定度**: {stab_label}")
 
     if HAS_HISTORY:
         try:

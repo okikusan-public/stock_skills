@@ -3,6 +3,7 @@
 import pytest
 
 from src.core.indicators import (
+    assess_return_stability,
     calculate_value_score,
     calculate_shareholder_return,
     calculate_shareholder_return_history,
@@ -612,3 +613,135 @@ class TestTrailingDividendYieldFallback:
         }
         result = calculate_shareholder_return(stock)
         assert result["dividend_yield"] == 0.028
+
+
+# ===================================================================
+# assess_return_stability (KIK-383)
+# ===================================================================
+
+class TestAssessReturnStability:
+    """Tests for assess_return_stability() (KIK-383)."""
+
+    def test_stable_high_return(self):
+        """3 years all >= 5%, not monotonic -> stable."""
+        history = [
+            {"total_return_rate": 0.07},
+            {"total_return_rate": 0.08},
+            {"total_return_rate": 0.06},
+        ]
+        result = assess_return_stability(history)
+        assert result["stability"] == "stable"
+        assert "安定" in result["label"]
+        assert result["latest_rate"] == 0.07
+        assert abs(result["avg_rate"] - 0.07) < 0.001
+
+    def test_increasing_trend(self):
+        """Rates rising year over year -> increasing."""
+        history = [
+            {"total_return_rate": 0.06},
+            {"total_return_rate": 0.04},
+            {"total_return_rate": 0.02},
+        ]
+        result = assess_return_stability(history)
+        assert result["stability"] == "increasing"
+        assert "増加" in result["label"]
+
+    def test_decreasing_trend(self):
+        """Rates falling year over year -> decreasing."""
+        history = [
+            {"total_return_rate": 0.02},
+            {"total_return_rate": 0.04},
+            {"total_return_rate": 0.06},
+        ]
+        result = assess_return_stability(history)
+        assert result["stability"] == "decreasing"
+        assert "減少" in result["label"]
+
+    def test_temporary_surge(self):
+        """Latest >= 2x previous -> temporary."""
+        history = [
+            {"total_return_rate": 0.17},
+            {"total_return_rate": 0.08},
+            {"total_return_rate": 0.07},
+        ]
+        result = assess_return_stability(history)
+        assert result["stability"] == "temporary"
+        assert "一時的" in result["label"]
+
+    def test_honda_like_temporary(self):
+        """Honda-like: 17.67% after 8% -> temporary."""
+        history = [
+            {"total_return_rate": 0.1767},
+            {"total_return_rate": 0.08},
+            {"total_return_rate": 0.06},
+        ]
+        result = assess_return_stability(history)
+        assert result["stability"] == "temporary"
+
+    def test_canon_like_stable(self):
+        """Canon-like: consistently 7-8%, not monotonic -> stable."""
+        history = [
+            {"total_return_rate": 0.075},
+            {"total_return_rate": 0.081},
+            {"total_return_rate": 0.072},
+        ]
+        result = assess_return_stability(history)
+        assert result["stability"] == "stable"
+
+    def test_mixed_pattern(self):
+        """Not clearly increasing, decreasing, or stable -> mixed."""
+        history = [
+            {"total_return_rate": 0.03},
+            {"total_return_rate": 0.06},
+            {"total_return_rate": 0.02},
+        ]
+        result = assess_return_stability(history)
+        assert result["stability"] == "mixed"
+        assert "変動" in result["label"]
+
+    def test_unknown_single_year(self):
+        """Only 1 year of data -> unknown."""
+        history = [{"total_return_rate": 0.05}]
+        result = assess_return_stability(history)
+        assert result["stability"] == "unknown"
+        assert result["latest_rate"] == 0.05
+
+    def test_unknown_empty(self):
+        """Empty history -> unknown."""
+        result = assess_return_stability([])
+        assert result["stability"] == "unknown"
+        assert result["latest_rate"] is None
+        assert result["avg_rate"] is None
+
+    def test_none_rates_skipped(self):
+        """Entries with None total_return_rate are skipped."""
+        history = [
+            {"total_return_rate": 0.06},
+            {"total_return_rate": None},
+            {"total_return_rate": 0.04},
+        ]
+        result = assess_return_stability(history)
+        # Only 2 valid rates: 0.06 and 0.04, increasing order
+        assert result["stability"] == "increasing"
+
+    def test_two_years_sufficient(self):
+        """2 years is enough for classification."""
+        history = [
+            {"total_return_rate": 0.07},
+            {"total_return_rate": 0.06},
+        ]
+        result = assess_return_stability(history)
+        # 0.07/0.06 = 1.17, not >= 2 -> not temporary
+        # increasing check: 0.07 >= 0.06 -> true -> increasing
+        assert result["stability"] == "increasing"
+
+    def test_temporary_takes_priority(self):
+        """Temporary detection takes priority over increasing."""
+        history = [
+            {"total_return_rate": 0.20},
+            {"total_return_rate": 0.05},
+            {"total_return_rate": 0.03},
+        ]
+        result = assess_return_stability(history)
+        # 0.20/0.05 = 4.0 >= 2.0 -> temporary (checked first)
+        assert result["stability"] == "temporary"

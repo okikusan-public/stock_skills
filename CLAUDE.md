@@ -89,7 +89,7 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
   │  common.py ─ 共通ユーティリティ(is_cash/is_etf/safe_float)   │
   │  ticker_utils.py ─ ティッカー推論(通貨/国マッピング)          │
   │  screener.py ─ 4つのスクリーナーエンジン                     │
-  │  indicators.py ─ バリュースコア(0-100点) + 株主還元率        │
+  │  indicators.py ─ バリュースコア(0-100点) + 株主還元率 + 還元安定度評価 │
   │  filters.py ─ ファンダメンタルズ条件フィルタ                   │
   │  query_builder.py ─ EquityQuery 構築                     │
   │  alpha.py ─ 変化スコア(アクルーアルズ/売上加速/FCF/ROE趨勢)    │

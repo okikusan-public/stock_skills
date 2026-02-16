@@ -26,6 +26,12 @@ try:
 except ImportError:
     HAS_HISTORY = False
 
+try:
+    from src.output.formatter import format_shareholder_return_markdown
+    HAS_SR_FORMAT = True
+except ImportError:
+    HAS_SR_FORMAT = False
+
 
 # Legacy market classes
 MARKETS = {
@@ -206,7 +212,10 @@ def run_query_mode(args):
                 top_n=args.top,
             )
             print(f"\n## {region_name} - {args.preset}{sector_label} スクリーニング結果 (EquityQuery)\n")
-            print(format_query_markdown(results))
+            if args.preset == "shareholder-return" and HAS_SR_FORMAT:
+                print(format_shareholder_return_markdown(results))
+            else:
+                print(format_query_markdown(results))
             if HAS_HISTORY and results:
                 try:
                     save_screening(preset=args.preset, region=region_code, results=results, sector=args.sector)

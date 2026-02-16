@@ -8,7 +8,7 @@ import yaml
 
 from src.core.alpha import compute_change_score
 from src.core.filters import apply_filters
-from src.core.indicators import calculate_value_score, calculate_shareholder_return
+from src.core.indicators import calculate_value_score, calculate_shareholder_return, calculate_shareholder_return_history, assess_return_stability
 from src.core.query_builder import build_query
 from src.core.technicals import detect_pullback_in_uptrend
 
@@ -310,6 +310,12 @@ class QueryScreener:
                 sr = calculate_shareholder_return(detail)
                 stock["total_shareholder_return"] = sr.get("total_return_rate")
                 stock["buyback_yield"] = sr.get("buyback_yield")
+                # KIK-383: Return stability assessment
+                sr_hist = calculate_shareholder_return_history(detail)
+                stability = assess_return_stability(sr_hist)
+                stock["return_stability"] = stability.get("stability")
+                stock["return_stability_label"] = stability.get("label")
+                stock["return_avg_rate"] = stability.get("avg_rate")
                 if apply_filters(stock, {"min_total_shareholder_return": criteria["min_total_shareholder_return"]}):
                     enriched.append(stock)
             results = enriched
