@@ -14,7 +14,7 @@
 - yahoo_client はモジュール関数（クラスではない）。`from src.data import yahoo_client` → `yahoo_client.get_stock_info(symbol)`
 - 配当利回りの正規化: `_normalize_ratio()` が値 > 1 の場合 100 で割って比率に変換
 - フィールド名のエイリアス: indicators.py は yfinance 生キー（`trailingPE`, `priceToBook`）と正規化済みキー（`per`, `pbr`）の両方を対応
-- `src/core/` はサブフォルダ構成（screening/, portfolio/, risk/, research/）。新モジュールは適切なサブフォルダに配置。`sys.modules` スタブで旧パス `src.core.xxx` も互換維持
+- `src/core/` はサブフォルダ構成（screening/, portfolio/, risk/, research/）。新モジュールは適切なサブフォルダに配置。import は直接パス（`src.core.screening.screener` 等）を使用
 
 ## テスト
 

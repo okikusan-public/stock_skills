@@ -1,4 +1,4 @@
-"""Tests for src.core.backtest module."""
+"""Tests for src.core.portfolio.backtest module."""
 
 import json
 from datetime import date, timedelta
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from src.core.backtest import _get_benchmark_return, run_backtest
+from src.core.portfolio.backtest import _get_benchmark_return, run_backtest
 from src.data.history_store import save_screening
 
 

@@ -43,7 +43,7 @@ def _load_portfolio_csv(csv_path: str) -> list[dict]:
     """
     # Try portfolio_manager first (may be implemented later)
     try:
-        from src.core.portfolio_manager import load_portfolio as _pm_load
+        from src.core.portfolio.portfolio_manager import load_portfolio as _pm_load
         return _pm_load(csv_path)
     except (ImportError, ModuleNotFoundError):
         pass

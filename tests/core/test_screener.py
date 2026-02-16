@@ -1,8 +1,8 @@
-"""Tests for src.core.screener module."""
+"""Tests for src.core.screening.screener module."""
 
 import pytest
 
-from src.core.screener import QueryScreener, PullbackScreener
+from src.core.screening.screener import QueryScreener, PullbackScreener
 
 
 # ===================================================================

@@ -1,10 +1,10 @@
-"""Tests for src.core.portfolio_manager module."""
+"""Tests for src.core.portfolio.portfolio_manager module."""
 
 import os
 
 import pytest
 
-from src.core.portfolio_manager import (
+from src.core.portfolio.portfolio_manager import (
     load_portfolio,
     save_portfolio,
     add_position,
@@ -424,7 +424,7 @@ class TestInferCountryCash:
 class TestGetSnapshotCash:
     def test_cash_position_skips_api(self, csv_path):
         """Cash positions should not trigger API calls."""
-        from src.core.portfolio_manager import get_snapshot
+        from src.core.portfolio.portfolio_manager import get_snapshot
 
         portfolio = [
             {"symbol": "JPY.CASH", "shares": 1, "cost_price": 500000.0,

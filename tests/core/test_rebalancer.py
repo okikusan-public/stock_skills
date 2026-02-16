@@ -2,11 +2,11 @@
 
 import pytest
 
-from src.core.rebalancer import (
+from src.core.portfolio.concentration import compute_hhi
+from src.core.portfolio.rebalancer import (
     _is_cash,
     _build_constraints,
     _compute_current_metrics,
-    _compute_hhi,
     _generate_sell_actions,
     _generate_reduce_actions,
     _generate_increase_actions,
@@ -239,28 +239,28 @@ class TestComputeCurrentMetrics:
 
 
 # ===================================================================
-# _compute_hhi tests
+# compute_hhi tests (moved to concentration.compute_hhi, KIK-387)
 # ===================================================================
 
 class TestComputeHhi:
-    """Tests for _compute_hhi()."""
+    """Tests for compute_hhi() from concentration module."""
 
-    def test_empty_dict(self):
-        assert _compute_hhi({}) == 0.0
+    def test_empty_list(self):
+        assert compute_hhi([]) == 0.0
 
     def test_single_category(self):
-        assert _compute_hhi({"A": 1.0}) == pytest.approx(1.0)
+        assert compute_hhi([1.0]) == pytest.approx(1.0)
 
     def test_two_equal(self):
-        assert _compute_hhi({"A": 0.5, "B": 0.5}) == pytest.approx(0.5)
+        assert compute_hhi([0.5, 0.5]) == pytest.approx(0.5)
 
     def test_three_equal(self):
         w = 1.0 / 3.0
-        assert _compute_hhi({"A": w, "B": w, "C": w}) == pytest.approx(1.0 / 3.0)
+        assert compute_hhi([w, w, w]) == pytest.approx(1.0 / 3.0)
 
     def test_concentrated(self):
         # 0.9^2 + 0.1^2 = 0.81 + 0.01 = 0.82
-        assert _compute_hhi({"A": 0.9, "B": 0.1}) == pytest.approx(0.82)
+        assert compute_hhi([0.9, 0.1]) == pytest.approx(0.82)
 
 
 # ===================================================================

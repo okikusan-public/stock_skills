@@ -1,4 +1,4 @@
-"""Tests for src.core.shock_sensitivity module."""
+"""Tests for src.core.risk.shock_sensitivity module."""
 
 import math
 
@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.shock_sensitivity import (
+from src.core.risk.shock_sensitivity import (
     _clamp,
     _safe_float,
     classify_quadrant,

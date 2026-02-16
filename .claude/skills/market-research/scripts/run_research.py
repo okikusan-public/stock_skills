@@ -11,13 +11,13 @@ from src.data import yahoo_client
 
 # HAS_MODULE パターン
 try:
-    from src.core.researcher import research_stock, research_industry, research_market
+    from src.core.research.researcher import research_stock, research_industry, research_market
     HAS_RESEARCHER = True
 except ImportError:
     HAS_RESEARCHER = False
 
 try:
-    from src.core.researcher import research_business
+    from src.core.research.researcher import research_business
     HAS_BUSINESS = True
 except ImportError:
     HAS_BUSINESS = False

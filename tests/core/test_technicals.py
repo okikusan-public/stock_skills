@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.technicals import (
+from src.core.screening.technicals import (
     compute_rsi,
     compute_bollinger_bands,
     detect_pullback_in_uptrend,

@@ -6,8 +6,8 @@ import tempfile
 
 import pytest
 
-from src.core.portfolio_manager import merge_positions, save_portfolio
-from src.core.portfolio_simulation import (
+from src.core.portfolio.portfolio_manager import merge_positions, save_portfolio
+from src.core.portfolio.portfolio_simulation import (
     _compute_judgment,
     _compute_required_cash,
     _extract_metrics,
@@ -381,7 +381,7 @@ class TestRunWhatIfSimulation:
         assert len(whatif_files) == 0
 
     def test_original_csv_unchanged(self, portfolio_csv, mock_client):
-        from src.core.portfolio_manager import load_portfolio
+        from src.core.portfolio.portfolio_manager import load_portfolio
 
         original = load_portfolio(portfolio_csv)
 

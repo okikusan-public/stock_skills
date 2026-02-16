@@ -85,7 +85,7 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
       │  sys.path.insert で project root を追加して src/ を import
       ▼
   ┌─────────────────────────────────────────────────────────┐
-  │ Core (src/core/)  ※ sys.modules スタブで旧パス互換維持      │
+  │ Core (src/core/)                                            │
   │                                                           │
   │  [root] 共通モジュール                                      │
   │  models.py ─ dataclass定義(Position/ForecastResult/HealthResult等) │
@@ -94,7 +94,6 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
   │  health_check.py ─ 保有銘柄ヘルスチェック(3段階アラート+クロス検出+トラップ検出) │
   │  return_estimate.py ─ 推定利回り(アナリスト+過去リターン+ニュース+Xセンチメント) │
   │  value_trap.py ─ バリュートラップ検出(health_checkから独立)     │
-  │  sharpe.py ─ ボラティリティユーティリティ                       │
   │                                                           │
   │  screening/ ─ スクリーニングエンジン                          │
   │    screener.py ─ 4つのスクリーナー(Query/Value/Pullback/Alpha) │

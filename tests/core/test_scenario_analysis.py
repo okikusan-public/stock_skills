@@ -1,8 +1,8 @@
-"""Tests for src.core.scenario_analysis module."""
+"""Tests for src.core.risk.scenario_analysis module."""
 
 import pytest
 
-from src.core.scenario_analysis import (
+from src.core.risk.scenario_analysis import (
     SCENARIOS,
     SCENARIO_ALIASES,
     resolve_scenario,
@@ -587,23 +587,23 @@ class TestETFAssetClassMapping:
     """Tests for ETF asset class detection (KIK-358)."""
 
     def test_gldm_is_gold(self):
-        from src.core.scenario_analysis import _get_etf_asset_class
+        from src.core.risk.scenario_analysis import _get_etf_asset_class
         assert _get_etf_asset_class("GLDM", {}) == "金・安全資産"
 
     def test_tlt_is_bond(self):
-        from src.core.scenario_analysis import _get_etf_asset_class
+        from src.core.risk.scenario_analysis import _get_etf_asset_class
         assert _get_etf_asset_class("TLT", {}) == "長期債"
 
     def test_jepi_is_equity_income(self):
-        from src.core.scenario_analysis import _get_etf_asset_class
+        from src.core.risk.scenario_analysis import _get_etf_asset_class
         assert _get_etf_asset_class("JEPI", {}) == "株式インカム"
 
     def test_regular_stock_returns_none(self):
-        from src.core.scenario_analysis import _get_etf_asset_class
+        from src.core.risk.scenario_analysis import _get_etf_asset_class
         assert _get_etf_asset_class("AAPL", {}) is None
 
     def test_unknown_etf_falls_back_to_equity_income(self):
-        from src.core.scenario_analysis import _get_etf_asset_class
+        from src.core.risk.scenario_analysis import _get_etf_asset_class
         assert _get_etf_asset_class("XYZ", {"quoteType": "ETF"}) == "株式インカム"
 
     def test_match_target_gold_etf(self):

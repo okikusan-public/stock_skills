@@ -4,7 +4,7 @@ import math
 import pytest
 import numpy as np
 
-from src.core.correlation import (
+from src.core.risk.correlation import (
     _compute_daily_returns,
     _safe_float,
     compute_correlation_matrix,

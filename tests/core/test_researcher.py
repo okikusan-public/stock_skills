@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from src.core.researcher import (
+from src.core.research.researcher import (
     research_stock,
     research_industry,
     research_market,

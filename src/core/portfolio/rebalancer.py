@@ -14,6 +14,7 @@ Uses existing modules:
 from typing import Optional
 
 from src.core.common import is_cash as _is_cash
+from src.core.portfolio.concentration import compute_hhi
 
 # ---------------------------------------------------------------------------
 # Thresholds
@@ -143,10 +144,6 @@ def _compute_current_metrics(positions: list[dict], total_value_jpy: float) -> d
         "currency_weights": currency_weights,
     }
 
-
-def _compute_hhi(breakdown: dict[str, float]) -> float:
-    """Compute HHI from a category breakdown dict."""
-    return sum(w * w for w in breakdown.values())
 
 
 # ---------------------------------------------------------------------------
@@ -501,8 +498,8 @@ def generate_rebalance_proposal(
     before_metrics = _compute_current_metrics(positions, total_value_jpy)
     before = {
         "base_return": round(before_metrics["base_return"], 4),
-        "sector_hhi": round(_compute_hhi(before_metrics["sector_weights"]), 4),
-        "region_hhi": round(_compute_hhi(before_metrics["region_weights"]), 4),
+        "sector_hhi": round(compute_hhi(list(before_metrics["sector_weights"].values())), 4),
+        "region_hhi": round(compute_hhi(list(before_metrics["region_weights"].values())), 4),
     }
     # Use concentration module values if available (more accurate)
     if concentration:

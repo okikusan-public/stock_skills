@@ -1,9 +1,9 @@
-"""Tests for src.core.query_builder module."""
+"""Tests for src.core.screening.query_builder module."""
 
 import pytest
 from yfinance import EquityQuery
 
-from src.core.query_builder import (
+from src.core.screening.query_builder import (
     build_query,
     _build_criteria_conditions,
     _build_region_condition,

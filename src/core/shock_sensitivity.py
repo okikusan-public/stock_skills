@@ -1,4 +1,0 @@
-"""Backward-compatible stub — moved to src/core/risk/shock_sensitivity.py (KIK-392)."""
-from src.core.risk import shock_sensitivity as _module
-import sys as _sys
-_sys.modules[__name__] = _module

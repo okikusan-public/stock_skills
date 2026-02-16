@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.core.simulator import (
+from src.core.portfolio.simulator import (
     simulate_portfolio,
     calculate_target_year,
     calculate_required_monthly,

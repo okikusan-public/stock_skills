@@ -368,9 +368,9 @@ class TestEstimateStockReturn:
 # ---------------------------------------------------------------------------
 
 class TestEstimatePortfolioReturn:
-    @patch("src.core.portfolio_manager._infer_currency")
-    @patch("src.core.portfolio_manager.get_fx_rates")
-    @patch("src.core.portfolio_manager.load_portfolio")
+    @patch("src.core.portfolio.portfolio_manager._infer_currency")
+    @patch("src.core.portfolio.portfolio_manager.get_fx_rates")
+    @patch("src.core.portfolio.portfolio_manager.load_portfolio")
     def test_portfolio_weighted_average(
         self, mock_load, mock_fx, mock_infer
     ):
@@ -430,7 +430,7 @@ class TestEstimatePortfolioReturn:
         assert result["portfolio"]["base"] is not None
         assert result["total_value_jpy"] > 0
 
-    @patch("src.core.portfolio_manager.load_portfolio")
+    @patch("src.core.portfolio.portfolio_manager.load_portfolio")
     def test_empty_portfolio(self, mock_load):
         """Empty portfolio returns empty result."""
         mock_load.return_value = []
@@ -440,9 +440,9 @@ class TestEstimatePortfolioReturn:
         assert result["positions"] == []
         assert result["portfolio"]["base"] is None
 
-    @patch("src.core.portfolio_manager._infer_currency")
-    @patch("src.core.portfolio_manager.get_fx_rates")
-    @patch("src.core.portfolio_manager.load_portfolio")
+    @patch("src.core.portfolio.portfolio_manager._infer_currency")
+    @patch("src.core.portfolio.portfolio_manager.get_fx_rates")
+    @patch("src.core.portfolio.portfolio_manager.load_portfolio")
     def test_failed_fetch_none_shows_no_data(self, mock_load, mock_fx, mock_infer):
         """Stock with None detail appears with method='no_data'."""
         mock_load.return_value = [
@@ -458,9 +458,9 @@ class TestEstimatePortfolioReturn:
         assert result["positions"][0]["method"] == "no_data"
         assert result["positions"][0]["base"] is None
 
-    @patch("src.core.portfolio_manager._infer_currency")
-    @patch("src.core.portfolio_manager.get_fx_rates")
-    @patch("src.core.portfolio_manager.load_portfolio")
+    @patch("src.core.portfolio.portfolio_manager._infer_currency")
+    @patch("src.core.portfolio.portfolio_manager.get_fx_rates")
+    @patch("src.core.portfolio.portfolio_manager.load_portfolio")
     def test_failed_fetch_no_price_shows_no_data(self, mock_load, mock_fx, mock_infer):
         """Stock with price=None in detail also appears as 'no_data'."""
         mock_load.return_value = [
@@ -476,9 +476,9 @@ class TestEstimatePortfolioReturn:
         assert result["positions"][0]["method"] == "no_data"
         assert result["positions"][0]["base"] is None
 
-    @patch("src.core.portfolio_manager._infer_currency")
-    @patch("src.core.portfolio_manager.get_fx_rates")
-    @patch("src.core.portfolio_manager.load_portfolio")
+    @patch("src.core.portfolio.portfolio_manager._infer_currency")
+    @patch("src.core.portfolio.portfolio_manager.get_fx_rates")
+    @patch("src.core.portfolio.portfolio_manager.load_portfolio")
     def test_forecast_never_calls_grok(self, mock_load, mock_fx, mock_infer):
         """Forecast should never call Grok API (KIK-369)."""
         mock_load.return_value = [
@@ -502,9 +502,9 @@ class TestEstimatePortfolioReturn:
         mock_grok.search_x_sentiment.assert_not_called()
         assert result["positions"][0]["x_sentiment"] is None
 
-    @patch("src.core.portfolio_manager._infer_currency")
-    @patch("src.core.portfolio_manager.get_fx_rates")
-    @patch("src.core.portfolio_manager.load_portfolio")
+    @patch("src.core.portfolio.portfolio_manager._infer_currency")
+    @patch("src.core.portfolio.portfolio_manager.get_fx_rates")
+    @patch("src.core.portfolio.portfolio_manager.load_portfolio")
     def test_cash_position_skips_api(self, mock_load, mock_fx, mock_infer):
         """Cash positions (.CASH) should not trigger API calls (KIK-361)."""
         mock_load.return_value = [

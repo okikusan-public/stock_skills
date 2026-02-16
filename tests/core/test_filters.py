@@ -1,6 +1,6 @@
 """Tests for src/core/filters.py -- apply_filters()."""
 
-from src.core.filters import apply_filters
+from src.core.screening.filters import apply_filters
 
 
 # ===================================================================

@@ -88,7 +88,7 @@ EquityQuery で日本株・米国株・ASEAN株等から割安銘柄を検索。
 Skills (.claude/skills/*/SKILL.md → scripts/*.py)
   │
   ▼
-Core (src/core/)  ※ sys.modules スタブで旧パス互換維持
+Core (src/core/)
   screening/ ─ screener, indicators, filters, query_builder, alpha, technicals
   portfolio/ ─ portfolio_manager, portfolio_simulation, concentration, rebalancer, simulator, backtest
   risk/      ─ correlation, shock_sensitivity, scenario_analysis, scenario_definitions, recommender

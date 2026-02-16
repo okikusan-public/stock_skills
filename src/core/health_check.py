@@ -70,7 +70,7 @@ def check_trend_health(hist: Optional[pd.DataFrame]) -> dict:
 
     close = hist["Close"]
 
-    from src.core.technicals import compute_rsi
+    from src.core.screening.technicals import compute_rsi
 
     sma50 = close.rolling(window=50).mean()
     sma200 = close.rolling(window=200).mean()
@@ -181,7 +181,7 @@ def check_change_quality(stock_detail: dict) -> dict:
             "is_etf": True,
         }
 
-    from src.core.alpha import compute_change_score
+    from src.core.screening.alpha import compute_change_score
 
     result = compute_change_score(stock_detail)
 
@@ -526,7 +526,7 @@ def run_health_check(csv_path: str, client) -> dict:
     dict
         Keys: positions, alerts (non-none only), summary.
     """
-    from src.core.portfolio_manager import get_snapshot
+    from src.core.portfolio.portfolio_manager import get_snapshot
 
     snapshot = get_snapshot(csv_path, client)
     positions = snapshot.get("positions", [])

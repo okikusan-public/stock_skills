@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.core.indicators import (
+from src.core.screening.indicators import (
     assess_return_stability,
     calculate_value_score,
     calculate_shareholder_return,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.core.recommender import (
+from src.core.risk.recommender import (
     generate_recommendations,
     _check_concentration,
     _check_correlations,

@@ -28,7 +28,7 @@ from src.data import yahoo_client
 
 # Team 2 module: portfolio_manager (core logic for portfolio operations)
 try:
-    from src.core.portfolio_manager import (
+    from src.core.portfolio.portfolio_manager import (
         load_portfolio,
         save_portfolio,
         add_position,
@@ -70,14 +70,14 @@ except ImportError:
 
 # Concentration analysis (already exists in the codebase)
 try:
-    from src.core.concentration import analyze_concentration
+    from src.core.portfolio.concentration import analyze_concentration
     HAS_CONCENTRATION = True
 except ImportError:
     HAS_CONCENTRATION = False
 
 # KIK-363: Rebalancer module
 try:
-    from src.core.rebalancer import generate_rebalance_proposal
+    from src.core.portfolio.rebalancer import generate_rebalance_proposal
     HAS_REBALANCER = True
 except ImportError:
     HAS_REBALANCER = False
@@ -91,7 +91,7 @@ except ImportError:
 
 # KIK-366: Simulator module
 try:
-    from src.core.simulator import simulate_portfolio
+    from src.core.portfolio.simulator import simulate_portfolio
     HAS_SIMULATOR = True
 except ImportError:
     HAS_SIMULATOR = False
@@ -112,14 +112,14 @@ except ImportError:
 
 # KIK-368: Backtest module
 try:
-    from src.core.backtest import run_backtest
+    from src.core.portfolio.backtest import run_backtest
     HAS_BACKTEST = True
 except ImportError:
     HAS_BACKTEST = False
 
 # Correlation module (for high-correlation pairs)
 try:
-    from src.core.correlation import (
+    from src.core.risk.correlation import (
         compute_correlation_matrix,
         find_high_correlation_pairs,
     )
@@ -129,14 +129,14 @@ except ImportError:
 
 # KIK-375: Shareholder return module
 try:
-    from src.core.indicators import calculate_shareholder_return
+    from src.core.screening.indicators import calculate_shareholder_return
     HAS_SHAREHOLDER_RETURN = True
 except ImportError:
     HAS_SHAREHOLDER_RETURN = False
 
 # KIK-376: What-If simulation module
 try:
-    from src.core.portfolio_simulation import (
+    from src.core.portfolio.portfolio_simulation import (
         parse_add_arg,
         run_what_if_simulation,
     )
@@ -784,7 +784,7 @@ def cmd_rebalance(
                     if not pos.get("sector"):
                         pos["sector"] = snap_pos.get("sector")
                     if not pos.get("country"):
-                        from src.core.portfolio_manager import _infer_country
+                        from src.core.portfolio.portfolio_manager import _infer_country
                         pos["country"] = _infer_country(pos.get("symbol", ""))
                     if not pos.get("evaluation_jpy"):
                         pos["evaluation_jpy"] = snap_pos.get("evaluation_jpy", 0)

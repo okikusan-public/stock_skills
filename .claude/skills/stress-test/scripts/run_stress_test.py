@@ -19,17 +19,17 @@ from typing import Optional
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from src.data import yahoo_client
-from src.core.concentration import analyze_concentration, compute_hhi
+from src.core.portfolio.concentration import analyze_concentration, compute_hhi
 
 # Team 2 module
 try:
-    from src.core.shock_sensitivity import analyze_stock_sensitivity
+    from src.core.risk.shock_sensitivity import analyze_stock_sensitivity
 except ImportError:
     analyze_stock_sensitivity = None
 
 # Team 3 modules
 try:
-    from src.core.scenario_analysis import resolve_scenario, analyze_portfolio_scenario
+    from src.core.risk.scenario_analysis import resolve_scenario, analyze_portfolio_scenario
 except ImportError:
     resolve_scenario = None
     analyze_portfolio_scenario = None
@@ -41,7 +41,7 @@ except ImportError:
 
 # KIK-352 modules
 try:
-    from src.core.correlation import (
+    from src.core.risk.correlation import (
         compute_correlation_matrix,
         find_high_correlation_pairs,
         decompose_factors,
@@ -56,7 +56,7 @@ except ImportError:
     MACRO_FACTORS = []
 
 try:
-    from src.core.recommender import generate_recommendations
+    from src.core.risk.recommender import generate_recommendations
 except ImportError:
     generate_recommendations = None
 

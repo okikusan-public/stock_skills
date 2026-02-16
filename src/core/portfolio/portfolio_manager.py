@@ -512,7 +512,7 @@ def get_structure_analysis(csv_path: str, client) -> dict:
             "risk_level": str,
         }
     """
-    from src.core.concentration import analyze_concentration
+    from src.core.portfolio.concentration import analyze_concentration
 
     # Get snapshot first (this also fetches current prices and FX rates)
     snapshot = get_snapshot(csv_path, client)

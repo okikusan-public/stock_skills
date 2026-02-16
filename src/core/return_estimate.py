@@ -316,7 +316,7 @@ def estimate_portfolio_return(csv_path: str, yahoo_client_module) -> dict:
             "fx_rates": dict,
         }
     """
-    from src.core.portfolio_manager import load_portfolio, get_fx_rates
+    from src.core.portfolio.portfolio_manager import load_portfolio, get_fx_rates
     from src.core.ticker_utils import infer_currency as _infer_currency
 
     portfolio = load_portfolio(csv_path)

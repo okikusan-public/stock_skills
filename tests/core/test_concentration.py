@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.core.concentration import (
+from src.core.portfolio.concentration import (
     compute_hhi,
     get_concentration_multiplier,
     analyze_concentration,

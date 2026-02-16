@@ -7,22 +7,22 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from src.data.yahoo_client import get_stock_info, get_stock_detail
-from src.core.indicators import calculate_value_score
+from src.core.screening.indicators import calculate_value_score
 
 try:
-    from src.core.indicators import calculate_shareholder_return
+    from src.core.screening.indicators import calculate_shareholder_return
     HAS_SHAREHOLDER_RETURN = True
 except ImportError:
     HAS_SHAREHOLDER_RETURN = False
 
 try:
-    from src.core.indicators import calculate_shareholder_return_history
+    from src.core.screening.indicators import calculate_shareholder_return_history
     HAS_SHAREHOLDER_HISTORY = True
 except ImportError:
     HAS_SHAREHOLDER_HISTORY = False
 
 try:
-    from src.core.indicators import assess_return_stability
+    from src.core.screening.indicators import assess_return_stability
     HAS_RETURN_STABILITY = True
 except ImportError:
     HAS_RETURN_STABILITY = False

@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from src.core.screener import TrendingScreener
+from src.core.screening.screener import TrendingScreener
 
 
 # ===================================================================
