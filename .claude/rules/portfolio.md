@@ -1,15 +1,10 @@
 ---
 paths:
-  - "src/core/portfolio_manager.py"
-  - "src/core/portfolio_bridge.py"
+  - "src/core/portfolio/**"
+  - "src/core/risk/**"
   - "src/core/health_check.py"
   - "src/core/return_estimate.py"
-  - "src/core/rebalancer.py"
-  - "src/core/concentration.py"
-  - "src/core/correlation.py"
-  - "src/core/shock_sensitivity.py"
-  - "src/core/scenario_analysis.py"
-  - "src/core/recommender.py"
+  - "src/core/value_trap.py"
   - "src/output/portfolio_formatter.py"
   - "src/output/stress_formatter.py"
   - ".claude/skills/stock-portfolio/**"

@@ -88,19 +88,12 @@ EquityQuery で日本株・米国株・ASEAN株等から割安銘柄を検索。
 Skills (.claude/skills/*/SKILL.md → scripts/*.py)
   │
   ▼
-Core (src/core/)
-  screener.py ─ 4つのスクリーナー (Query/Value/Pullback/Alpha)
-  indicators.py ─ バリュースコア (100点) + 株主還元率
-  alpha.py ─ 変化スコア (100点)
-  technicals.py ─ 押し目判定
-  health_check.py ─ ヘルスチェック (3段階アラート + ゴールデンクロス/デッドクロス検出)
-  return_estimate.py ─ 推定利回り (3シナリオ + Xセンチメント)
-  concentration.py ─ HHI集中度分析
-  correlation.py ─ 相関分析・ファクター分解・VaR
-  shock_sensitivity.py ─ ショック感応度
-  scenario_analysis.py ─ シナリオ分析 (8シナリオ)
-  recommender.py ─ 推奨アクション
-  portfolio_manager.py ─ ポートフォリオ管理
+Core (src/core/)  ※ sys.modules スタブで旧パス互換維持
+  screening/ ─ screener, indicators, filters, query_builder, alpha, technicals
+  portfolio/ ─ portfolio_manager, portfolio_simulation, concentration, rebalancer, simulator, backtest
+  risk/      ─ correlation, shock_sensitivity, scenario_analysis, scenario_definitions, recommender
+  research/  ─ researcher (yfinance + Grok API統合)
+  [root]     ─ common, models, ticker_utils, health_check, return_estimate, value_trap
   │
   ├─ Markets (src/markets/) ─ japan/us/asean
   ├─ Data (src/data/)
@@ -115,7 +108,7 @@ Core (src/core/)
 ## テスト
 
 ```bash
-pytest tests/           # 全640テスト (< 1秒)
+pytest tests/           # 全1191テスト (< 1秒)
 pytest tests/core/ -v   # コアモジュール
 ```
 

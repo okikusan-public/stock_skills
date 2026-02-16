@@ -85,31 +85,43 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
       │  sys.path.insert で project root を追加して src/ を import
       ▼
   ┌─────────────────────────────────────────────────────────┐
-  │ Core (src/core/)                                        │
+  │ Core (src/core/)  ※ sys.modules スタブで旧パス互換維持      │
+  │                                                           │
+  │  [root] 共通モジュール                                      │
   │  models.py ─ dataclass定義(Position/ForecastResult/HealthResult等) │
   │  common.py ─ 共通ユーティリティ(is_cash/is_etf/safe_float)   │
-  │  ticker_utils.py ─ ティッカー推論(通貨/国マッピング)          │
-  │  screener.py ─ 4つのスクリーナーエンジン                     │
-  │  indicators.py ─ バリュースコア(0-100点) + 株主還元率 + 還元安定度評価 │
-  │  filters.py ─ ファンダメンタルズ条件フィルタ                   │
-  │  query_builder.py ─ EquityQuery 構築                     │
-  │  alpha.py ─ 変化スコア(アクルーアルズ/売上加速/FCF/ROE趨勢)    │
-  │  technicals.py ─ 押し目判定(RSI/BB/バウンススコア)           │
-  │  health_check.py ─ 保有銘柄ヘルスチェック(3段階アラート + クロス検出 + バリュートラップ検出) │
-  │  return_estimate.py ─ 推定利回り(アナリスト+過去リターン+ニュース+Xセンチメント+トラップ警告) │
-  │  simulator.py ─ 複利シミュレーション(3シナリオ+配当再投資+積立) │
-  │  portfolio_simulation.py ─ What-Ifシミュレーション(追加銘柄のBefore/After比較) │
-  │  concentration.py ─ HHI集中度分析                          │
-  │  correlation.py ─ 日次リターン・相関行列・因子分解              │
-  │  shock_sensitivity.py ─ ショック感応度スコア                  │
-  │  scenario_analysis.py ─ シナリオ分析(実行ロジック)            │
-  │  scenario_definitions.py ─ シナリオ定義(8シナリオ+ETF資産クラス) │
-  │  recommender.py ─ ルールベース推奨アクション                   │
-  │  rebalancer.py ─ リスク制約付きリバランス提案エンジン            │
-  │  backtest.py ─ 蓄積データからリターン検証・ベンチマーク比較       │
-  │  portfolio_manager.py ─ CSV ベースのポートフォリオ管理         │
-  │  portfolio_bridge.py ─ ポートフォリオCSV→ストレステスト連携     │
-  │  researcher.py ─ 深掘りリサーチ(yfinance+Grok API統合)         │
+  │  ticker_utils.py ─ ティッカー推論(通貨/地域マッピング)         │
+  │  health_check.py ─ 保有銘柄ヘルスチェック(3段階アラート+クロス検出+トラップ検出) │
+  │  return_estimate.py ─ 推定利回り(アナリスト+過去リターン+ニュース+Xセンチメント) │
+  │  value_trap.py ─ バリュートラップ検出(health_checkから独立)     │
+  │  sharpe.py ─ ボラティリティユーティリティ                       │
+  │                                                           │
+  │  screening/ ─ スクリーニングエンジン                          │
+  │    screener.py ─ 4つのスクリーナー(Query/Value/Pullback/Alpha) │
+  │    indicators.py ─ バリュースコア(0-100点)+株主還元率+安定度   │
+  │    filters.py ─ ファンダメンタルズ条件フィルタ                  │
+  │    query_builder.py ─ EquityQuery構築                      │
+  │    alpha.py ─ 変化スコア(アクルーアルズ/売上加速/FCF/ROE趨勢)  │
+  │    technicals.py ─ 押し目判定(RSI/BB/バウンススコア)          │
+  │                                                           │
+  │  portfolio/ ─ ポートフォリオ管理・分析                        │
+  │    portfolio_manager.py ─ CSVベースのポートフォリオ管理        │
+  │    portfolio_simulation.py ─ What-Ifシミュレーション           │
+  │    portfolio_bridge.py ─ PF CSV→ストレステスト連携            │
+  │    concentration.py ─ HHI集中度分析                          │
+  │    rebalancer.py ─ リスク制約付きリバランス提案エンジン          │
+  │    simulator.py ─ 複利シミュレーション(3シナリオ+配当再投資+積立) │
+  │    backtest.py ─ 蓄積データからリターン検証・ベンチマーク比較     │
+  │                                                           │
+  │  risk/ ─ リスク分析・ストレステスト                           │
+  │    correlation.py ─ 日次リターン・相関行列・因子分解            │
+  │    shock_sensitivity.py ─ ショック感応度スコア                 │
+  │    scenario_analysis.py ─ シナリオ分析(実行ロジック)           │
+  │    scenario_definitions.py ─ シナリオ定義(8シナリオ+ETF資産クラス) │
+  │    recommender.py ─ ルールベース推奨アクション                  │
+  │                                                           │
+  │  research/ ─ 深掘りリサーチ                                  │
+  │    researcher.py ─ yfinance+Grok API統合リサーチ              │
   └─────────────────────────────────────────────────────────┘
       │                    │                    │
   Markets            Data                  Output

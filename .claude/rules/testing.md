@@ -10,7 +10,7 @@ paths:
 ## テスト実行
 
 ```bash
-python3 -m pytest tests/ -q                       # 全件実行（約740テスト, ~1秒）
+python3 -m pytest tests/ -q                       # 全件実行（約1191テスト, ~1秒）
 python3 -m pytest tests/core/test_indicators.py -v # 特定モジュール
 python3 -m pytest tests/ -k "test_value_score"     # キーワード指定
 ```

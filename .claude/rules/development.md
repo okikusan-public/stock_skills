@@ -14,10 +14,11 @@
 - yahoo_client はモジュール関数（クラスではない）。`from src.data import yahoo_client` → `yahoo_client.get_stock_info(symbol)`
 - 配当利回りの正規化: `_normalize_ratio()` が値 > 1 の場合 100 で割って比率に変換
 - フィールド名のエイリアス: indicators.py は yfinance 生キー（`trailingPE`, `priceToBook`）と正規化済みキー（`per`, `pbr`）の両方を対応
+- `src/core/` はサブフォルダ構成（screening/, portfolio/, risk/, research/）。新モジュールは適切なサブフォルダに配置。`sys.modules` スタブで旧パス `src.core.xxx` も互換維持
 
 ## テスト
 
-- `python3 -m pytest tests/ -q` で全テスト実行（約740テスト、~1秒）
+- `python3 -m pytest tests/ -q` で全テスト実行（約1191テスト、~1秒）
 - `tests/conftest.py` に共通フィクスチャ: `stock_info_data`, `stock_detail_data`, `price_history_df`, `mock_yahoo_client`
 - `tests/fixtures/` に JSON/CSV テストデータ（Toyota 7203.T ベース）
 - `mock_yahoo_client` は monkeypatch で yahoo_client モジュール関数をモック

@@ -1,11 +1,6 @@
 ---
 paths:
-  - "src/core/screener.py"
-  - "src/core/indicators.py"
-  - "src/core/query_builder.py"
-  - "src/core/filters.py"
-  - "src/core/alpha.py"
-  - "src/core/technicals.py"
+  - "src/core/screening/**"
   - ".claude/skills/screen-stocks/**"
   - "config/screening_presets.yaml"
 ---
