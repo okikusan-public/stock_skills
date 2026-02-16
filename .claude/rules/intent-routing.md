@@ -46,6 +46,7 @@
 | 押し目、調整中 | pullback |
 | トレンド、話題、X、Twitter、SNS | trending |
 | 長期、長期投資、じっくり、バイ＆ホールド、安定成長 | long-term |
+| 還元、株主還元、自社株買い、バイバック、総還元 | shareholder-return |
 | 指定なし | alpha（デフォルト） |
 
 ## 複合意図の処理

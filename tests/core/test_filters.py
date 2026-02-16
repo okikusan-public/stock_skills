@@ -251,3 +251,31 @@ class TestApplyFiltersMarketCap:
         stock = {"market_cap": 100_000_000_000}
         criteria = {"min_market_cap": 100_000_000_000}
         assert apply_filters(stock, criteria) is True
+
+
+# ===================================================================
+# Total shareholder return filter tests (KIK-378)
+# ===================================================================
+
+class TestApplyFiltersTotalShareholderReturn:
+    """Tests for min_total_shareholder_return filter."""
+
+    def test_shareholder_return_passes(self):
+        stock = {"total_shareholder_return": 0.07}
+        criteria = {"min_total_shareholder_return": 0.05}
+        assert apply_filters(stock, criteria) is True
+
+    def test_shareholder_return_fails(self):
+        stock = {"total_shareholder_return": 0.03}
+        criteria = {"min_total_shareholder_return": 0.05}
+        assert apply_filters(stock, criteria) is False
+
+    def test_shareholder_return_none_skips(self):
+        stock = {"total_shareholder_return": None}
+        criteria = {"min_total_shareholder_return": 0.05}
+        assert apply_filters(stock, criteria) is True
+
+    def test_shareholder_return_exactly_at_min(self):
+        stock = {"total_shareholder_return": 0.05}
+        criteria = {"min_total_shareholder_return": 0.05}
+        assert apply_filters(stock, criteria) is True

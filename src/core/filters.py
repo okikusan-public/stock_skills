@@ -24,6 +24,7 @@ def apply_filters(stock_data: dict, criteria: dict) -> bool:
         ("min_revenue_growth", "revenue_growth", "min"),
         ("min_earnings_growth", "earnings_growth", "min"),
         ("min_market_cap", "market_cap", "min"),
+        ("min_total_shareholder_return", "total_shareholder_return", "min"),
     ]
 
     for criteria_key, data_key, direction in checks:

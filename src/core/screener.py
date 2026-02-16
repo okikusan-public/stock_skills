@@ -8,7 +8,7 @@ import yaml
 
 from src.core.alpha import compute_change_score
 from src.core.filters import apply_filters
-from src.core.indicators import calculate_value_score
+from src.core.indicators import calculate_value_score, calculate_shareholder_return
 from src.core.query_builder import build_query
 from src.core.technicals import detect_pullback_in_uptrend
 
@@ -286,6 +286,26 @@ class QueryScreener:
 
             normalized["value_score"] = score
             results.append(normalized)
+
+        # -----------------------------------------------------------
+        # Optional shareholder return filter (KIK-378)
+        # Requires get_stock_detail() for cashflow data
+        # -----------------------------------------------------------
+        if "min_total_shareholder_return" in criteria:
+            enriched = []
+            for stock in results:
+                symbol = stock.get("symbol")
+                if not symbol:
+                    continue
+                detail = self.yahoo_client.get_stock_detail(symbol)
+                if detail is None:
+                    continue
+                sr = calculate_shareholder_return(detail)
+                stock["total_shareholder_return"] = sr.get("total_return_rate")
+                stock["buyback_yield"] = sr.get("buyback_yield")
+                if apply_filters(stock, {"min_total_shareholder_return": criteria["min_total_shareholder_return"]}):
+                    enriched.append(stock)
+            results = enriched
 
         # -----------------------------------------------------------
         # Optional pullback-in-uptrend filter

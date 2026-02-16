@@ -51,6 +51,13 @@ presets:
     description: "Xトレンド銘柄（SNSで話題の銘柄をファンダメンタルズ評価）"
     mode: "trending"
 
+  shareholder-return:
+    description: "高還元銘柄（配当+自社株買い5%以上）"
+    criteria:
+      min_total_shareholder_return: 0.05
+      max_per: 20
+      min_roe: 0.08
+
   long-term:
     description: "長期投資適性（高ROE・EPS成長・高配当・安定企業）"
     criteria:
