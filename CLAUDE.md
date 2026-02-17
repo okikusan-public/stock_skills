@@ -139,6 +139,17 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                      (スキル実行時の自動蓄積,
                       data/history/ へ日付付きJSON,
                       screen/report/trade/health)
+                     graph_store.py
+                     (Neo4jナレッジグラフCRUD,
+                      スキーマ初期化+MERGE操作,
+                      graceful degradation)
+                     note_manager.py
+                     (投資メモ管理,
+                      JSON=master, Neo4j=view,
+                      thesis/observation/concern/review/target)
+
+  Scripts: scripts/
+           init_graph.py ─ Neo4jスキーマ初期化+既存履歴インポート
 
   Config: config/screening_presets.yaml (7プリセット)
           config/exchanges.yaml (60+地域の取引所・閾値)
