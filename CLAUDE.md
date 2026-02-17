@@ -143,6 +143,9 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                      graph_store.py
                      (Neo4jナレッジグラフCRUD,
                       スキーマ初期化+MERGE操作,
+                      Stock/Screen/Report/Trade/Health/
+                      Research/Watchlist/Note,
+                      SUPERSEDES チェーン,
                       graceful degradation)
                      note_manager.py
                      (投資メモ管理,
@@ -151,6 +154,8 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
 
   Scripts: scripts/
            init_graph.py ─ Neo4jスキーマ初期化+既存履歴インポート
+                           (screen/report/trade/health/research/
+                            portfolio/watchlist/notes, --rebuild)
 
   Config: config/screening_presets.yaml (7プリセット)
           config/exchanges.yaml (60+地域の取引所・閾値)
