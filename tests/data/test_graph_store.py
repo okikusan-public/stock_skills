@@ -80,8 +80,8 @@ class TestSchema:
     def test_init_schema_success(self, gs_with_driver):
         gs, _, session = gs_with_driver
         assert gs.init_schema() is True
-        # 8 constraints + 5 indexes = 13 statements
-        assert session.run.call_count == 13
+        # 10 constraints + 7 indexes = 17 statements
+        assert session.run.call_count == 17
 
     def test_init_schema_no_driver(self):
         import src.data.graph_store as gs
@@ -253,6 +253,7 @@ class TestGetStockHistory:
             assert result == {
                 "screens": [], "reports": [], "trades": [],
                 "health_checks": [], "notes": [], "themes": [],
+                "researches": [],
             }
 
     def test_get_stock_history_success(self, gs_with_driver):
@@ -266,8 +267,9 @@ class TestGetStockHistory:
         assert "health_checks" in result
         assert "notes" in result
         assert "themes" in result
-        # 6 queries: screens, reports, trades, health_checks, notes, themes
-        assert session.run.call_count == 6
+        assert "researches" in result
+        # 7 queries: screens, reports, trades, health_checks, notes, themes, researches
+        assert session.run.call_count == 7
 
     def test_get_stock_history_error(self, gs_with_driver):
         gs, driver, _ = gs_with_driver
@@ -275,6 +277,7 @@ class TestGetStockHistory:
         result = gs.get_stock_history("7203.T")
         assert result["screens"] == []
         assert result["themes"] == []
+        assert result["researches"] == []
 
 
 # ===================================================================
@@ -306,3 +309,147 @@ class TestIdGeneration:
         gs.merge_health("2025-01-15", {}, [])
         kwargs = session.run.call_args_list[0][1]
         assert kwargs["id"] == "health_2025-01-15"
+
+    def test_research_id_format(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        gs.merge_research("2025-01-15", "stock", "7203.T")
+        kwargs = session.run.call_args_list[0][1]
+        assert kwargs["id"] == "research_2025-01-15_stock_7203_T"
+
+    def test_research_id_japanese(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        gs.merge_research("2025-01-15", "industry", "半導体")
+        kwargs = session.run.call_args_list[0][1]
+        assert kwargs["id"] == "research_2025-01-15_industry____"
+
+
+# ===================================================================
+# merge_research tests (KIK-398)
+# ===================================================================
+
+class TestMergeResearch:
+    def test_merge_research_stock(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        assert gs.merge_research("2025-01-15", "stock", "7203.T", "Toyota analysis") is True
+        # 1 MERGE research + 1 RESEARCHED rel (stock type links to Stock)
+        assert session.run.call_count == 2
+
+    def test_merge_research_industry(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        assert gs.merge_research("2025-01-15", "industry", "半導体", "Semiconductor trends") is True
+        # 1 MERGE research only (industry type does NOT link to Stock)
+        assert session.run.call_count == 1
+
+    def test_merge_research_market(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        assert gs.merge_research("2025-01-15", "market", "日経平均") is True
+        assert session.run.call_count == 1
+
+    def test_merge_research_business(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        assert gs.merge_research("2025-01-15", "business", "7751.T") is True
+        # business type also links to Stock
+        assert session.run.call_count == 2
+
+    def test_merge_research_no_driver(self):
+        import src.data.graph_store as gs
+        with patch("src.data.graph_store._get_driver", return_value=None):
+            assert gs.merge_research("2025-01-15", "stock", "7203.T") is False
+
+    def test_merge_research_error(self, gs_with_driver):
+        gs, driver, _ = gs_with_driver
+        driver.session.return_value.__enter__.return_value.run.side_effect = Exception("err")
+        assert gs.merge_research("2025-01-15", "stock", "7203.T") is False
+
+
+# ===================================================================
+# merge_watchlist tests (KIK-398)
+# ===================================================================
+
+class TestMergeWatchlist:
+    def test_merge_watchlist_basic(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        symbols = ["7203.T", "AAPL", "D05.SI"]
+        assert gs.merge_watchlist("my-list", symbols) is True
+        # 1 MERGE watchlist + 3 BOOKMARKED relationships
+        assert session.run.call_count == 4
+
+    def test_merge_watchlist_empty(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        assert gs.merge_watchlist("empty-list", []) is True
+        assert session.run.call_count == 1
+
+    def test_merge_watchlist_no_driver(self):
+        import src.data.graph_store as gs
+        with patch("src.data.graph_store._get_driver", return_value=None):
+            assert gs.merge_watchlist("my-list", ["7203.T"]) is False
+
+    def test_merge_watchlist_error(self, gs_with_driver):
+        gs, driver, _ = gs_with_driver
+        driver.session.return_value.__enter__.return_value.run.side_effect = Exception("err")
+        assert gs.merge_watchlist("my-list", ["7203.T"]) is False
+
+
+# ===================================================================
+# link_research_supersedes tests (KIK-398)
+# ===================================================================
+
+class TestLinkResearchSupersedes:
+    def test_link_supersedes_basic(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        assert gs.link_research_supersedes("stock", "7203.T") is True
+        assert session.run.call_count == 1
+        kwargs = session.run.call_args[1]
+        assert kwargs["rtype"] == "stock"
+        assert kwargs["target"] == "7203.T"
+
+    def test_link_supersedes_no_driver(self):
+        import src.data.graph_store as gs
+        with patch("src.data.graph_store._get_driver", return_value=None):
+            assert gs.link_research_supersedes("stock", "7203.T") is False
+
+    def test_link_supersedes_error(self, gs_with_driver):
+        gs, driver, _ = gs_with_driver
+        driver.session.return_value.__enter__.return_value.run.side_effect = Exception("err")
+        assert gs.link_research_supersedes("stock", "7203.T") is False
+
+
+# ===================================================================
+# clear_all tests (KIK-398)
+# ===================================================================
+
+class TestClearAll:
+    def test_clear_all_success(self, gs_with_driver):
+        gs, _, session = gs_with_driver
+        assert gs.clear_all() is True
+        assert session.run.call_count == 1
+        cypher = session.run.call_args[0][0]
+        assert "DETACH DELETE" in cypher
+
+    def test_clear_all_no_driver(self):
+        import src.data.graph_store as gs
+        with patch("src.data.graph_store._get_driver", return_value=None):
+            assert gs.clear_all() is False
+
+    def test_clear_all_error(self, gs_with_driver):
+        gs, driver, _ = gs_with_driver
+        driver.session.return_value.__enter__.return_value.run.side_effect = Exception("err")
+        assert gs.clear_all() is False
+
+
+# ===================================================================
+# _safe_id tests (KIK-398)
+# ===================================================================
+
+class TestSafeId:
+    def test_safe_id_symbol(self):
+        from src.data.graph_store import _safe_id
+        assert _safe_id("7203.T") == "7203_T"
+
+    def test_safe_id_japanese(self):
+        from src.data.graph_store import _safe_id
+        assert _safe_id("半導体") == "___"
+
+    def test_safe_id_clean(self):
+        from src.data.graph_store import _safe_id
+        assert _safe_id("AAPL") == "AAPL"

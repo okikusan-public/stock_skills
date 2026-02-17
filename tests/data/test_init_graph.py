@@ -14,7 +14,10 @@ from scripts.init_graph import (
     import_reports,
     import_trades,
     import_health,
+    import_research,
     import_notes,
+    import_portfolio,
+    import_watchlists,
 )
 
 
@@ -231,4 +234,245 @@ class TestImportNotes:
     @patch("scripts.init_graph.merge_note")
     def test_import_notes_nonexistent_dir(self, mock_note, tmp_path):
         count = import_notes(str(tmp_path / "nonexistent"))
+        assert count == 0
+
+
+# ===================================================================
+# import_research tests
+# ===================================================================
+
+class TestImportResearch:
+    @patch("scripts.init_graph.link_research_supersedes")
+    @patch("scripts.init_graph.merge_research")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_research_stock(self, mock_stock, mock_research, mock_link, tmp_path):
+        d = tmp_path / "research"
+        _write_json(d / "2025-01-15_stock_7203_T.json", {
+            "date": "2025-01-15",
+            "research_type": "stock",
+            "target": "7203.T",
+            "name": "Toyota",
+            "summary": "Strong fundamentals",
+        })
+        count = import_research(str(tmp_path))
+        assert count == 1
+        mock_stock.assert_called_once_with(symbol="7203.T", name="Toyota")
+        mock_research.assert_called_once_with(
+            research_date="2025-01-15",
+            research_type="stock",
+            target="7203.T",
+            summary="Strong fundamentals",
+        )
+        mock_link.assert_called_once_with("stock", "7203.T")
+
+    @patch("scripts.init_graph.link_research_supersedes")
+    @patch("scripts.init_graph.merge_research")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_research_industry(self, mock_stock, mock_research, mock_link, tmp_path):
+        d = tmp_path / "research"
+        _write_json(d / "2025-01-15_industry_semiconductor.json", {
+            "date": "2025-01-15",
+            "research_type": "industry",
+            "target": "半導体",
+            "summary": "Growing demand",
+        })
+        count = import_research(str(tmp_path))
+        assert count == 1
+        mock_stock.assert_not_called()  # industry type: no Stock merge
+        mock_research.assert_called_once()
+        mock_link.assert_called_once_with("industry", "半導体")
+
+    @patch("scripts.init_graph.link_research_supersedes")
+    @patch("scripts.init_graph.merge_research")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_research_market(self, mock_stock, mock_research, mock_link, tmp_path):
+        d = tmp_path / "research"
+        _write_json(d / "2025-01-15_market_nikkei.json", {
+            "date": "2025-01-15",
+            "research_type": "market",
+            "target": "日経平均",
+            "summary": "Bullish trend",
+        })
+        count = import_research(str(tmp_path))
+        assert count == 1
+        mock_stock.assert_not_called()  # market type: no Stock merge
+
+    @patch("scripts.init_graph.link_research_supersedes")
+    @patch("scripts.init_graph.merge_research")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_research_business(self, mock_stock, mock_research, mock_link, tmp_path):
+        d = tmp_path / "research"
+        _write_json(d / "2025-01-15_business_7751_T.json", {
+            "date": "2025-01-15",
+            "research_type": "business",
+            "target": "7751.T",
+            "summary": "Diversified revenue",
+        })
+        count = import_research(str(tmp_path))
+        assert count == 1
+        mock_stock.assert_called_once_with(symbol="7751.T", name="")
+        mock_research.assert_called_once()
+
+    @patch("scripts.init_graph.link_research_supersedes")
+    @patch("scripts.init_graph.merge_research")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_research_no_target_skipped(self, mock_stock, mock_research, mock_link, tmp_path):
+        d = tmp_path / "research"
+        _write_json(d / "2025-01-15_bad.json", {
+            "date": "2025-01-15",
+            "research_type": "stock",
+        })
+        count = import_research(str(tmp_path))
+        assert count == 0
+        mock_research.assert_not_called()
+
+    @patch("scripts.init_graph.link_research_supersedes")
+    @patch("scripts.init_graph.merge_research")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_research_supersedes_chains(self, mock_stock, mock_research, mock_link, tmp_path):
+        """Multiple research files for same target should create one SUPERSEDES chain."""
+        d = tmp_path / "research"
+        _write_json(d / "2025-01-15_stock_7203_T.json", {
+            "date": "2025-01-15",
+            "research_type": "stock",
+            "target": "7203.T",
+            "summary": "First",
+        })
+        _write_json(d / "2025-02-15_stock_7203_T.json", {
+            "date": "2025-02-15",
+            "research_type": "stock",
+            "target": "7203.T",
+            "summary": "Second",
+        })
+        count = import_research(str(tmp_path))
+        assert count == 2
+        assert mock_research.call_count == 2
+        # link_research_supersedes called once for (stock, 7203.T)
+        mock_link.assert_called_once_with("stock", "7203.T")
+
+    @patch("scripts.init_graph.link_research_supersedes")
+    @patch("scripts.init_graph.merge_research")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_research_empty_dir(self, mock_stock, mock_research, mock_link, tmp_path):
+        count = import_research(str(tmp_path))
+        assert count == 0
+
+    @patch("scripts.init_graph.link_research_supersedes")
+    @patch("scripts.init_graph.merge_research")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_research_corrupted_file(self, mock_stock, mock_research, mock_link, tmp_path):
+        d = tmp_path / "research"
+        d.mkdir(parents=True)
+        (d / "bad.json").write_text("not json")
+        count = import_research(str(tmp_path))
+        assert count == 0
+
+
+# ===================================================================
+# import_portfolio tests
+# ===================================================================
+
+def _write_csv(path: Path, rows: list[dict]):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        path.write_text("")
+        return
+    import csv as _csv
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = _csv.DictWriter(f, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+class TestImportPortfolio:
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_portfolio_basic(self, mock_stock, tmp_path):
+        csv_path = tmp_path / "portfolio.csv"
+        _write_csv(csv_path, [
+            {"symbol": "7203.T", "shares": "100", "price": "2850", "memo": "Toyota"},
+            {"symbol": "AAPL", "shares": "10", "price": "178", "memo": "Apple"},
+        ])
+        count = import_portfolio(str(csv_path))
+        assert count == 2
+        assert mock_stock.call_count == 2
+        mock_stock.assert_any_call(symbol="7203.T", name="Toyota")
+        mock_stock.assert_any_call(symbol="AAPL", name="Apple")
+
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_portfolio_skip_cash(self, mock_stock, tmp_path):
+        csv_path = tmp_path / "portfolio.csv"
+        _write_csv(csv_path, [
+            {"symbol": "7203.T", "shares": "100", "price": "2850", "memo": "Toyota"},
+            {"symbol": "JPY.CASH", "shares": "1", "price": "500000", "memo": "Cash"},
+        ])
+        count = import_portfolio(str(csv_path))
+        assert count == 1
+        mock_stock.assert_called_once_with(symbol="7203.T", name="Toyota")
+
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_portfolio_nonexistent(self, mock_stock, tmp_path):
+        count = import_portfolio(str(tmp_path / "missing.csv"))
+        assert count == 0
+        mock_stock.assert_not_called()
+
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_portfolio_empty_symbol(self, mock_stock, tmp_path):
+        csv_path = tmp_path / "portfolio.csv"
+        _write_csv(csv_path, [
+            {"symbol": "", "shares": "100", "price": "0", "memo": "Empty"},
+        ])
+        count = import_portfolio(str(csv_path))
+        assert count == 0
+
+
+# ===================================================================
+# import_watchlists tests
+# ===================================================================
+
+class TestImportWatchlists:
+    @patch("scripts.init_graph.merge_watchlist")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_watchlists_basic(self, mock_stock, mock_wl, tmp_path):
+        _write_json(tmp_path / "favorites.json", ["7203.T", "AAPL", "D05.SI"])
+        count = import_watchlists(str(tmp_path))
+        assert count == 1
+        assert mock_stock.call_count == 3
+        mock_wl.assert_called_once_with("favorites", ["7203.T", "AAPL", "D05.SI"])
+
+    @patch("scripts.init_graph.merge_watchlist")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_watchlists_multiple_files(self, mock_stock, mock_wl, tmp_path):
+        _write_json(tmp_path / "japan.json", ["7203.T", "9984.T"])
+        _write_json(tmp_path / "us.json", ["AAPL", "MSFT"])
+        count = import_watchlists(str(tmp_path))
+        assert count == 2
+        assert mock_wl.call_count == 2
+
+    @patch("scripts.init_graph.merge_watchlist")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_watchlists_empty_list(self, mock_stock, mock_wl, tmp_path):
+        _write_json(tmp_path / "empty.json", [])
+        count = import_watchlists(str(tmp_path))
+        assert count == 0
+        mock_wl.assert_not_called()
+
+    @patch("scripts.init_graph.merge_watchlist")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_watchlists_not_a_list(self, mock_stock, mock_wl, tmp_path):
+        _write_json(tmp_path / "bad.json", {"key": "value"})
+        count = import_watchlists(str(tmp_path))
+        assert count == 0
+
+    @patch("scripts.init_graph.merge_watchlist")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_watchlists_nonexistent_dir(self, mock_stock, mock_wl, tmp_path):
+        count = import_watchlists(str(tmp_path / "missing"))
+        assert count == 0
+
+    @patch("scripts.init_graph.merge_watchlist")
+    @patch("scripts.init_graph.merge_stock")
+    def test_import_watchlists_corrupted_file(self, mock_stock, mock_wl, tmp_path):
+        tmp_path.mkdir(exist_ok=True)
+        (tmp_path / "bad.json").write_text("not json")
+        count = import_watchlists(str(tmp_path))
         assert count == 0

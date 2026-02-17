@@ -1,4 +1,4 @@
-"""Neo4j graph store for investment knowledge graph (KIK-397).
+"""Neo4j graph store for investment knowledge graph (KIK-397/398).
 
 Provides schema initialization and CRUD operations for the knowledge graph.
 All writes use MERGE for idempotent operations.
@@ -6,6 +6,7 @@ Graceful degradation: if Neo4j is unavailable, operations are silently skipped.
 """
 
 import os
+import re
 from datetime import date, datetime
 from typing import Optional
 
@@ -67,6 +68,8 @@ _SCHEMA_CONSTRAINTS = [
     "CREATE CONSTRAINT note_id IF NOT EXISTS FOR (n:Note) REQUIRE n.id IS UNIQUE",
     "CREATE CONSTRAINT theme_name IF NOT EXISTS FOR (t:Theme) REQUIRE t.name IS UNIQUE",
     "CREATE CONSTRAINT sector_name IF NOT EXISTS FOR (s:Sector) REQUIRE s.name IS UNIQUE",
+    "CREATE CONSTRAINT research_id IF NOT EXISTS FOR (r:Research) REQUIRE r.id IS UNIQUE",
+    "CREATE CONSTRAINT watchlist_name IF NOT EXISTS FOR (w:Watchlist) REQUIRE w.name IS UNIQUE",
 ]
 
 _SCHEMA_INDEXES = [
@@ -75,6 +78,8 @@ _SCHEMA_INDEXES = [
     "CREATE INDEX report_date IF NOT EXISTS FOR (r:Report) ON (r.date)",
     "CREATE INDEX trade_date IF NOT EXISTS FOR (t:Trade) ON (t.date)",
     "CREATE INDEX note_type IF NOT EXISTS FOR (n:Note) ON (n.type)",
+    "CREATE INDEX research_date IF NOT EXISTS FOR (r:Research) ON (r.date)",
+    "CREATE INDEX research_type IF NOT EXISTS FOR (r:Research) ON (r.research_type)",
 ]
 
 
@@ -313,21 +318,135 @@ def tag_theme(symbol: str, theme: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Research node (KIK-398)
+# ---------------------------------------------------------------------------
+
+def _safe_id(text: str) -> str:
+    """Make text safe for use in a node ID (replace non-alphanum with _)."""
+    return re.sub(r"[^a-zA-Z0-9]", "_", text)
+
+
+def merge_research(
+    research_date: str, research_type: str, target: str,
+    summary: str = "",
+) -> bool:
+    """Create a Research node and optionally RESEARCHED relationship to Stock.
+
+    For stock/business types, target is treated as a symbol and linked to Stock.
+    For industry/market types, no Stock link is created.
+    """
+    driver = _get_driver()
+    if driver is None:
+        return False
+    research_id = f"research_{research_date}_{research_type}_{_safe_id(target)}"
+    try:
+        with driver.session() as session:
+            session.run(
+                "MERGE (r:Research {id: $id}) "
+                "SET r.date = $date, r.research_type = $rtype, "
+                "r.target = $target, r.summary = $summary",
+                id=research_id, date=research_date, rtype=research_type,
+                target=target, summary=summary,
+            )
+            if research_type in ("stock", "business"):
+                session.run(
+                    "MATCH (r:Research {id: $research_id}) "
+                    "MERGE (s:Stock {symbol: $symbol}) "
+                    "MERGE (r)-[:RESEARCHED]->(s)",
+                    research_id=research_id, symbol=target,
+                )
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Watchlist node (KIK-398)
+# ---------------------------------------------------------------------------
+
+def merge_watchlist(name: str, symbols: list[str]) -> bool:
+    """Create a Watchlist node and BOOKMARKED relationships to stocks."""
+    driver = _get_driver()
+    if driver is None:
+        return False
+    try:
+        with driver.session() as session:
+            session.run(
+                "MERGE (w:Watchlist {name: $name})",
+                name=name,
+            )
+            for sym in symbols:
+                session.run(
+                    "MATCH (w:Watchlist {name: $name}) "
+                    "MERGE (s:Stock {symbol: $symbol}) "
+                    "MERGE (w)-[:BOOKMARKED]->(s)",
+                    name=name, symbol=sym,
+                )
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Research SUPERSEDES chain (KIK-398)
+# ---------------------------------------------------------------------------
+
+def link_research_supersedes(research_type: str, target: str) -> bool:
+    """Link Research nodes of same type+target in date order with SUPERSEDES."""
+    driver = _get_driver()
+    if driver is None:
+        return False
+    try:
+        with driver.session() as session:
+            session.run(
+                "MATCH (r:Research {research_type: $rtype, target: $target}) "
+                "WITH r ORDER BY r.date ASC "
+                "WITH collect(r) AS nodes "
+                "UNWIND range(0, size(nodes)-2) AS i "
+                "WITH nodes[i] AS a, nodes[i+1] AS b "
+                "MERGE (a)-[:SUPERSEDES]->(b)",
+                rtype=research_type, target=target,
+            )
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Clear all (KIK-398 --rebuild)
+# ---------------------------------------------------------------------------
+
+def clear_all() -> bool:
+    """Delete all nodes and relationships. Used for --rebuild."""
+    driver = _get_driver()
+    if driver is None:
+        return False
+    try:
+        with driver.session() as session:
+            session.run("MATCH (n) DETACH DELETE n")
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Query helpers
 # ---------------------------------------------------------------------------
 
 def get_stock_history(symbol: str) -> dict:
     """Get all graph relationships for a stock.
 
-    Returns dict with keys: screens, reports, trades, health_checks, notes, themes.
+    Returns dict with keys: screens, reports, trades, health_checks,
+    notes, themes, researches.
     """
+    _empty = {"screens": [], "reports": [], "trades": [],
+              "health_checks": [], "notes": [], "themes": [],
+              "researches": []}
     driver = _get_driver()
     if driver is None:
-        return {"screens": [], "reports": [], "trades": [],
-                "health_checks": [], "notes": [], "themes": []}
+        return dict(_empty)
     try:
-        result = {"screens": [], "reports": [], "trades": [],
-                  "health_checks": [], "notes": [], "themes": []}
+        result = dict(_empty)
         with driver.session() as session:
             # Screens
             records = session.run(
@@ -384,7 +503,16 @@ def get_stock_history(symbol: str) -> dict:
             )
             result["themes"] = [r["name"] for r in records]
 
+            # Researches (KIK-398)
+            records = session.run(
+                "MATCH (r:Research)-[:RESEARCHED]->(s:Stock {symbol: $symbol}) "
+                "RETURN r.date AS date, r.research_type AS research_type, "
+                "r.summary AS summary "
+                "ORDER BY r.date DESC",
+                symbol=symbol,
+            )
+            result["researches"] = [dict(r) for r in records]
+
         return result
     except Exception:
-        return {"screens": [], "reports": [], "trades": [],
-                "health_checks": [], "notes": [], "themes": []}
+        return dict(_empty)
