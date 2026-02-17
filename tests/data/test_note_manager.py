@@ -67,7 +67,14 @@ class TestSaveNote:
             save_note("7203.T", "invalid_type", "content", base_dir=str(tmp_path))
 
     def test_save_note_valid_types(self):
-        assert _VALID_TYPES == {"thesis", "observation", "concern", "review", "target"}
+        assert _VALID_TYPES == {"thesis", "observation", "concern", "review", "target", "lesson"}
+
+    def test_save_note_lesson_type(self, tmp_path):
+        """lesson タイプのノートが保存できること (KIK-408)."""
+        with patch("src.data.graph_store.merge_note"):
+            note = save_note("7203.T", "lesson", "Never chase momentum blindly", base_dir=str(tmp_path))
+        assert note["type"] == "lesson"
+        assert note["content"] == "Never chase momentum blindly"
 
     def test_save_note_source_field(self, tmp_path):
         with patch("src.data.graph_store.merge_note"):

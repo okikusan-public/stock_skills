@@ -12,7 +12,7 @@ from typing import Optional
 
 
 _NOTES_DIR = "data/notes"
-_VALID_TYPES = {"thesis", "observation", "concern", "review", "target"}
+_VALID_TYPES = {"thesis", "observation", "concern", "review", "target", "lesson"}
 
 
 def _notes_dir(base_dir: str = _NOTES_DIR) -> Path:

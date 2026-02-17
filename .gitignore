@@ -2,6 +2,7 @@ data/cache/
 data/history/
 data/watchlists/
 data/screening_results/
+data/notes/
 __pycache__/
 *.pyc
 .venv/

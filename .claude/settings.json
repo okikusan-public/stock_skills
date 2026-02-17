@@ -11,6 +11,11 @@
             "type": "command",
             "command": "FILE=$(cat | jq -r '.tool_input.file_path // empty'); if echo \"$FILE\" | grep -q '\\.py$'; then cd /Users/kikuchihiroyuki/stock-skills && python3 -m pytest tests/ -q --tb=no 2>&1 | tail -3; fi",
             "timeout": 30000
+          },
+          {
+            "type": "command",
+            "command": "FILE=$(cat | jq -r '.tool_input.file_path // empty'); if echo \"$FILE\" | grep -qE 'src/(core|data)/.*\\.py$'; then echo 'コアモジュール変更: CLAUDE.md / SKILL.md / rules の更新を確認してください'; fi",
+            "timeout": 5000
           }
         ]
       }
@@ -22,6 +27,10 @@
           {
             "type": "prompt",
             "prompt": "会話の中で株の売買（buy/sell コマンド）が実行された場合のみ、ポートフォリオのHHI集中度を確認し、危険な集中(セクターHHI>0.4)があれば警告してください。売買が実行されていない場合は何もしないでください。"
+          },
+          {
+            "type": "prompt",
+            "prompt": "会話の中で src/core/ または src/data/ の Python ファイルが変更された場合のみ、関連ドキュメント（CLAUDE.md, SKILL.md, intent-routing.md, rules/*.md）が更新されているか確認してください。未更新があれば具体的に指摘してください。src/ の変更がない場合は何もしないでください。"
           }
         ]
       }

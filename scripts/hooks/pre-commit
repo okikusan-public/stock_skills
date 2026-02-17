@@ -1,0 +1,15 @@
+#!/bin/bash
+# Pre-commit hook: warn if src/ changes without doc updates (KIK-407)
+#
+# Install: cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Bypass:  git commit --no-verify
+
+SRC_CHANGED=$(git diff --cached --name-only | grep -cE '^src/(core|data)/')
+DOC_CHANGED=$(git diff --cached --name-only | grep -cE '(CLAUDE\.md|README\.md|SKILL\.md|rules/|config/)')
+
+if [ "$SRC_CHANGED" -gt 0 ] && [ "$DOC_CHANGED" -eq 0 ]; then
+  echo "src/ に変更がありますが、ドキュメントが更新されていません。"
+  echo "対象: CLAUDE.md, SKILL.md, rules/, config/, README.md"
+  echo "バイパス: git commit --no-verify"
+  exit 1
+fi

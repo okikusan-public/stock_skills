@@ -30,9 +30,18 @@
 - ブランチ名: `feature/kik-{NNN}-{short-desc}`
 - 完了後: `git merge --no-ff` → `git push` → `git worktree remove` → `git branch -d` → Linear を Done に更新
 
+## ドキュメント更新リマインダー (KIK-407)
+
+3レイヤーで `src/core/` `src/data/` 変更時のドキュメント更新漏れを防止:
+
+1. **PostToolUse hook**: Edit/Write で `src/(core|data)/*.py` 変更時にリマインドメッセージ表示
+2. **Stop hook**: 会話終了時に未更新ドキュメントを指摘
+3. **pre-commit hook**: `scripts/hooks/pre-commit` — src/ 変更 + doc 未更新の commit をブロック（`--no-verify` でバイパス可）
+
 ## gitignore 対象
 
 - `data/cache/` — 銘柄ごと JSON キャッシュ（TTL 24時間）
 - `data/watchlists/` — ウォッチリストデータ
 - `data/screening_results/` — スクリーニング結果
+- `data/notes/` — 投資メモデータ
 - ポートフォリオデータ: `.claude/skills/stock-portfolio/data/portfolio.csv`

@@ -62,6 +62,14 @@ python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py what-if --add "7
 python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py backtest --preset alpha --region jp --days 90
 python3 .claude/skills/stock-portfolio/scripts/run_portfolio.py list
 
+# 投資メモ管理
+python3 .claude/skills/investment-note/scripts/manage_note.py save --symbol 7203.T --type thesis --content "EV普及で部品需要増"
+python3 .claude/skills/investment-note/scripts/manage_note.py list
+python3 .claude/skills/investment-note/scripts/manage_note.py delete --id NOTE_ID
+
+# 知識グラフ照会（自然言語）
+python3 .claude/skills/graph-query/scripts/run_query.py "7203.Tの前回レポートは？"
+
 # テスト
 python3 -m pytest tests/ -q
 
@@ -80,6 +88,8 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
   ├─ market-research/run_research.py … stock/industry/market/business (Grok API深掘り)
   ├─ watchlist/manage_watchlist.py
   ├─ stress-test/run_stress_test.py
+  ├─ investment-note/manage_note.py  … save/list/delete (投資メモCRUD)
+  ├─ graph-query/run_query.py        … 自然言語→グラフ照会
   └─ stock-portfolio/run_portfolio.py … snapshot/buy/sell/analyze/health/forecast/rebalance/simulate/what-if/backtest/list
       │
       │  sys.path.insert で project root を追加して src/ を import
@@ -157,10 +167,16 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                      note_manager.py
                      (投資メモ管理,
                       JSON=master, Neo4j=view,
-                      thesis/observation/concern/review/target)
+                      thesis/observation/concern/review/target/lesson)
+                     graph_nl_query.py
+                     (自然言語→グラフ照会ディスパッチ,
+                      テンプレートマッチ→graph_query関数,
+                      前回レポート/常連銘柄/リサーチ履歴/
+                      市況/取引コンテキスト/メモ照会)
 
   Scripts: scripts/
            init_graph.py ─ Neo4jスキーマ初期化+既存履歴インポート
+           hooks/pre-commit ─ src/変更時のドキュメント更新チェック(KIK-407)
                            (screen/report/trade/health/research/
                             portfolio/watchlist/notes/market_context,
                             --rebuild)
