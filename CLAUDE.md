@@ -138,7 +138,8 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                      history_store.py
                      (スキル実行時の自動蓄積,
                       data/history/ へ日付付きJSON,
-                      screen/report/trade/health)
+                      screen/report/trade/health/
+                      research/market_context)
 
   Config: config/screening_presets.yaml (7プリセット)
           config/exchanges.yaml (60+地域の取引所・閾値)
