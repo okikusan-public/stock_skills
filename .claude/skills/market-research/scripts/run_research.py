@@ -38,6 +38,12 @@ try:
 except ImportError:
     HAS_BUSINESS_FORMATTER = False
 
+try:
+    from src.data.history_store import save_research, save_market_context
+    HAS_HISTORY = True
+except ImportError:
+    HAS_HISTORY = False
+
 
 def cmd_stock(args):
     """銘柄リサーチ"""
@@ -53,6 +59,12 @@ def cmd_stock(args):
     else:
         import json
         print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    if HAS_HISTORY:
+        try:
+            save_research("stock", args.symbol, result)
+        except Exception as e:
+            print(f"Warning: リサーチ履歴保存失敗: {e}", file=sys.stderr)
 
 
 def cmd_industry(args):
@@ -70,6 +82,12 @@ def cmd_industry(args):
         import json
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
+    if HAS_HISTORY:
+        try:
+            save_research("industry", args.theme, result)
+        except Exception as e:
+            print(f"Warning: リサーチ履歴保存失敗: {e}", file=sys.stderr)
+
 
 def cmd_market(args):
     """マーケットリサーチ"""
@@ -86,6 +104,16 @@ def cmd_market(args):
         import json
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
+    if HAS_HISTORY:
+        try:
+            save_research("market", args.market, result)
+            # Also save market context snapshot
+            macro = result.get("macro_indicators")
+            if macro:
+                save_market_context({"indices": macro})
+        except Exception as e:
+            print(f"Warning: リサーチ履歴保存失敗: {e}", file=sys.stderr)
+
 
 def cmd_business(args):
     """ビジネスモデル分析"""
@@ -101,6 +129,12 @@ def cmd_business(args):
     else:
         import json
         print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    if HAS_HISTORY:
+        try:
+            save_research("business", args.symbol, result)
+        except Exception as e:
+            print(f"Warning: リサーチ履歴保存失敗: {e}", file=sys.stderr)
 
 
 def main():

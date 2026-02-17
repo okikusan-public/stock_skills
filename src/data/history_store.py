@@ -1,4 +1,4 @@
-"""History store -- save and load screening/report/trade/health JSON files."""
+"""History store -- save and load screening/report/trade/health/research JSON files."""
 
 import json
 import os
@@ -223,6 +223,90 @@ def save_health(
     }
 
     d = _history_dir("health", base_dir)
+    path = d / filename
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(_sanitize(payload), f, ensure_ascii=False, indent=2)
+    return str(path.resolve())
+
+
+def save_research(
+    research_type: str,
+    target: str,
+    result: dict,
+    base_dir: str = "data/history",
+) -> str:
+    """Save research results to JSON (KIK-405).
+
+    Parameters
+    ----------
+    research_type : str
+        "stock", "industry", "market", or "business".
+    target : str
+        Symbol (e.g. "7203.T") or theme name (e.g. "半導体").
+    result : dict
+        Return value from researcher.research_*() functions.
+    base_dir : str
+        Root history directory.
+
+    Returns
+    -------
+    str
+        Absolute path of the saved file.
+    """
+    today = date.today().isoformat()
+    now = datetime.now().isoformat(timespec="seconds")
+    identifier = f"{_safe_filename(research_type)}_{_safe_filename(target)}"
+    filename = f"{today}_{identifier}.json"
+
+    payload = {
+        "category": "research",
+        "date": today,
+        "timestamp": now,
+        "research_type": research_type,
+        "target": target,
+        **{k: v for k, v in result.items() if k != "type"},
+        "_saved_at": now,
+    }
+
+    d = _history_dir("research", base_dir)
+    path = d / filename
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(_sanitize(payload), f, ensure_ascii=False, indent=2)
+    return str(path.resolve())
+
+
+def save_market_context(
+    context: dict,
+    base_dir: str = "data/history",
+) -> str:
+    """Save market context snapshot to JSON (KIK-405).
+
+    Parameters
+    ----------
+    context : dict
+        Market context data. Expected key: "indices" (list of dicts from
+        get_macro_indicators) or a flat dict with indicator values.
+    base_dir : str
+        Root history directory.
+
+    Returns
+    -------
+    str
+        Absolute path of the saved file.
+    """
+    today = date.today().isoformat()
+    now = datetime.now().isoformat(timespec="seconds")
+    filename = f"{today}_context.json"
+
+    payload = {
+        "category": "market_context",
+        "date": today,
+        "timestamp": now,
+        **context,
+        "_saved_at": now,
+    }
+
+    d = _history_dir("market_context", base_dir)
     path = d / filename
     with open(path, "w", encoding="utf-8") as f:
         json.dump(_sanitize(payload), f, ensure_ascii=False, indent=2)

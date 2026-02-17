@@ -66,7 +66,7 @@ _IMPORT_REGISTRY = [
         ("format_simulation", None),
     ]),
     ("src.data.history_store", "HISTORY", [
-        ("save_trade", None), ("save_health", None),
+        ("save_trade", None), ("save_health", None), ("save_market_context", None),
     ]),
     ("src.core.portfolio.backtest", "BACKTEST", [
         ("run_backtest", None),
@@ -265,6 +265,22 @@ def cmd_snapshot(csv_path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Helper: save market context at trade time
+# ---------------------------------------------------------------------------
+
+def _save_trade_market_context() -> None:
+    """Save market context snapshot alongside a trade record."""
+    if not HAS_HISTORY:
+        return
+    try:
+        macro = yahoo_client.get_macro_indicators()
+        if macro:
+            save_market_context({"indices": macro})
+    except Exception as e:
+        print(f"Warning: 市況スナップショット保存失敗: {e}", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
 # Command: buy
 # ---------------------------------------------------------------------------
 
@@ -298,6 +314,7 @@ def cmd_buy(
                     save_trade(symbol, "buy", shares, price, currency, purchase_date, memo)
                 except Exception as e:
                     print(f"Warning: 履歴保存失敗: {e}", file=sys.stderr)
+                _save_trade_market_context()
             return
     else:
         holdings = _fallback_load_csv(csv_path)
@@ -335,6 +352,7 @@ def cmd_buy(
             save_trade(symbol, "buy", shares, price, currency, purchase_date, memo)
         except Exception as e:
             print(f"Warning: 履歴保存失敗: {e}", file=sys.stderr)
+        _save_trade_market_context()
 
 
 # ---------------------------------------------------------------------------
@@ -356,6 +374,7 @@ def cmd_sell(csv_path: str, symbol: str, shares: int) -> None:
                     save_trade(symbol, "sell", shares, 0.0, "", date.today().isoformat())
                 except Exception as e:
                     print(f"Warning: 履歴保存失敗: {e}", file=sys.stderr)
+                _save_trade_market_context()
             return
         except ValueError as e:
             print(f"Error: {e}")
@@ -386,6 +405,7 @@ def cmd_sell(csv_path: str, symbol: str, shares: int) -> None:
             save_trade(symbol, "sell", shares, 0.0, "", date.today().isoformat())
         except Exception as e:
             print(f"Warning: 履歴保存失敗: {e}", file=sys.stderr)
+        _save_trade_market_context()
 
 
 # ---------------------------------------------------------------------------

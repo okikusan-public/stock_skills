@@ -13,7 +13,9 @@ from src.data.history_store import (
     load_history,
     list_history_files,
     save_health,
+    save_market_context,
     save_report,
+    save_research,
     save_screening,
     save_trade,
 )
@@ -454,6 +456,141 @@ class TestNumpyHandling:
         path = save_screening("value", "japan", results, base_dir=str(tmp_path))
         data = _read_json(path)
         assert data["results"][0]["values"] == [1.0, 2.0, 3.0]
+
+
+# ===================================================================
+# base_dir parameter
+# ===================================================================
+
+
+# ===================================================================
+# save_research (KIK-405)
+# ===================================================================
+
+
+def _read_json(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+class TestSaveResearch:
+    def test_stock_research(self, tmp_path):
+        result = {
+            "type": "stock",
+            "symbol": "7203.T",
+            "name": "Toyota",
+            "fundamentals": {"per": 10.5, "pbr": 1.2},
+            "value_score": 65.0,
+            "grok_research": {"recent_news": "test news"},
+            "x_sentiment": {"sentiment_score": 0.5},
+            "news": [{"title": "headline"}],
+        }
+        path = save_research("stock", "7203.T", result, base_dir=str(tmp_path))
+        assert Path(path).exists()
+        data = _read_json(path)
+        assert data["category"] == "research"
+        assert data["research_type"] == "stock"
+        assert data["target"] == "7203.T"
+        assert data["symbol"] == "7203.T"
+        assert data["name"] == "Toyota"
+        assert data["value_score"] == 65.0
+        assert "type" not in data  # "type" from result excluded
+        assert data["_saved_at"] is not None
+
+    def test_industry_research(self, tmp_path):
+        result = {
+            "type": "industry",
+            "theme": "半導体",
+            "grok_research": {"trends": "AI demand"},
+        }
+        path = save_research("industry", "半導体", result, base_dir=str(tmp_path))
+        assert Path(path).exists()
+        data = _read_json(path)
+        assert data["research_type"] == "industry"
+        assert data["target"] == "半導体"
+        assert "research" in path
+
+    def test_market_research(self, tmp_path):
+        result = {
+            "type": "market",
+            "market": "日経平均",
+            "macro_indicators": [{"name": "日経平均", "price": 40000}],
+            "grok_research": {"sentiment": "bullish"},
+        }
+        path = save_research("market", "日経平均", result, base_dir=str(tmp_path))
+        data = _read_json(path)
+        assert data["research_type"] == "market"
+        assert data["macro_indicators"][0]["price"] == 40000
+
+    def test_business_research(self, tmp_path):
+        result = {
+            "type": "business",
+            "symbol": "7751.T",
+            "name": "Canon",
+            "grok_research": {"overview": "imaging company"},
+        }
+        path = save_research("business", "7751.T", result, base_dir=str(tmp_path))
+        data = _read_json(path)
+        assert data["research_type"] == "business"
+        assert data["target"] == "7751.T"
+
+    def test_filename_format(self, tmp_path):
+        result = {"type": "stock", "symbol": "AAPL"}
+        path = save_research("stock", "AAPL", result, base_dir=str(tmp_path))
+        fname = Path(path).name
+        today = date.today().isoformat()
+        assert fname.startswith(today)
+        assert "stock_AAPL" in fname
+
+    def test_load_research(self, tmp_path):
+        result = {"type": "stock", "symbol": "7203.T"}
+        save_research("stock", "7203.T", result, base_dir=str(tmp_path))
+        loaded = load_history("research", base_dir=str(tmp_path))
+        assert len(loaded) == 1
+        assert loaded[0]["research_type"] == "stock"
+
+
+# ===================================================================
+# save_market_context (KIK-405)
+# ===================================================================
+
+
+class TestSaveMarketContext:
+    def test_basic(self, tmp_path):
+        context = {
+            "indices": [
+                {"name": "S&P500", "symbol": "^GSPC", "price": 5800},
+                {"name": "日経平均", "symbol": "^N225", "price": 40000},
+                {"name": "VIX", "symbol": "^VIX", "price": 15.0},
+                {"name": "USD/JPY", "symbol": "JPY=X", "price": 150.0},
+            ]
+        }
+        path = save_market_context(context, base_dir=str(tmp_path))
+        assert Path(path).exists()
+        data = _read_json(path)
+        assert data["category"] == "market_context"
+        assert len(data["indices"]) == 4
+        assert data["_saved_at"] is not None
+
+    def test_filename_format(self, tmp_path):
+        context = {"indices": []}
+        path = save_market_context(context, base_dir=str(tmp_path))
+        fname = Path(path).name
+        today = date.today().isoformat()
+        assert fname == f"{today}_context.json"
+
+    def test_load_market_context(self, tmp_path):
+        context = {"indices": [{"name": "VIX", "price": 20.0}]}
+        save_market_context(context, base_dir=str(tmp_path))
+        loaded = load_history("market_context", base_dir=str(tmp_path))
+        assert len(loaded) == 1
+        assert loaded[0]["category"] == "market_context"
+
+    def test_numpy_handling(self, tmp_path):
+        context = {"indices": [{"name": "test", "price": np.float64(100.5)}]}
+        path = save_market_context(context, base_dir=str(tmp_path))
+        data = _read_json(path)
+        assert data["indices"][0]["price"] == 100.5
 
 
 # ===================================================================
