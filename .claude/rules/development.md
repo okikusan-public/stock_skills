@@ -38,6 +38,14 @@
 2. **Stop hook**: 会話終了時に未更新ドキュメントを指摘
 3. **pre-commit hook**: `scripts/hooks/pre-commit` — src/ 変更 + doc 未更新の commit をブロック（`--no-verify` でバイパス可）
 
+## ドキュメント構成 (KIK-412)
+
+- `docs/architecture.md` — システムアーキテクチャ（3層構成、Mermaid図、設計原則、モジュール一覧）
+- `docs/neo4j-schema.md` — Neo4j スキーマリファレンス（11ノードタイプ、リレーション、制約/インデックス、サンプルCypher）
+- `docs/skill-catalog.md` — 8スキルのカタログ（概要、コマンド例、Core依存、出力形式）
+
+新しいスキルやノードタイプを追加した場合は対応するドキュメントも更新すること。
+
 ## gitignore 対象
 
 - `data/cache/` — 銘柄ごと JSON キャッシュ（TTL 24時間）

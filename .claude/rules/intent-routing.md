@@ -72,6 +72,7 @@
 | 業界の動向、トレンド | `/market-research industry` | 業界名・テーマが対象 |
 | マーケット概況、相場の状況 | `/market-research market` | 市場全体が対象 |
 | ビジネスモデル、事業構造、セグメント、収益構造、何で稼いでる | `/market-research business` | 事業の仕組みが対象 |
+| 過去の分析結果、前回のレポート、以前のスクリーニング | `/graph-query` | 過去データの参照（知識ドメインへ連携） |
 
 **迷ったとき**:
 - 「〇〇ってどう？」「〇〇を調べて」 → `/stock-report`（まず数値から）
@@ -106,6 +107,8 @@
 | **シミュレーション**: 〇年後、複利、積立、老後、目標額 | `simulate` |
 | **過去検証**: バックテスト、検証、過去の成績 | `backtest` |
 | **What-If**: 追加したら、買ったらどうなる、影響、シミュレーション追加 | `what-if` |
+| **売買→記録**: 買った理由を記録したい、投資理由をメモ | `buy` → `/investment-note save --type thesis` |
+| **損切り→学び**: 損切りの学びを記録、反省メモ | `sell` → `/investment-note save --type lesson` |
 
 **KIK-376 関連**:
 - 「〇〇を追加したらどうなる？」「〇〇を買ったらPFどう変わる？」「影響は？」 → `what-if`
@@ -266,6 +269,12 @@
 | `/stock-portfolio health` でバリュートラップ検出 | 「詳しく見たい」 | → `/stock-report <該当銘柄>` |
 | `/screen-stocks shareholder-return` で ⚠️ 表示 | 「⚠️の銘柄を詳しく」 | → `/stock-report <該当銘柄>` |
 | `/screen-stocks shareholder-return` 結果表示後 | 「安定してるやつだけ見たい」 | → 結果から ✅/📈 のみフィルタ |
+| `/stock-portfolio buy` で購入記録 | 「メモしておいて」「投資理由を記録」 | → `/investment-note save --symbol <銘柄> --type thesis --content ...` |
+| `/stock-portfolio health` で EXIT 判定 | 「学びを記録」「反省メモ」 | → `/investment-note save --symbol <銘柄> --type lesson --content ...` |
+| `/graph-query` で過去レポート表示 | 「最新も見たい」「今はどう？」 | → `/stock-report <銘柄>` |
+| `/investment-note list` でメモ表示 | 「この銘柄を調べて」 | → `/stock-report <銘柄>` |
+| `/stock-report` でレポート生成 | 「懸念をメモしておいて」 | → `/investment-note save --symbol <銘柄> --type concern --content ...` |
+| `/screen-stocks` の結果表示後 | 「前にも出てきた？」「繰り返し候補？」 | → `/graph-query "よく出る銘柄"` |
 
 ---
 
@@ -320,6 +329,27 @@
 → 2. /stock-portfolio simulate --years 5
 ```
 
+### 売買 → 記録
+```
+「トヨタ100株買った、理由もメモして」
+→ 1. /stock-portfolio buy --symbol 7203.T --shares 100 --price ...
+→ 2. /investment-note save --symbol 7203.T --type thesis --content ...
+```
+
+### リサーチ → 記録
+```
+「トヨタを調べて、気になる点をメモして」
+→ 1. /stock-report 7203.T
+→ 2. /investment-note save --symbol 7203.T --type observation --content ...
+```
+
+### 知識グラフ → 最新分析
+```
+「前に調べた銘柄の最新状況を確認して」
+→ 1. /graph-query "前に調べた銘柄"
+→ 2. 結果の銘柄に /stock-report を実行
+```
+
 ---
 
 ## 曖昧な場合の対応
@@ -341,6 +371,15 @@
 → 対象による:
   1. 保有銘柄全体 → /stock-portfolio health（バリュートラップ検出付き）
   2. 特定の銘柄 → /stock-report（個別バリュートラップ判定）
+```
+
+```
+ユーザー: 「メモを見せて」
+
+→ どちらの意味ですか？
+  1. 特定銘柄のメモ → /investment-note list --symbol <銘柄>
+  2. 全メモ一覧 → /investment-note list
+  3. 過去の分析記録 → /graph-query "過去のレポート"
 ```
 
 ただし、文脈から明らかに判断できる場合は確認せずに実行する。

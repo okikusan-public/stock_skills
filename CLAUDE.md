@@ -191,6 +191,11 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
           screening.md       ─ スクリーニング開発ルール (path-specific)
           portfolio.md       ─ ポートフォリオ開発ルール (path-specific)
           testing.md         ─ テスト開発ルール (path-specific)
+
+  Docs: docs/
+          architecture.md    ─ システムアーキテクチャ（3層構成、Mermaid図、設計原則）
+          neo4j-schema.md    ─ Neo4jスキーマリファレンス（11ノード、リレーション、Cypher例）
+          skill-catalog.md   ─ 8スキルのカタログ（入出力、依存モジュール、コマンド例）
 ```
 
 ## Post-Implementation Rule
