@@ -277,6 +277,69 @@ def save_health(
     return str(path.resolve())
 
 
+def _build_research_summary(research_type: str, result: dict) -> str:
+    """Build a summary string from research result for Neo4j storage (KIK-416).
+
+    Extracts key information from grok_research and other fields to create
+    a concise summary (max 200 chars) for GraphRAG queries.
+    """
+    grok = result.get("grok_research")
+    if grok is None or not isinstance(grok, dict):
+        grok = {}
+
+    parts: list[str] = []
+
+    if research_type == "stock":
+        # Name + first news headline + sentiment score + value_score
+        name = result.get("name", "")
+        if name:
+            parts.append(name)
+        news = grok.get("recent_news") or result.get("news") or []
+        if news and isinstance(news, list) and isinstance(news[0], (str, dict)):
+            headline = news[0] if isinstance(news[0], str) else news[0].get("title", "")
+            headline = headline.split("<")[0].strip()  # strip grok citation tags
+            if headline:
+                parts.append(headline[:80])
+        xs = grok.get("x_sentiment") or result.get("x_sentiment") or {}
+        if isinstance(xs, dict) and xs.get("score") is not None:
+            parts.append(f"Xセンチメント{xs['score']}")
+        vs = result.get("value_score")
+        if vs is not None:
+            parts.append(f"スコア{vs}")
+
+    elif research_type == "market":
+        # price_action + sentiment score
+        pa = grok.get("price_action", "")
+        if pa:
+            pa_clean = pa.split("<")[0].strip()
+            parts.append(pa_clean[:120])
+        sent = grok.get("sentiment") or {}
+        if isinstance(sent, dict) and sent.get("score") is not None:
+            parts.append(f"センチメント{sent['score']}")
+
+    elif research_type == "industry":
+        # trends
+        trends = grok.get("trends", "")
+        if trends:
+            trends_clean = trends.split("<")[0].strip()
+            parts.append(trends_clean[:120])
+
+    elif research_type == "business":
+        # name + overview
+        name = result.get("name", "")
+        if name:
+            parts.append(name)
+        overview = grok.get("overview", "")
+        if overview:
+            overview_clean = overview.split("<")[0].strip()
+            parts.append(overview_clean[:120])
+
+    summary = ". ".join(parts)
+    if len(summary) > 200:
+        summary = summary[:197] + "..."
+    return summary
+
+
 def save_research(
     research_type: str,
     target: str,
@@ -321,14 +384,15 @@ def save_research(
     with open(path, "w", encoding="utf-8") as f:
         json.dump(_sanitize(payload), f, ensure_ascii=False, indent=2)
 
-    # Neo4j dual-write (KIK-399/413) -- graceful degradation
+    # Neo4j dual-write (KIK-399/413/416) -- graceful degradation
     try:
         from src.data.graph_store import merge_research_full, merge_stock, link_research_supersedes
         if research_type in ("stock", "business"):
             merge_stock(symbol=target, name=result.get("name", ""))
+        summary = result.get("summary", "") or _build_research_summary(research_type, result)
         merge_research_full(
             research_date=today, research_type=research_type,
-            target=target, summary=result.get("summary", ""),
+            target=target, summary=summary,
             grok_research=result.get("grok_research"),
             x_sentiment=result.get("x_sentiment"),
             news=result.get("news"),
