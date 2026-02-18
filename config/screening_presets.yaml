@@ -14,6 +14,15 @@ presets:
       max_per: 20
       min_roe: 0.05
 
+  growth:
+    description: "純成長株（高ROE・高成長、割安制約なし）"
+    mode: "growth"
+    criteria:
+      min_roe: 0.15
+      min_revenue_growth: 0.05
+      min_earnings_growth: 0.10
+      min_market_cap: 100000000000
+
   growth-value:
     description: "成長バリュー（成長性＋割安度）"
     criteria:

@@ -19,7 +19,7 @@ export XAI_API_KEY=xai-xxxxxxxxxxxxx
 
 ### `/screen-stocks` — 割安株スクリーニング
 
-EquityQuery で日本株・米国株・ASEAN株等から割安銘柄を検索。7つのプリセットと60+地域に対応。
+EquityQuery で日本株・米国株・ASEAN株等から銘柄を検索。11のプリセットと60+地域に対応。
 
 ```bash
 # 基本
@@ -28,7 +28,7 @@ EquityQuery で日本株・米国株・ASEAN株等から割安銘柄を検索。
 /screen-stocks asean growth-value # ASEAN成長割安
 
 # プリセット一覧
-# value / high-dividend / growth-value / deep-value / quality / pullback / alpha
+# value / high-dividend / growth / growth-value / deep-value / quality / pullback / alpha / trending / long-term / shareholder-return
 
 # オプション
 /screen-stocks japan value --sector Technology  # セクター指定

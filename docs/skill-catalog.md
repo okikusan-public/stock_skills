@@ -8,7 +8,7 @@
 
 | Skill | Description | Core Dependencies |
 |:---|:---|:---|
-| screen-stocks | 割安株スクリーニング (60地域, 9プリセット) | screening/*.py, yahoo_client |
+| screen-stocks | 割安株スクリーニング (60地域, 11プリセット) | screening/*.py, yahoo_client |
 | stock-report | 個別銘柄バリュエーションレポート | indicators.py, value_trap.py, yahoo_client |
 | market-research | 深掘りリサーチ (銘柄/業界/市場/ビジネスモデル) | researcher.py, grok_client |
 | watchlist | ウォッチリスト管理 (add/remove/list) | (直接 JSON) |
@@ -27,7 +27,7 @@
 
 **Options**:
 - `--region`: 対象地域 (japan, us, asean, sg, hk, kr, tw, cn, etc.)
-- `--preset`: 戦略プリセット (alpha, value, high-dividend, growth-value, deep-value, quality, pullback, trending, long-term, shareholder-return)
+- `--preset`: 戦略プリセット (alpha, value, high-dividend, growth, growth-value, deep-value, quality, pullback, trending, long-term, shareholder-return)
 - `--sector`: セクター絞り込み (e.g. Technology)
 - `--top N`: 上位N件表示
 - `--with-pullback`: 押し目分析を付加
@@ -37,6 +37,7 @@
 ```bash
 python3 run_screen.py --region japan --preset alpha --top 10
 python3 run_screen.py --region us --preset trending --theme "AI" --top 10
+python3 run_screen.py --region japan --preset growth --top 10
 python3 run_screen.py --region japan --preset long-term --top 10
 ```
 

@@ -43,7 +43,8 @@ CLIデフォルト: value。自然言語で「いい株ある？」等プリセ�
 |:-----------|:-----------|
 | 「割安」「バリュー」 | value |
 | 「高配当」 | high-dividend |
-| 「成長」「グロース」 | growth-value |
+| 「純成長」「高成長」「成長率重視」「グロース株」 | growth |
+| 「成長バリュー」「成長＋割安」 | growth-value |
 | 「超割安」「ディープバリュー」 | deep-value |
 | 「クオリティ」「高品質」 | quality |
 | 「押し目」「pullback」 | pullback |
@@ -101,6 +102,7 @@ CLIデフォルト: value。自然言語で「いい株ある？」等プリセ�
 
 - `value` : 伝統的バリュー投資（低PER・低PBR・ROE≧5%）
 - `high-dividend` : 高配当株（配当利回り3%以上）
+- `growth` : 純成長株（高ROE≧15%・売上成長≧10%。PER制約なし。割安度を問わず成長力で選別）
 - `growth-value` : 成長バリュー（成長性＋割安度）
 - `deep-value` : ディープバリュー（非常に低いPER/PBR）
 - `quality` : クオリティバリュー（高ROE≧15%＋割安。value の ROE 閾値を5%→15%に厳格化した上位集合。収益力の高い割安株に限定）
@@ -125,6 +127,9 @@ CLIデフォルト: value。自然言語で「いい株ある？」等プリセ�
 
 ### Alpha モードの出力列
 順位 / 銘柄 / 株価 / PER / PBR / 割安 / 変化 / 総合 / 押し目 / ア / 加速 / FCF / ROE趨勢
+
+### Growth モードの出力列
+順位 / 銘柄 / セクター / 株価 / PER / PBR / EPS成長 / 売上成長 / ROE
 
 ### Trending モードの出力列
 順位 / 銘柄 / 話題の理由 / 株価 / PER / PBR / 配当利回り / ROE / スコア / 判定
@@ -179,6 +184,12 @@ python3 .../run_screen.py --region japan --preset long-term
 
 # 米国の長期投資候補
 python3 .../run_screen.py --region us --preset long-term
+
+# 日本の純成長株（割安制約なし）
+python3 .../run_screen.py --region japan --preset growth
+
+# 米国の純成長株
+python3 .../run_screen.py --region us --preset growth
 
 # 日本の高還元株
 python3 .../run_screen.py --region japan --preset shareholder-return

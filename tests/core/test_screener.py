@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.core.screening.screener import QueryScreener, PullbackScreener
+from src.core.screening.screener import QueryScreener, PullbackScreener, GrowthScreener
 
 
 # ===================================================================
@@ -252,3 +252,181 @@ class TestNormalizeQuoteAnomalyGuard:
         # Anomaly guard catches it: -1.5 < -1.0 -> None
         quote = {"returnOnEquity": -1.5}
         assert QueryScreener._normalize_quote(quote)["roe"] is None
+
+
+# ===================================================================
+# GrowthScreener
+# ===================================================================
+
+
+class TestGrowthScreener:
+    """Tests for GrowthScreener."""
+
+    def _make_raw_quote(self, symbol, short_name="Test", per=15.0, roe=0.20):
+        return {
+            "symbol": symbol,
+            "shortName": short_name,
+            "sector": "Technology",
+            "regularMarketPrice": 1000.0,
+            "marketCap": 500_000_000_000,
+            "trailingPE": per,
+            "forwardPE": per * 0.9,
+            "priceToBook": 2.0,
+            "returnOnEquity": roe,
+            "dividendYield": 1.0,
+            "revenueGrowth": 0.10,
+        }
+
+    def _make_detail(self, eps_growth=0.30, revenue_growth=0.10):
+        return {
+            "eps_growth": eps_growth,
+            "revenue_growth": revenue_growth,
+        }
+
+    def test_screen_returns_sorted_by_eps_growth(self):
+        """Results should be sorted by eps_growth descending."""
+        quotes = [
+            self._make_raw_quote("LOW.T", per=10),
+            self._make_raw_quote("MID.T", per=20),
+            self._make_raw_quote("HIGH.T", per=50),
+        ]
+        details = {
+            "LOW.T": self._make_detail(eps_growth=0.10),
+            "MID.T": self._make_detail(eps_growth=0.50),
+            "HIGH.T": self._make_detail(eps_growth=0.80),
+        }
+
+        class MockClient:
+            def screen_stocks(self, *a, **kw):
+                return quotes
+            def get_stock_info(self, sym):
+                return {"symbol": sym}
+            def get_stock_detail(self, sym):
+                return details.get(sym)
+
+        screener = GrowthScreener(MockClient())
+        results = screener.screen(region="jp", top_n=10)
+
+        assert len(results) == 3
+        assert results[0]["symbol"] == "HIGH.T"
+        assert results[0]["eps_growth"] == 0.80
+        assert results[1]["symbol"] == "MID.T"
+        assert results[2]["symbol"] == "LOW.T"
+
+    def test_screen_excludes_negative_eps_growth(self):
+        """Stocks with negative or zero EPS growth are excluded."""
+        quotes = [
+            self._make_raw_quote("POS.T"),
+            self._make_raw_quote("NEG.T"),
+            self._make_raw_quote("ZERO.T"),
+        ]
+        details = {
+            "POS.T": self._make_detail(eps_growth=0.25),
+            "NEG.T": self._make_detail(eps_growth=-0.10),
+            "ZERO.T": self._make_detail(eps_growth=0),
+        }
+
+        class MockClient:
+            def screen_stocks(self, *a, **kw):
+                return quotes
+            def get_stock_info(self, sym):
+                return {"symbol": sym}
+            def get_stock_detail(self, sym):
+                return details.get(sym)
+
+        screener = GrowthScreener(MockClient())
+        results = screener.screen(region="jp", top_n=10)
+
+        assert len(results) == 1
+        assert results[0]["symbol"] == "POS.T"
+
+    def test_screen_empty_quotes(self):
+        """Empty screen_stocks result returns empty list."""
+        class MockClient:
+            def screen_stocks(self, *a, **kw):
+                return []
+            def get_stock_info(self, sym):
+                return None
+            def get_stock_detail(self, sym):
+                return None
+
+        screener = GrowthScreener(MockClient())
+        assert screener.screen(region="jp") == []
+
+    def test_screen_no_detail_available(self):
+        """Stocks with no detail data are skipped."""
+        quotes = [self._make_raw_quote("NODATA.T")]
+
+        class MockClient:
+            def screen_stocks(self, *a, **kw):
+                return quotes
+            def get_stock_info(self, sym):
+                return {"symbol": sym}
+            def get_stock_detail(self, sym):
+                return None
+
+        screener = GrowthScreener(MockClient())
+        assert screener.screen(region="jp") == []
+
+    def test_screen_top_n_limit(self):
+        """Results should be capped at top_n."""
+        quotes = [self._make_raw_quote(f"S{i}.T") for i in range(5)]
+        details = {f"S{i}.T": self._make_detail(eps_growth=0.5 - i * 0.05) for i in range(5)}
+
+        class MockClient:
+            def screen_stocks(self, *a, **kw):
+                return quotes
+            def get_stock_info(self, sym):
+                return {"symbol": sym}
+            def get_stock_detail(self, sym):
+                return details.get(sym)
+
+        screener = GrowthScreener(MockClient())
+        results = screener.screen(region="jp", top_n=3)
+        assert len(results) == 3
+
+    def test_screen_includes_high_per_stocks(self):
+        """High PER stocks should NOT be excluded (no PER cap)."""
+        quotes = [
+            self._make_raw_quote("HIGHPER.T", per=100.0),
+        ]
+        details = {"HIGHPER.T": self._make_detail(eps_growth=0.40)}
+
+        class MockClient:
+            def screen_stocks(self, *a, **kw):
+                return quotes
+            def get_stock_info(self, sym):
+                return {"symbol": sym}
+            def get_stock_detail(self, sym):
+                return details.get(sym)
+
+        screener = GrowthScreener(MockClient())
+        results = screener.screen(region="jp", top_n=10)
+        assert len(results) == 1
+        assert results[0]["per"] == 100.0
+
+    def test_screen_result_fields(self):
+        """Result dict should contain expected growth-oriented fields."""
+        quotes = [self._make_raw_quote("7203.T", short_name="Toyota")]
+        details = {"7203.T": self._make_detail(eps_growth=0.30, revenue_growth=0.12)}
+
+        class MockClient:
+            def screen_stocks(self, *a, **kw):
+                return quotes
+            def get_stock_info(self, sym):
+                return {"symbol": sym}
+            def get_stock_detail(self, sym):
+                return details.get(sym)
+
+        screener = GrowthScreener(MockClient())
+        results = screener.screen(region="jp", top_n=10)
+
+        assert len(results) == 1
+        r = results[0]
+        assert r["symbol"] == "7203.T"
+        assert r["eps_growth"] == 0.30
+        assert r["revenue_growth"] is not None
+        assert "sector" in r
+        assert "per" in r
+        assert "pbr" in r
+        assert "roe" in r

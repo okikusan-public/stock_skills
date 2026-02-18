@@ -31,6 +31,9 @@ python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --pres
 python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset trending --top 10
 python3 .claude/skills/screen-stocks/scripts/run_screen.py --region us --preset trending --theme "AI" --top 10
 
+# 純成長株スクリーニング（高ROE・高成長、割安制約なし）
+python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset growth --top 10
+
 # 長期投資候補スクリーニング（高ROE・EPS成長・高配当・安定大型株）
 python3 .claude/skills/screen-stocks/scripts/run_screen.py --region japan --preset long-term --top 10
 
@@ -106,7 +109,7 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
   │  value_trap.py ─ バリュートラップ検出(health_checkから独立)     │
   │                                                           │
   │  screening/ ─ スクリーニングエンジン                          │
-  │    screener.py ─ 4つのスクリーナー(Query/Value/Pullback/Alpha) │
+  │    screener.py ─ 5つのスクリーナー(Query/Value/Pullback/Alpha/Growth) │
   │    indicators.py ─ バリュースコア(0-100点)+株主還元率+安定度   │
   │    filters.py ─ ファンダメンタルズ条件フィルタ                  │
   │    query_builder.py ─ EquityQuery構築                      │
@@ -201,7 +204,7 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                             portfolio/watchlist/notes/market_context,
                             --rebuild)
 
-  Config: config/screening_presets.yaml (7プリセット)
+  Config: config/screening_presets.yaml (11プリセット)
           config/exchanges.yaml (60+地域の取引所・閾値)
 
   Rules: .claude/rules/

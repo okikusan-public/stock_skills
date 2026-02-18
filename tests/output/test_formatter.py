@@ -15,6 +15,7 @@ from src.output.formatter import (
     format_pullback_markdown,
     format_query_markdown,
     format_shareholder_return_markdown,
+    format_growth_markdown,
 )
 
 
@@ -267,3 +268,64 @@ class TestFormatShareholderReturnMarkdown:
         output = format_shareholder_return_markdown(results)
         assert "❓ データ不足" in output
         assert "（" not in output
+
+
+# ---------------------------------------------------------------------------
+# format_growth_markdown — KIK-417
+# ---------------------------------------------------------------------------
+
+class TestFormatGrowthMarkdown:
+    """Tests for format_growth_markdown()."""
+
+    def test_includes_growth_columns(self):
+        """Growth markdown includes EPS growth and revenue growth columns."""
+        results = [{
+            "symbol": "7203.T",
+            "name": "Toyota Motor",
+            "sector": "Consumer Cyclical",
+            "price": 2850.0,
+            "per": 10.5,
+            "pbr": 1.2,
+            "eps_growth": 0.30,
+            "revenue_growth": 0.15,
+            "roe": 0.18,
+        }]
+        output = format_growth_markdown(results)
+
+        assert "| EPS成長 |" in output
+        assert "| 売上成長 |" in output
+        assert "| ROE |" in output
+        assert "| セクター |" in output
+        assert "7203.T" in output
+        assert "Toyota Motor" in output
+        assert "30.00%" in output  # eps_growth
+        assert "15.00%" in output  # revenue_growth
+        assert "18.00%" in output  # roe
+
+    def test_does_not_include_value_score_column(self):
+        """Growth markdown should NOT include value score or dividend columns."""
+        results = [{
+            "symbol": "TEST",
+            "eps_growth": 0.50,
+        }]
+        output = format_growth_markdown(results)
+
+        assert "スコア" not in output
+        assert "配当利回り" not in output
+
+    def test_empty_list_returns_not_found_message(self):
+        """Empty results list produces growth-specific not found message."""
+        output = format_growth_markdown([])
+        assert "成長条件に合致する銘柄が見つかりませんでした" in output
+
+    def test_missing_fields_show_dash(self):
+        """Missing fields are displayed as '-'."""
+        results = [{
+            "symbol": "TEST",
+            "sector": None,
+            "eps_growth": None,
+            "revenue_growth": None,
+            "roe": None,
+        }]
+        output = format_growth_markdown(results)
+        assert "TEST" in output

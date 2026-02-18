@@ -131,6 +131,39 @@ def format_pullback_markdown(results: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def format_growth_markdown(results: list[dict]) -> str:
+    """Format growth screening results as a Markdown table.
+
+    Shows EPS growth, revenue growth, and ROE instead of value-centric columns.
+    """
+    if not results:
+        return "成長条件に合致する銘柄が見つかりませんでした。"
+
+    lines = [
+        "| 順位 | 銘柄 | セクター | 株価 | PER | PBR | EPS成長 | 売上成長 | ROE |",
+        "|---:|:-----|:---------|-----:|----:|----:|-------:|--------:|----:|",
+    ]
+
+    for rank, row in enumerate(results, start=1):
+        symbol = row.get("symbol", "-")
+        name = row.get("name") or ""
+        label = f"{symbol} {name}".strip() if name else symbol
+        sector = row.get("sector") or "-"
+
+        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
+        per = _fmt_float(row.get("per"))
+        pbr = _fmt_float(row.get("pbr"))
+        eps_g = _fmt_pct(row.get("eps_growth"))
+        rev_g = _fmt_pct(row.get("revenue_growth"))
+        roe = _fmt_pct(row.get("roe"))
+
+        lines.append(
+            f"| {rank} | {label} | {sector} | {price} | {per} | {pbr} | {eps_g} | {rev_g} | {roe} |"
+        )
+
+    return "\n".join(lines)
+
+
 def format_alpha_markdown(results: list[dict]) -> str:
     """Format alpha signal screening results as a Markdown table.
 

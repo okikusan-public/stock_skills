@@ -14,8 +14,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 from src.data import yahoo_client
-from src.core.screening.screener import ValueScreener, QueryScreener, PullbackScreener, AlphaScreener, TrendingScreener
-from src.output.formatter import format_markdown, format_query_markdown, format_pullback_markdown, format_alpha_markdown, format_trending_markdown
+from src.core.screening.screener import ValueScreener, QueryScreener, PullbackScreener, AlphaScreener, TrendingScreener, GrowthScreener
+from src.output.formatter import format_markdown, format_query_markdown, format_pullback_markdown, format_alpha_markdown, format_trending_markdown, format_growth_markdown
 from src.markets.japan import JapanMarket
 from src.markets.us import USMarket
 from src.markets.asean import ASEANMarket
@@ -193,6 +193,26 @@ def run_query_mode(args):
             print()
         return
 
+    # growth preset uses GrowthScreener
+    if args.preset == "growth":
+        screener = GrowthScreener(yahoo_client)
+        for region_code in regions:
+            region_name = REGION_NAMES.get(region_code, region_code.upper())
+            sector_label = f" [{args.sector}]" if args.sector else ""
+            print(f"\n## {region_name} - 純成長株{sector_label} スクリーニング結果\n")
+            print("Step 1: 成長条件で絞り込み中 (EquityQuery)...")
+            results = screener.screen(region=region_code, top_n=args.top, sector=args.sector)
+            print(f"Step 2: {len(results)}銘柄のEPS成長率を取得・ソート完了\n")
+            print(format_growth_markdown(results))
+            _print_recurring_picks(results)
+            if HAS_HISTORY and results:
+                try:
+                    save_screening(preset="growth", region=region_code, results=results, sector=args.sector)
+                except Exception as e:
+                    print(f"Warning: 履歴保存失敗: {e}", file=sys.stderr)
+            print()
+        return
+
     # alpha preset uses AlphaScreener
     if args.preset == "alpha":
         screener = AlphaScreener(yahoo_client)
@@ -314,7 +334,7 @@ def main():
     parser.add_argument(
         "--preset",
         default="value",
-        choices=["value", "high-dividend", "growth-value", "deep-value", "quality", "pullback", "alpha", "trending", "long-term", "shareholder-return"],
+        choices=["value", "high-dividend", "growth", "growth-value", "deep-value", "quality", "pullback", "alpha", "trending", "long-term", "shareholder-return"],
     )
     parser.add_argument(
         "--sector",
@@ -371,6 +391,10 @@ def main():
 
     if args.preset == "alpha" and args.mode == "legacy":
         print("Note: alpha preset requires query mode. Switching to --mode query.")
+        args.mode = "query"
+
+    if args.preset == "growth" and args.mode == "legacy":
+        print("Note: growth preset requires query mode. Switching to --mode query.")
         args.mode = "query"
 
     if args.preset == "trending" and args.mode == "legacy":
