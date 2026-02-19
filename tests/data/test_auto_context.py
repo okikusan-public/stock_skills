@@ -1,10 +1,11 @@
-"""Tests for src.data.auto_context module (KIK-411/420).
+"""Tests for src.data.auto_context module (KIK-411/420/427).
 
 All graph_store/graph_query functions are mocked — no Neo4j dependency.
 KIK-420 additions: vector search integration tests.
+KIK-427 additions: freshness label tests.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,19 +17,24 @@ from src.data.auto_context import (
     _format_context,
     _format_market_context,
     _format_vector_results,
+    _fresh_hours,
     _has_bought_not_sold,
     _has_concern_notes,
     _has_exit_alert,
     _has_recent_research,
+    _hours_since,
     _infer_skill_from_vectors,
     _is_market_query,
     _is_portfolio_query,
     _merge_context,
+    _recent_hours,
     _recommend_skill,
     _resolve_symbol,
     _screening_count,
     _thesis_needs_review,
     _vector_search,
+    freshness_action,
+    freshness_label,
     get_context,
 )
 
@@ -300,16 +306,127 @@ class TestRecommendSkill:
 
 
 # ===================================================================
+# KIK-427: Freshness detection tests
+# ===================================================================
+
+class TestFreshHours:
+    def test_default(self):
+        with patch.dict("os.environ", {}, clear=True):
+            assert _fresh_hours() == 24
+
+    def test_custom_value(self):
+        with patch.dict("os.environ", {"CONTEXT_FRESH_HOURS": "12"}):
+            assert _fresh_hours() == 12
+
+    def test_invalid_value(self):
+        with patch.dict("os.environ", {"CONTEXT_FRESH_HOURS": "abc"}):
+            assert _fresh_hours() == 24
+
+    def test_empty_string(self):
+        with patch.dict("os.environ", {"CONTEXT_FRESH_HOURS": ""}):
+            assert _fresh_hours() == 24
+
+
+class TestRecentHours:
+    def test_default(self):
+        with patch.dict("os.environ", {}, clear=True):
+            assert _recent_hours() == 168
+
+    def test_custom_value(self):
+        with patch.dict("os.environ", {"CONTEXT_RECENT_HOURS": "72"}):
+            assert _recent_hours() == 72
+
+    def test_invalid_value(self):
+        with patch.dict("os.environ", {"CONTEXT_RECENT_HOURS": "xyz"}):
+            assert _recent_hours() == 168
+
+
+class TestHoursSince:
+    def test_today(self):
+        today = date.today().isoformat()
+        h = _hours_since(today)
+        assert 0 <= h < 25  # within today
+
+    def test_yesterday(self):
+        yesterday = (date.today() - timedelta(days=1)).isoformat()
+        h = _hours_since(yesterday)
+        assert 23 < h < 49
+
+    def test_invalid_date(self):
+        assert _hours_since("not-a-date") == 999999
+
+    def test_none(self):
+        assert _hours_since(None) == 999999
+
+    def test_empty_string(self):
+        assert _hours_since("") == 999999
+
+
+class TestFreshnessLabel:
+    def test_fresh(self):
+        """今日のデータ → FRESH"""
+        today = date.today().isoformat()
+        assert freshness_label(today) == "FRESH"
+
+    def test_recent(self):
+        """3日前のデータ → RECENT"""
+        three_days_ago = (date.today() - timedelta(days=3)).isoformat()
+        assert freshness_label(three_days_ago) == "RECENT"
+
+    def test_stale(self):
+        """30日前のデータ → STALE"""
+        old_date = (date.today() - timedelta(days=30)).isoformat()
+        assert freshness_label(old_date) == "STALE"
+
+    def test_none_date(self):
+        """空文字列 → NONE"""
+        assert freshness_label("") == "NONE"
+        assert freshness_label(None) == "NONE"
+
+    def test_custom_thresholds(self):
+        """環境変数で閾値をカスタマイズ"""
+        two_days_ago = (date.today() - timedelta(days=2)).isoformat()
+        # Default: 24h fresh → 2 days ago is RECENT
+        assert freshness_label(two_days_ago) == "RECENT"
+        # Custom: 72h fresh → 2 days ago is FRESH
+        with patch.dict("os.environ", {"CONTEXT_FRESH_HOURS": "72"}):
+            assert freshness_label(two_days_ago) == "FRESH"
+
+    def test_boundary_stale(self):
+        """ちょうど7日+1日前 → STALE"""
+        eight_days_ago = (date.today() - timedelta(days=8)).isoformat()
+        assert freshness_label(eight_days_ago) == "STALE"
+
+
+class TestFreshnessAction:
+    def test_fresh(self):
+        assert freshness_action("FRESH") == "コンテキスト利用"
+
+    def test_recent(self):
+        assert freshness_action("RECENT") == "差分モード推奨"
+
+    def test_stale(self):
+        assert freshness_action("STALE") == "フル再取得推奨"
+
+    def test_none(self):
+        assert freshness_action("NONE") == "新規取得"
+
+    def test_unknown(self):
+        assert freshness_action("UNKNOWN") == "新規取得"
+
+
+# ===================================================================
 # Context formatting tests
 # ===================================================================
 
 class TestFormatContext:
     def test_with_data(self):
-        """履歴あり → screens/reports/trades が含まれる"""
+        """履歴あり → screens/reports/trades + 鮮度ラベルが含まれる"""
+        today = date.today().isoformat()
         history = {
-            "screens": [{"date": "2026-02-14", "preset": "alpha", "region": "jp"}],
-            "reports": [{"date": "2026-02-16", "score": 75, "verdict": "割安"}],
-            "trades": [{"date": "2026-02-16", "type": "buy", "shares": 100, "price": 2850}],
+            "screens": [{"date": today, "preset": "alpha", "region": "jp"}],
+            "reports": [{"date": today, "score": 75, "verdict": "割安"}],
+            "trades": [{"date": today, "type": "buy", "shares": 100, "price": 2850}],
             "health_checks": [],
             "notes": [],
             "themes": ["EV", "自動車"],
@@ -321,6 +438,10 @@ class TestFormatContext:
         assert "スコア 75" in md
         assert "購入" in md
         assert "EV" in md
+        # KIK-427: freshness labels
+        assert "[FRESH]" in md
+        assert "鮮度サマリー" in md
+        assert "コンテキスト利用" in md
 
     def test_empty_history(self):
         """空の履歴 → 過去データなし"""
@@ -328,6 +449,8 @@ class TestFormatContext:
         md = _format_context("AAPL", history, "report", "未知", "未知")
         assert "AAPL" in md
         assert "過去データなし" in md
+        # No freshness summary when no data
+        assert "鮮度サマリー" not in md
 
     def test_notes_truncated(self):
         """長いメモ → 50文字に切り詰め"""
@@ -336,11 +459,33 @@ class TestFormatContext:
         assert "A" * 50 in md
         assert "A" * 51 not in md
 
+    def test_stale_data_shows_stale_label(self):
+        """古いデータ → [STALE] ラベル + フル再取得推奨"""
+        old_date = (date.today() - timedelta(days=30)).isoformat()
+        history = {
+            "reports": [{"date": old_date, "score": 50, "verdict": "適正"}],
+        }
+        md = _format_context("7203.T", history, "report", "既知", "既知")
+        assert "[STALE]" in md
+        assert "フル再取得推奨" in md
+
+    def test_recent_data_shows_recent_label(self):
+        """3日前のデータ → [RECENT] ラベル + 差分モード推奨"""
+        recent_date = (date.today() - timedelta(days=3)).isoformat()
+        history = {
+            "researches": [{"date": recent_date, "research_type": "stock",
+                            "summary": "test"}],
+        }
+        md = _format_context("7203.T", history, "report", "既知", "既知")
+        assert "[RECENT]" in md
+        assert "差分モード推奨" in md
+
 
 class TestFormatMarketContext:
     def test_basic(self):
+        today = date.today().isoformat()
         mc = {
-            "date": "2026-02-17",
+            "date": today,
             "indices": [
                 {"name": "日経225", "price": 38500},
                 {"name": "S&P 500", "price": 5200},
@@ -350,11 +495,22 @@ class TestFormatMarketContext:
         assert "市況コンテキスト" in md
         assert "日経225" in md
         assert "38500" in md
+        # KIK-427: freshness label
+        assert "[FRESH]" in md
+        assert "コンテキスト利用" in md
 
     def test_empty_indices(self):
         mc = {"date": "2026-02-17", "indices": []}
         md = _format_market_context(mc)
         assert "2026-02-17" in md
+
+    def test_stale_market_context(self):
+        """古い市況データ → [STALE]"""
+        old_date = (date.today() - timedelta(days=30)).isoformat()
+        mc = {"date": old_date, "indices": []}
+        md = _format_market_context(mc)
+        assert "[STALE]" in md
+        assert "フル再取得推奨" in md
 
 
 # ===================================================================
@@ -596,11 +752,12 @@ class TestFormatVectorResults:
     """Tests for _format_vector_results()."""
 
     def test_formats_results(self):
+        today = date.today().isoformat()
         results = [
-            {"label": "Screen", "summary": "japan alpha 2026-02-18",
-             "score": 0.95, "date": "2026-02-18", "id": "s1"},
+            {"label": "Screen", "summary": "japan alpha",
+             "score": 0.95, "date": today, "id": "s1"},
             {"label": "Report", "summary": "7203.T Toyota / 割安(72.5)",
-             "score": 0.88, "date": "2026-02-18", "id": "r1"},
+             "score": 0.88, "date": today, "id": "r1"},
         ]
         md = _format_vector_results(results)
         assert "関連する過去の記録" in md
@@ -608,6 +765,8 @@ class TestFormatVectorResults:
         assert "[Report]" in md
         assert "95%" in md
         assert "88%" in md
+        # KIK-427: freshness labels
+        assert "[FRESH]" in md
 
     def test_empty_results(self):
         md = _format_vector_results([])
@@ -618,6 +777,21 @@ class TestFormatVectorResults:
                      "date": "2026-01-01", "id": "n1"}]
         md = _format_vector_results(results)
         assert "(要約なし)" in md
+
+    def test_stale_vector_result(self):
+        """古いベクトル結果 → [STALE] ラベル"""
+        old_date = (date.today() - timedelta(days=30)).isoformat()
+        results = [{"label": "Report", "summary": "old report",
+                     "score": 0.75, "date": old_date, "id": "r1"}]
+        md = _format_vector_results(results)
+        assert "[STALE]" in md
+
+    def test_no_date_shows_none(self):
+        """日付なしのベクトル結果 → [NONE] ラベル"""
+        results = [{"label": "Note", "summary": "note", "score": 0.6,
+                     "date": "", "id": "n1"}]
+        md = _format_vector_results(results)
+        assert "[NONE]" in md
 
 
 class TestInferSkillFromVectors:

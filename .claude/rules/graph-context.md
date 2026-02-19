@@ -62,9 +62,9 @@ python3 scripts/get_context.py "<ユーザー入力>"
 4. 前回の値がある場合は差分を意識した出力にする
 5. Neo4j 未接続時は出力が「コンテキストなし」→ 従来通り intent-routing のみで判断
 
-## コンテキスト鮮度判定（予定: KIK-427）
+## コンテキスト鮮度判定 (KIK-427)
 
-`get_context.py` の出力に鮮度ラベル（FRESH/RECENT/STALE）を付与し、LLM がデータの再取得要否を判断する。
+`get_context.py` の出力に鮮度ラベル（FRESH/RECENT/STALE/NONE）を付与し、LLM がデータの再取得要否を判断する。
 
 ### 鮮度ラベル
 

@@ -1,11 +1,13 @@
-"""Auto graph context injection for user prompts (KIK-411/420).
+"""Auto graph context injection for user prompts (KIK-411/420/427).
 
 Detects ticker symbols in user input, queries Neo4j for past knowledge,
 and recommends the optimal skill based on graph state.
 KIK-420: Hybrid search — vector similarity + symbol-based retrieval.
+KIK-427: Freshness labels (FRESH/RECENT/STALE) with env-configurable thresholds.
 Returns None when no context available or Neo4j unavailable (graceful degradation).
 """
 
+import os
 import re
 from datetime import date, datetime, timedelta
 from typing import Optional
@@ -85,6 +87,60 @@ def _days_since(date_str: str) -> int:
         return (date.today() - d).days
     except (ValueError, TypeError):
         return 9999
+
+
+# ---------------------------------------------------------------------------
+# Freshness detection (KIK-427)
+# ---------------------------------------------------------------------------
+
+def _fresh_hours() -> int:
+    """Return CONTEXT_FRESH_HOURS threshold (default 24)."""
+    try:
+        return int(os.environ.get("CONTEXT_FRESH_HOURS", "24"))
+    except (ValueError, TypeError):
+        return 24
+
+
+def _recent_hours() -> int:
+    """Return CONTEXT_RECENT_HOURS threshold (default 168 = 7 days)."""
+    try:
+        return int(os.environ.get("CONTEXT_RECENT_HOURS", "168"))
+    except (ValueError, TypeError):
+        return 168
+
+
+def _hours_since(date_str: str) -> float:
+    """Return hours between date_str and now. Returns 999999 on parse error."""
+    try:
+        d = datetime.strptime(date_str[:10], "%Y-%m-%d")
+        return (datetime.now() - d).total_seconds() / 3600
+    except (ValueError, TypeError):
+        return 999999
+
+
+def freshness_label(date_str: str) -> str:
+    """Return freshness label for a date string.
+
+    Returns one of: FRESH, RECENT, STALE, NONE.
+    """
+    if not date_str:
+        return "NONE"
+    h = _hours_since(date_str)
+    if h <= _fresh_hours():
+        return "FRESH"
+    if h <= _recent_hours():
+        return "RECENT"
+    return "STALE"
+
+
+def freshness_action(label: str) -> str:
+    """Return recommended action for a freshness label."""
+    return {
+        "FRESH": "コンテキスト利用",
+        "RECENT": "差分モード推奨",
+        "STALE": "フル再取得推奨",
+        "NONE": "新規取得",
+    }.get(label, "新規取得")
 
 
 def _has_bought_not_sold(history: dict) -> bool:
@@ -190,29 +246,44 @@ def _recommend_skill(history: dict, is_bookmarked: bool,
 
 def _format_context(symbol: str, history: dict, skill: str, reason: str,
                     relationship: str) -> str:
-    """Format graph context as markdown."""
+    """Format graph context as markdown with freshness labels (KIK-427)."""
     lines = [f"## 過去の経緯: {symbol} ({relationship})"]
+
+    # Track freshness by data type for summary
+    freshness_map: dict[str, str] = {}  # data_type -> label
 
     # Screens
     for s in history.get("screens", [])[:3]:
-        lines.append(f"- {s.get('date', '?')} {s.get('preset', '')} "
+        d = s.get("date", "?")
+        fl = freshness_label(d)
+        lines.append(f"- [{fl}] {d} {s.get('preset', '')} "
                      f"スクリーニング ({s.get('region', '')})")
+        freshness_map.setdefault("スクリーニング", fl)
 
     # Reports
     for r in history.get("reports", [])[:2]:
+        d = r.get("date", "?")
+        fl = freshness_label(d)
         verdict = r.get("verdict", "")
         score = r.get("score", "")
-        lines.append(f"- {r.get('date', '?')} レポート: スコア {score}, {verdict}")
+        lines.append(f"- [{fl}] {d} レポート: スコア {score}, {verdict}")
+        freshness_map.setdefault("レポート", fl)
 
     # Trades
     for t in history.get("trades", [])[:3]:
+        d = t.get("date", "?")
+        fl = freshness_label(d)
         action = "購入" if t.get("type") == "buy" else "売却"
-        lines.append(f"- {t.get('date', '?')} {action}: "
+        lines.append(f"- [{fl}] {d} {action}: "
                      f"{t.get('shares', '')}株 @ {t.get('price', '')}")
+        freshness_map.setdefault("取引", fl)
 
     # Health checks
     for h in history.get("health_checks", [])[:1]:
-        lines.append(f"- {h.get('date', '?')} ヘルスチェック実施")
+        d = h.get("date", "?")
+        fl = freshness_label(d)
+        lines.append(f"- [{fl}] {d} ヘルスチェック実施")
+        freshness_map.setdefault("ヘルスチェック", fl)
 
     # Notes
     for n in history.get("notes", [])[:3]:
@@ -226,12 +297,22 @@ def _format_context(symbol: str, history: dict, skill: str, reason: str,
 
     # Researches
     for r in history.get("researches", [])[:2]:
+        d = r.get("date", "?")
+        fl = freshness_label(d)
         summary = (r.get("summary", "") or "")[:50]
-        lines.append(f"- {r.get('date', '?')} リサーチ({r.get('research_type', '')}): "
+        lines.append(f"- [{fl}] {d} リサーチ({r.get('research_type', '')}): "
                      f"{summary}")
+        freshness_map.setdefault("リサーチ", fl)
 
     if len(lines) == 1:
         lines.append("- (過去データなし)")
+
+    # Freshness summary (KIK-427)
+    if freshness_map:
+        lines.append("")
+        lines.append("### 鮮度サマリー")
+        for dtype, fl in freshness_map.items():
+            lines.append(f"- {dtype}: [{fl}] → {freshness_action(fl)}")
 
     lines.append(f"\n**推奨**: {skill} ({reason})")
     return "\n".join(lines)
@@ -242,9 +323,11 @@ def _format_context(symbol: str, history: dict, skill: str, reason: str,
 # ---------------------------------------------------------------------------
 
 def _format_market_context(mc: dict) -> str:
-    """Format market context as markdown."""
-    lines = ["## 直近の市況コンテキスト"]
-    lines.append(f"- 取得日: {mc.get('date', '?')}")
+    """Format market context as markdown with freshness label (KIK-427)."""
+    d = mc.get("date", "?")
+    fl = freshness_label(d)
+    lines = [f"## 直近の市況コンテキスト [{fl}]"]
+    lines.append(f"- 取得日: {d} → {freshness_action(fl)}")
     for idx in mc.get("indices", [])[:5]:
         if isinstance(idx, dict):
             name = idx.get("name", idx.get("symbol", "?"))
@@ -299,12 +382,13 @@ def _vector_search(user_input: str) -> list[dict]:
 
 
 def _format_vector_results(results: list[dict]) -> str:
-    """Format vector search results as markdown."""
+    """Format vector search results as markdown with freshness labels (KIK-427)."""
     lines = ["## 関連する過去の記録"]
     for r in results[:5]:
         score_pct = f"{r['score'] * 100:.0f}%"
         summary = r.get("summary") or "(要約なし)"
-        lines.append(f"- [{r['label']}] {summary} (類似度{score_pct})")
+        fl = freshness_label(r.get("date", ""))
+        lines.append(f"- [{r['label']}][{fl}] {summary} (類似度{score_pct})")
     return "\n".join(lines)
 
 
