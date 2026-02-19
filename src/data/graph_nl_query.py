@@ -56,6 +56,9 @@ _TEMPLATES = [
     (r"バリュエーション.*推移|PER.*推移|スコア.*推移|レポート.*推移", "report_trend", _extract_symbol),
     (r"イベント|予定|upcoming|今後.*予定", "upcoming_events", None),
     (r"指標.*推移|VIX.*推移|インディケーター|マクロ指標", "indicator_history", None),
+    # KIK-428 stress test / forecast
+    (r"前回.*ストレステスト|ストレステスト.*履歴|ストレス.*結果", "stress_test_history", _extract_symbol),
+    (r"フォーキャスト.*推移|前回.*見通し|予測.*履歴|forecast.*履歴", "forecast_history", _extract_symbol),
 ]
 
 _COMPILED = [(re.compile(pat, re.IGNORECASE), qtype, extractor) for pat, qtype, extractor in _TEMPLATES]
@@ -160,6 +163,15 @@ def _execute(query_type: str, params: dict):
 
     if query_type == "indicator_history":
         return graph_query.get_recent_market_context()
+
+    # KIK-428
+    if query_type == "stress_test_history":
+        symbol = params.get("symbol")
+        return graph_query.get_stress_test_history(symbol=symbol)
+
+    if query_type == "forecast_history":
+        symbol = params.get("symbol")
+        return graph_query.get_forecast_history(symbol=symbol)
 
     return None
 
@@ -329,6 +341,48 @@ def _fmt_indicator_history(result, params: dict) -> str:
     return _fmt_market_context(result, params)
 
 
+def _fmt_stress_test_history(result, params: dict) -> str:
+    if not result:
+        return "ストレステストの履歴は見つかりませんでした。"
+    lines = ["## ストレステスト履歴\n",
+             "| 日付 | シナリオ | PF影響 | VaR95 | VaR99 | 銘柄数 |",
+             "|:-----|:---------|:-------|:------|:------|:-------|"]
+    for r in result:
+        impact = r.get("portfolio_impact")
+        impact_str = f"{impact * 100:+.1f}%" if impact is not None else "-"
+        var95 = r.get("var_95")
+        var95_str = f"{var95 * 100:.1f}%" if var95 else "-"
+        var99 = r.get("var_99")
+        var99_str = f"{var99 * 100:.1f}%" if var99 else "-"
+        lines.append(
+            f"| {r.get('date', '-')} | {r.get('scenario', '-')} "
+            f"| {impact_str} | {var95_str} | {var99_str} | {r.get('symbol_count', '-')} |"
+        )
+    return "\n".join(lines)
+
+
+def _fmt_forecast_history(result, params: dict) -> str:
+    if not result:
+        return "フォーキャストの履歴は見つかりませんでした。"
+    lines = ["## フォーキャスト履歴\n",
+             "| 日付 | 楽観 | ベース | 悲観 | 評価額(万円) | 銘柄数 |",
+             "|:-----|:-----|:-------|:-----|:------------|:-------|"]
+    for r in result:
+        opt = r.get("optimistic")
+        opt_str = f"{opt * 100:+.1f}%" if opt is not None else "-"
+        base = r.get("base")
+        base_str = f"{base * 100:+.1f}%" if base is not None else "-"
+        pess = r.get("pessimistic")
+        pess_str = f"{pess * 100:+.1f}%" if pess is not None else "-"
+        total = r.get("total_value_jpy")
+        total_str = f"{total / 10000:,.0f}" if total else "-"
+        lines.append(
+            f"| {r.get('date', '-')} | {opt_str} | {base_str} "
+            f"| {pess_str} | {total_str} | {r.get('symbol_count', '-')} |"
+        )
+    return "\n".join(lines)
+
+
 _FORMATTERS = {
     "prior_report": _fmt_prior_report,
     "recurring_picks": _fmt_recurring_picks,
@@ -343,4 +397,7 @@ _FORMATTERS = {
     "report_trend": _fmt_report_trend,
     "upcoming_events": _fmt_upcoming_events,
     "indicator_history": _fmt_indicator_history,
+    # KIK-428
+    "stress_test_history": _fmt_stress_test_history,
+    "forecast_history": _fmt_forecast_history,
 }

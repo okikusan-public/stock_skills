@@ -31,6 +31,7 @@ from src.data.graph_store import (
     init_schema,
     is_available,
     link_research_supersedes,
+    merge_forecast,
     merge_health,
     merge_market_context,
     merge_market_context_full,
@@ -41,6 +42,7 @@ from src.data.graph_store import (
     merge_research_full,
     merge_screen,
     merge_stock,
+    merge_stress_test,
     merge_trade,
     merge_watchlist,
     sync_portfolio,
@@ -445,6 +447,97 @@ def import_watchlists(watchlists_dir: str) -> int:
     return count
 
 
+def import_stress_tests(history_dir: str) -> int:
+    """Import stress test history files (KIK-428)."""
+    d = Path(history_dir) / "stress_test"
+    if not d.exists():
+        return 0
+    count = 0
+    for fp in sorted(d.glob("*.json")):
+        try:
+            with open(fp, encoding="utf-8") as f:
+                data = json.load(f)
+            test_date = data.get("date", "")
+            scenario = data.get("scenario", "")
+            symbols = data.get("symbols", [])
+            portfolio_impact = data.get("portfolio_impact", 0)
+            var_result = data.get("var_result", {})
+
+            for sym in symbols:
+                if sym:
+                    merge_stock(symbol=sym)
+
+            summary_text = ""
+            emb = None
+            if HAS_EMBEDDING:
+                try:
+                    summary_text = summary_builder.build_stress_test_summary(
+                        test_date, scenario, portfolio_impact, len(symbols))
+                    emb = _get_embedding(summary_text)
+                except Exception:
+                    pass
+
+            merge_stress_test(
+                test_date=test_date, scenario=scenario,
+                portfolio_impact=portfolio_impact, symbols=symbols,
+                var_95=var_result.get("var_95_daily", 0),
+                var_99=var_result.get("var_99_daily", 0),
+                semantic_summary=summary_text, embedding=emb,
+            )
+            count += 1
+        except (json.JSONDecodeError, OSError):
+            continue
+    return count
+
+
+def import_forecasts(history_dir: str) -> int:
+    """Import forecast history files (KIK-428)."""
+    d = Path(history_dir) / "forecast"
+    if not d.exists():
+        return 0
+    count = 0
+    for fp in sorted(d.glob("*.json")):
+        try:
+            with open(fp, encoding="utf-8") as f:
+                data = json.load(f)
+            forecast_date = data.get("date", "")
+            portfolio = data.get("portfolio", {})
+            positions = data.get("positions", [])
+            symbols = [p.get("symbol", "") for p in positions if p.get("symbol")]
+
+            for sym in symbols:
+                if sym:
+                    merge_stock(symbol=sym)
+
+            summary_text = ""
+            emb = None
+            if HAS_EMBEDDING:
+                try:
+                    summary_text = summary_builder.build_forecast_summary(
+                        forecast_date,
+                        portfolio.get("optimistic"),
+                        portfolio.get("base"),
+                        portfolio.get("pessimistic"),
+                        len(symbols))
+                    emb = _get_embedding(summary_text)
+                except Exception:
+                    pass
+
+            merge_forecast(
+                forecast_date=forecast_date,
+                optimistic=portfolio.get("optimistic", 0),
+                base=portfolio.get("base", 0),
+                pessimistic=portfolio.get("pessimistic", 0),
+                symbols=symbols,
+                total_value_jpy=data.get("total_value_jpy", 0),
+                semantic_summary=summary_text, embedding=emb,
+            )
+            count += 1
+        except (json.JSONDecodeError, OSError):
+            continue
+    return count
+
+
 def main():
     parser = argparse.ArgumentParser(description="Initialize Neo4j knowledge graph")
     parser.add_argument("--history-dir", default="data/history")
@@ -492,6 +585,8 @@ def main():
     health = import_health(args.history_dir)
     research = import_research(args.history_dir)
     market_ctx = import_market_context(args.history_dir)
+    stress_tests = import_stress_tests(args.history_dir)
+    forecasts = import_forecasts(args.history_dir)
 
     print(f"  Screens:        {screens}")
     print(f"  Reports:        {reports}")
@@ -499,6 +594,8 @@ def main():
     print(f"  Health:         {health}")
     print(f"  Research:       {research}")
     print(f"  MarketContext:  {market_ctx}")
+    print(f"  StressTests:    {stress_tests}")
+    print(f"  Forecasts:      {forecasts}")
 
     print(f"\nImporting portfolio from {args.portfolio_csv}...")
     portfolio = import_portfolio(args.portfolio_csv)
@@ -512,7 +609,7 @@ def main():
     notes = import_notes(args.notes_dir)
     print(f"  Notes:    {notes}")
 
-    total = screens + reports + trades + health + research + portfolio + watchlists + notes
+    total = screens + reports + trades + health + research + stress_tests + forecasts + portfolio + watchlists + notes
     print(f"\nDone. Total {total} records imported.")
 
 

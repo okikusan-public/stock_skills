@@ -120,6 +120,9 @@ _SCHEMA_CONSTRAINTS = [
     "CREATE CONSTRAINT sector_rotation_id IF NOT EXISTS FOR (r:SectorRotation) REQUIRE r.id IS UNIQUE",
     # KIK-414 portfolio sync
     "CREATE CONSTRAINT portfolio_name IF NOT EXISTS FOR (p:Portfolio) REQUIRE p.name IS UNIQUE",
+    # KIK-428 stress test / forecast auto-save
+    "CREATE CONSTRAINT stress_test_id IF NOT EXISTS FOR (st:StressTest) REQUIRE st.id IS UNIQUE",
+    "CREATE CONSTRAINT forecast_id IF NOT EXISTS FOR (f:Forecast) REQUIRE f.id IS UNIQUE",
 ]
 
 _SCHEMA_INDEXES = [
@@ -131,6 +134,9 @@ _SCHEMA_INDEXES = [
     "CREATE INDEX research_date IF NOT EXISTS FOR (r:Research) ON (r.date)",
     "CREATE INDEX research_type IF NOT EXISTS FOR (r:Research) ON (r.research_type)",
     "CREATE INDEX market_context_date IF NOT EXISTS FOR (m:MarketContext) ON (m.date)",
+    # KIK-428 stress test / forecast indexes
+    "CREATE INDEX stress_test_date IF NOT EXISTS FOR (st:StressTest) ON (st.date)",
+    "CREATE INDEX forecast_date IF NOT EXISTS FOR (f:Forecast) ON (f.date)",
     # KIK-413 full-mode indexes
     "CREATE INDEX news_date IF NOT EXISTS FOR (n:News) ON (n.date)",
     "CREATE INDEX sentiment_source IF NOT EXISTS FOR (s:Sentiment) ON (s.source)",
@@ -155,6 +161,11 @@ _VECTOR_INDEXES = [
     "CREATE VECTOR INDEX note_embedding IF NOT EXISTS FOR (n:Note) ON (n.embedding) "
     "OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}",
     "CREATE VECTOR INDEX watchlist_embedding IF NOT EXISTS FOR (w:Watchlist) ON (w.embedding) "
+    "OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}",
+    # KIK-428 stress test / forecast vector indexes
+    "CREATE VECTOR INDEX stresstest_embedding IF NOT EXISTS FOR (st:StressTest) ON (st.embedding) "
+    "OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}",
+    "CREATE VECTOR INDEX forecast_embedding IF NOT EXISTS FOR (f:Forecast) ON (f.embedding) "
     "OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}",
 ]
 
@@ -694,6 +705,91 @@ def merge_market_context(context_date: str, indices: list[dict],
                 indices=_json.dumps(indices, ensure_ascii=False),
             )
             _set_embedding(session, "MarketContext", context_id, semantic_summary, embedding)
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# StressTest node (KIK-428)
+# ---------------------------------------------------------------------------
+
+
+def merge_stress_test(
+    test_date: str, scenario: str, portfolio_impact: float,
+    symbols: list[str], var_95: float = 0, var_99: float = 0,
+    semantic_summary: str = "", embedding: list[float] | None = None,
+) -> bool:
+    """Create a StressTest node and STRESSED relationships to stocks."""
+    if _get_mode() == "off":
+        return False
+    driver = _get_driver()
+    if driver is None:
+        return False
+    test_id = f"stress_test_{test_date}_{_safe_id(scenario)}"
+    try:
+        with driver.session() as session:
+            session.run(
+                "MERGE (st:StressTest {id: $id}) "
+                "SET st.date = $date, st.scenario = $scenario, "
+                "st.portfolio_impact = $impact, "
+                "st.var_95 = $var95, st.var_99 = $var99, "
+                "st.symbol_count = $cnt",
+                id=test_id, date=test_date, scenario=scenario,
+                impact=float(portfolio_impact),
+                var95=float(var_95), var99=float(var_99),
+                cnt=len(symbols),
+            )
+            for sym in symbols:
+                session.run(
+                    "MATCH (st:StressTest {id: $test_id}) "
+                    "MERGE (s:Stock {symbol: $symbol}) "
+                    "MERGE (st)-[:STRESSED]->(s)",
+                    test_id=test_id, symbol=sym,
+                )
+            _set_embedding(session, "StressTest", test_id, semantic_summary, embedding)
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Forecast node (KIK-428)
+# ---------------------------------------------------------------------------
+
+
+def merge_forecast(
+    forecast_date: str, optimistic: float, base: float, pessimistic: float,
+    symbols: list[str], total_value_jpy: float = 0,
+    semantic_summary: str = "", embedding: list[float] | None = None,
+) -> bool:
+    """Create a Forecast node and FORECASTED relationships to stocks."""
+    if _get_mode() == "off":
+        return False
+    driver = _get_driver()
+    if driver is None:
+        return False
+    forecast_id = f"forecast_{forecast_date}"
+    try:
+        with driver.session() as session:
+            session.run(
+                "MERGE (f:Forecast {id: $id}) "
+                "SET f.date = $date, f.optimistic = $opt, "
+                "f.base = $base, f.pessimistic = $pess, "
+                "f.total_value_jpy = $total, f.symbol_count = $cnt",
+                id=forecast_id, date=forecast_date,
+                opt=float(optimistic), base=float(base),
+                pess=float(pessimistic),
+                total=float(total_value_jpy), cnt=len(symbols),
+            )
+            for sym in symbols:
+                session.run(
+                    "MATCH (f:Forecast {id: $forecast_id}) "
+                    "MERGE (s:Stock {symbol: $symbol}) "
+                    "MERGE (f)-[:FORECASTED]->(s)",
+                    forecast_id=forecast_id, symbol=sym,
+                )
+            _set_embedding(session, "Forecast", forecast_id, semantic_summary, embedding)
         return True
     except Exception:
         return False

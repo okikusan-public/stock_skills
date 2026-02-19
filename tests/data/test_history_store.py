@@ -13,11 +13,13 @@ from src.data.history_store import (
     _safe_filename,
     load_history,
     list_history_files,
+    save_forecast,
     save_health,
     save_market_context,
     save_report,
     save_research,
     save_screening,
+    save_stress_test,
     save_trade,
 )
 
@@ -643,6 +645,176 @@ class TestGraphDualWrite:
         with patch("src.data.graph_store.merge_market_context_full", side_effect=Exception("Neo4j down")):
             context = {"indices": [{"name": "VIX", "price": 20.0}]}
             path = save_market_context(context, base_dir=str(tmp_path))
+            assert Path(path).exists()
+
+
+# ===================================================================
+# save_stress_test (KIK-428)
+# ===================================================================
+
+
+class TestSaveStressTest:
+    def test_save_creates_file(self, tmp_path):
+        path = save_stress_test(
+            scenario="トリプル安",
+            symbols=["7203.T", "AAPL"],
+            portfolio_impact=-0.15,
+            base_dir=str(tmp_path),
+        )
+        assert Path(path).exists()
+
+    def test_save_file_naming(self, tmp_path):
+        path = save_stress_test(
+            scenario="トリプル安",
+            symbols=["7203.T"],
+            portfolio_impact=-0.10,
+            base_dir=str(tmp_path),
+        )
+        filename = Path(path).name
+        today = date.today().isoformat()
+        assert filename.startswith(today)
+        assert filename.endswith(".json")
+
+    def test_save_contains_metadata(self, tmp_path):
+        path = save_stress_test(
+            scenario="ドル高円安",
+            symbols=["7203.T", "AAPL", "D05.SI"],
+            portfolio_impact=0.05,
+            var_result={"var_95_daily": 0.02, "var_99_daily": 0.03},
+            concentration={"sector_hhi": 0.3},
+            recommendations=["ヘッジ追加"],
+            base_dir=str(tmp_path),
+        )
+        data = _read_json(path)
+        assert data["category"] == "stress_test"
+        assert data["scenario"] == "ドル高円安"
+        assert data["symbols"] == ["7203.T", "AAPL", "D05.SI"]
+        assert data["portfolio_impact"] == 0.05
+        assert data["var_result"]["var_95_daily"] == 0.02
+        assert data["concentration"]["sector_hhi"] == 0.3
+        assert data["recommendations"] == ["ヘッジ追加"]
+        assert "_saved_at" in data
+
+    def test_save_creates_stress_test_subdirectory(self, tmp_path):
+        save_stress_test(
+            scenario="テスト", symbols=[], portfolio_impact=0,
+            base_dir=str(tmp_path),
+        )
+        assert (tmp_path / "stress_test").is_dir()
+
+    def test_load_stress_test(self, tmp_path):
+        save_stress_test(
+            scenario="トリプル安", symbols=["7203.T"],
+            portfolio_impact=-0.15, base_dir=str(tmp_path),
+        )
+        loaded = load_history("stress_test", base_dir=str(tmp_path))
+        assert len(loaded) == 1
+        assert loaded[0]["category"] == "stress_test"
+        assert loaded[0]["scenario"] == "トリプル安"
+
+    def test_numpy_handling(self, tmp_path):
+        path = save_stress_test(
+            scenario="テスト",
+            symbols=["X"],
+            portfolio_impact=np.float64(-0.123),
+            var_result={"var_95_daily": np.float64(0.05)},
+            base_dir=str(tmp_path),
+        )
+        data = _read_json(path)
+        assert isinstance(data["portfolio_impact"], float)
+        assert data["var_result"]["var_95_daily"] == 0.05
+
+    def test_graph_failure_still_saves(self, tmp_path):
+        with patch("src.data.graph_store.merge_stock", side_effect=Exception("Neo4j down")):
+            path = save_stress_test(
+                scenario="トリプル安", symbols=["7203.T"],
+                portfolio_impact=-0.15, base_dir=str(tmp_path),
+            )
+            assert Path(path).exists()
+
+
+# ===================================================================
+# save_forecast (KIK-428)
+# ===================================================================
+
+
+class TestSaveForecast:
+    def _sample_positions(self):
+        return [
+            {"symbol": "7203.T", "optimistic": 0.30, "base": 0.15, "pessimistic": -0.05, "method": "analyst"},
+            {"symbol": "AAPL", "optimistic": 0.25, "base": 0.10, "pessimistic": -0.10, "method": "analyst"},
+        ]
+
+    def test_save_creates_file(self, tmp_path):
+        path = save_forecast(
+            positions=self._sample_positions(),
+            total_value_jpy=5000000,
+            base_dir=str(tmp_path),
+        )
+        assert Path(path).exists()
+
+    def test_save_file_naming(self, tmp_path):
+        path = save_forecast(
+            positions=self._sample_positions(),
+            base_dir=str(tmp_path),
+        )
+        filename = Path(path).name
+        today = date.today().isoformat()
+        assert filename == f"{today}_forecast.json"
+
+    def test_save_contains_metadata(self, tmp_path):
+        positions = self._sample_positions()
+        path = save_forecast(
+            positions=positions,
+            total_value_jpy=7500000,
+            base_dir=str(tmp_path),
+        )
+        data = _read_json(path)
+        assert data["category"] == "forecast"
+        assert data["total_value_jpy"] == 7500000
+        assert "portfolio" in data
+        assert "positions" in data
+        assert len(data["positions"]) == 2
+        assert "_saved_at" in data
+
+    def test_save_computes_portfolio_averages(self, tmp_path):
+        positions = self._sample_positions()
+        path = save_forecast(positions=positions, base_dir=str(tmp_path))
+        data = _read_json(path)
+        pf = data["portfolio"]
+        # Average of [0.30, 0.25] = 0.275, [0.15, 0.10] = 0.125, [-0.05, -0.10] = -0.075
+        assert abs(pf["optimistic"] - 0.275) < 0.001
+        assert abs(pf["base"] - 0.125) < 0.001
+        assert abs(pf["pessimistic"] - (-0.075)) < 0.001
+
+    def test_save_creates_forecast_subdirectory(self, tmp_path):
+        save_forecast(positions=[], base_dir=str(tmp_path))
+        assert (tmp_path / "forecast").is_dir()
+
+    def test_load_forecast(self, tmp_path):
+        save_forecast(
+            positions=self._sample_positions(),
+            total_value_jpy=5000000,
+            base_dir=str(tmp_path),
+        )
+        loaded = load_history("forecast", base_dir=str(tmp_path))
+        assert len(loaded) == 1
+        assert loaded[0]["category"] == "forecast"
+
+    def test_empty_positions(self, tmp_path):
+        path = save_forecast(positions=[], base_dir=str(tmp_path))
+        data = _read_json(path)
+        assert data["portfolio"]["optimistic"] == 0
+        assert data["portfolio"]["base"] == 0
+        assert data["portfolio"]["pessimistic"] == 0
+
+    def test_graph_failure_still_saves(self, tmp_path):
+        with patch("src.data.graph_store.merge_stock", side_effect=Exception("Neo4j down")):
+            path = save_forecast(
+                positions=self._sample_positions(),
+                total_value_jpy=5000000,
+                base_dir=str(tmp_path),
+            )
             assert Path(path).exists()
 
 

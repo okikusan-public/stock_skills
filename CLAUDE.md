@@ -161,20 +161,24 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                      (スキル実行時の自動蓄積,
                       data/history/ へ日付付きJSON,
                       screen/report/trade/health/
-                      research/market_context,
+                      research/market_context/
+                      stress_test/forecast(KIK-428),
                       Neo4j dual-write: JSON=master, Neo4j=view)
                      graph_store.py
                      (Neo4jナレッジグラフCRUD,
                       スキーマ初期化+MERGE操作,
                       Stock/Screen/Report/Trade/Health/
-                      Research/Watchlist/Note/MarketContext/Portfolio,
+                      Research/Watchlist/Note/MarketContext/Portfolio/
+                      StressTest/Forecast(KIK-428),
                       SUPERSEDES チェーン,
                       NEO4J_MODE環境変数(off/summary/full)(KIK-413),
                       full: News/Sentiment/Catalyst/AnalystView/
                       Indicator/UpcomingEvent/SectorRotation展開,
                       sync_portfolio()/is_held()/get_held_symbols()(KIK-414),
                       Portfolio→HOLDS→Stock(CSV=master, Neo4j=view),
-                      ベクトルインデックス7本+_set_embedding()(KIK-420),
+                      StressTest→STRESSED→Stock(KIK-428),
+                      Forecast→FORECASTED→Stock(KIK-428),
+                      ベクトルインデックス9本+_set_embedding()(KIK-420/428),
                       graceful degradation)
                      graph_query.py
                      (Neo4jナレッジグラフ照会,
@@ -187,7 +191,8 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                       現在保有銘柄一覧(KIK-414),
                       直近売却バッチ取得(KIK-418),
                       メモバッチ取得(KIK-419),
-                      vector_search()全7タイプ横断(KIK-420),
+                      ストレステスト履歴/フォーキャスト履歴(KIK-428),
+                      vector_search()全9タイプ横断(KIK-420/428),
                       Neo4j不可時は空/None返却)
                      screen_annotator.py
                      (スクリーニング結果アノテーション(KIK-418/419),
@@ -206,7 +211,8 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                       市況/取引コンテキスト/メモ照会/
                       ニュース履歴/センチメント推移/
                       カタリスト/バリュエーション推移/
-                      イベント/指標推移(KIK-413))
+                      イベント/指標推移(KIK-413),
+                      ストレステスト履歴/フォーキャスト履歴(KIK-428))
                      auto_context.py
                      (自動コンテキスト注入エンジン(KIK-411/420),
                       ハイブリッド検索: ベクトル+シンボルベース,
@@ -223,9 +229,10 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                       graceful degradation)
                      summary_builder.py
                      (semantic_summaryテンプレートビルダー(KIK-420),
-                      7ノードタイプ対応,
+                      9ノードタイプ対応,
                       build_screen/report/trade/health/
-                      research/market_context/note_summary(),
+                      research/market_context/note/
+                      stress_test/forecast_summary()(KIK-428),
                       max200文字, LLM不使用)
 
   Scripts: scripts/
@@ -250,7 +257,7 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
 
   Docs: docs/
           architecture.md    ─ システムアーキテクチャ（3層構成、Mermaid図、設計原則）
-          neo4j-schema.md    ─ Neo4jスキーマリファレンス（19ノード、リレーション、NEO4J_MODE、Cypher例）
+          neo4j-schema.md    ─ Neo4jスキーマリファレンス（21ノード、リレーション、NEO4J_MODE、Cypher例）
           skill-catalog.md   ─ 8スキルのカタログ（入出力、依存モジュール、コマンド例）
 ```
 

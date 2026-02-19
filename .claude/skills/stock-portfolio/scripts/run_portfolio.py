@@ -67,6 +67,7 @@ _IMPORT_REGISTRY = [
     ]),
     ("src.data.history_store", "HISTORY", [
         ("save_trade", None), ("save_health", None), ("save_market_context", None),
+        ("save_forecast", None),
     ]),
     ("src.core.portfolio.backtest", "BACKTEST", [
         ("run_backtest", None),
@@ -634,6 +635,14 @@ def cmd_forecast(csv_path: str) -> None:
             base_str = f"{base_r * 100:+.2f}%" if base_r is not None else "-"
             print(f"  {pos.get('symbol', '-')}: {base_str} ({pos.get('method', '')})")
         print()
+
+    # KIK-428: Auto-save forecast results
+    if HAS_HISTORY:
+        try:
+            total_jpy = result.get("total_value_jpy", 0)
+            save_forecast(positions=positions, total_value_jpy=total_jpy)
+        except Exception as e:
+            print(f"Warning: フォーキャスト履歴保存失敗: {e}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------

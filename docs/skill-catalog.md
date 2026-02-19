@@ -141,11 +141,13 @@ python3 run_stress_test.py --portfolio 7203.T,AAPL,D05.SI
 python3 run_stress_test.py --scenario テック暴落
 ```
 
-**Output**: Markdown レポート (相関行列/ショック感応度/シナリオ分析/因果連鎖/推奨アクション)
+**Output**: Markdown レポート (相関行列/ショック感応度/シナリオ分析/因果連鎖/推奨アクション)。実行結果は `data/history/stress_test/` に自動保存 (KIK-428)。
 
 **Scenarios**: トリプル安、ドル高円安、米国リセッション、日銀利上げ、米中対立、インフレ再燃、テック暴落、円高ドル安
 
-**Core Dependencies**: `src/core/risk/correlation.py`, `shock_sensitivity.py`, `scenario_analysis.py`, `scenario_definitions.py`, `recommender.py`
+**Auto-Save** (KIK-428): 実行完了時に `data/history/stress_test/{date}_{scenario}.json` へ自動保存。Neo4j にも StressTest ノード + STRESSED リレーションを dual-write。
+
+**Core Dependencies**: `src/core/risk/correlation.py`, `shock_sensitivity.py`, `scenario_analysis.py`, `scenario_definitions.py`, `recommender.py`, `src/data/history_store.py`
 
 ---
 
@@ -165,7 +167,7 @@ python3 run_stress_test.py --scenario テック暴落
 | `sell` | 売却記録 |
 | `analyze` | 構造分析 (セクター/地域/通貨 HHI) |
 | `health` | ヘルスチェック (3段階アラート+クロス検出+バリュートラップ+還元安定度) |
-| `forecast` | 推定利回り (3シナリオ) |
+| `forecast` | 推定利回り (3シナリオ)。結果は自動保存 (KIK-428) |
 | `rebalance` | リバランス提案 |
 | `simulate` | 複利シミュレーション |
 | `what-if` | What-If シミュレーション (銘柄追加の影響) |
@@ -182,7 +184,9 @@ python3 run_portfolio.py what-if --add "7203.T:100:2850,AAPL:10:250"
 python3 run_portfolio.py backtest --preset alpha --region jp --days 90
 ```
 
-**Core Dependencies**: `src/core/portfolio/portfolio_manager.py`, `concentration.py`, `rebalancer.py`, `simulator.py`, `backtest.py`, `portfolio_simulation.py`, `src/core/health_check.py`, `return_estimate.py`, `value_trap.py`
+**Auto-Save** (KIK-428): forecast サブコマンド実行完了時に `data/history/forecast/{date}_forecast.json` へ自動保存。Neo4j にも Forecast ノード + FORECASTED リレーションを dual-write。
+
+**Core Dependencies**: `src/core/portfolio/portfolio_manager.py`, `concentration.py`, `rebalancer.py`, `simulator.py`, `backtest.py`, `portfolio_simulation.py`, `src/core/health_check.py`, `return_estimate.py`, `value_trap.py`, `src/data/history_store.py`
 
 ---
 
@@ -231,6 +235,8 @@ python3 manage_note.py delete --id abc123
 | 最近の相場、市況 | market_context | `get_recent_market_context()` |
 | 取引履歴、売買記録 | trade_context | `get_trade_context(symbol)` |
 | メモ、ノート一覧 | stock_notes | `get_trade_context(symbol).notes` |
+| ストレステスト履歴、前回のストレステスト | stress_test_history | `get_stress_test_history(symbol)` (KIK-428) |
+| フォーキャスト推移、前回の見通し | forecast_history | `get_forecast_history(symbol)` (KIK-428) |
 
 **Examples**:
 ```bash

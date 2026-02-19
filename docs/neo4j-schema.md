@@ -4,7 +4,7 @@
 
 ---
 
-## Node Types (19)
+## Node Types (21)
 
 ### Stock
 中心ノード。すべてのアクティビティがこのノードに接続される。
@@ -202,6 +202,32 @@
 |:---|:---|:---|
 | name | string (UNIQUE) | ポートフォリオ名 (デフォルト: "default") |
 
+### StressTest (KIK-428)
+ストレステスト実行結果。STRESSED リレーションで対象銘柄に接続。
+
+| Property | Type | Description |
+|:---|:---|:---|
+| id | string (UNIQUE) | `stress_test_{date}_{scenario}` |
+| date | string | 実行日 (YYYY-MM-DD) |
+| scenario | string | シナリオ名 (トリプル安, テック暴落, etc.) |
+| portfolio_impact | float | PF全体の推定損失率 |
+| var_95 | float | 95% VaR (日次) |
+| var_99 | float | 99% VaR (日次) |
+| symbol_count | int | 対象銘柄数 |
+
+### Forecast (KIK-428)
+フォーキャスト（将来予測）実行結果。FORECASTED リレーションで対象銘柄に接続。
+
+| Property | Type | Description |
+|:---|:---|:---|
+| id | string (UNIQUE) | `forecast_{date}` |
+| date | string | 実行日 (YYYY-MM-DD) |
+| optimistic | float | 楽観シナリオ推定リターン (%) |
+| base | float | ベースシナリオ推定リターン (%) |
+| pessimistic | float | 悲観シナリオ推定リターン (%) |
+| total_value_jpy | float | PF時価総額 (円) |
+| symbol_count | int | 対象銘柄数 |
+
 ---
 
 ## Relationships
@@ -229,6 +255,8 @@ graph LR
     MarketContext -- HAS_ROTATION --> SectorRotation
     MarketContext -- HAS_SENTIMENT --> Sentiment
     Portfolio -- HOLDS --> Stock
+    StressTest -- STRESSED --> Stock
+    Forecast -- FORECASTED --> Stock
 ```
 
 | Relationship | From | To | Description |
@@ -253,10 +281,12 @@ graph LR
 | HAS_EVENT | MarketContext | UpcomingEvent | 今後のイベント (KIK-413) |
 | HAS_ROTATION | MarketContext | SectorRotation | セクターローテーション (KIK-413) |
 | HOLDS | Portfolio | Stock | 現在保有中の銘柄 (KIK-414)。プロパティ: shares, cost_price, cost_currency, purchase_date |
+| STRESSED | StressTest | Stock | ストレステスト対象銘柄 (KIK-428)。プロパティ: impact (推定損失率) |
+| FORECASTED | Forecast | Stock | フォーキャスト対象銘柄 (KIK-428)。プロパティ: optimistic, base, pessimistic (各シナリオリターン) |
 
 ---
 
-## Constraints (19)
+## Constraints (21)
 
 ```cypher
 CREATE CONSTRAINT stock_symbol IF NOT EXISTS FOR (s:Stock) REQUIRE s.symbol IS UNIQUE
@@ -280,9 +310,12 @@ CREATE CONSTRAINT upcoming_event_id IF NOT EXISTS FOR (e:UpcomingEvent) REQUIRE 
 CREATE CONSTRAINT sector_rotation_id IF NOT EXISTS FOR (r:SectorRotation) REQUIRE r.id IS UNIQUE
 -- KIK-414 portfolio sync
 CREATE CONSTRAINT portfolio_name IF NOT EXISTS FOR (p:Portfolio) REQUIRE p.name IS UNIQUE
+-- KIK-428 stress test / forecast
+CREATE CONSTRAINT stress_test_id IF NOT EXISTS FOR (st:StressTest) REQUIRE st.id IS UNIQUE
+CREATE CONSTRAINT forecast_id IF NOT EXISTS FOR (f:Forecast) REQUIRE f.id IS UNIQUE
 ```
 
-## Indexes (12)
+## Indexes (14)
 
 ```cypher
 CREATE INDEX stock_sector IF NOT EXISTS FOR (s:Stock) ON (s.sector)
@@ -298,9 +331,12 @@ CREATE INDEX news_date IF NOT EXISTS FOR (n:News) ON (n.date)
 CREATE INDEX sentiment_source IF NOT EXISTS FOR (s:Sentiment) ON (s.source)
 CREATE INDEX catalyst_type IF NOT EXISTS FOR (c:Catalyst) ON (c.type)
 CREATE INDEX indicator_date IF NOT EXISTS FOR (i:Indicator) ON (i.date)
+-- KIK-428 stress test / forecast
+CREATE INDEX stress_test_date IF NOT EXISTS FOR (st:StressTest) ON (st.date)
+CREATE INDEX forecast_date IF NOT EXISTS FOR (f:Forecast) ON (f.date)
 ```
 
-## Vector Indexes (7) — KIK-420
+## Vector Indexes (9) — KIK-420/428
 
 TEI (Text Embeddings Inference) で生成した384次元ベクトルによるコサイン類似検索用。
 各ノードに `semantic_summary` (テンプレート生成テキスト) と `embedding` (384次元ベクトル) プロパティを追加。
@@ -319,6 +355,11 @@ CREATE VECTOR INDEX research_embedding IF NOT EXISTS FOR (r:Research) ON (r.embe
 CREATE VECTOR INDEX marketcontext_embedding IF NOT EXISTS FOR (m:MarketContext) ON (m.embedding)
   OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}
 CREATE VECTOR INDEX note_embedding IF NOT EXISTS FOR (n:Note) ON (n.embedding)
+  OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}
+-- KIK-428 stress test / forecast
+CREATE VECTOR INDEX stresstest_embedding IF NOT EXISTS FOR (st:StressTest) ON (st.embedding)
+  OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}
+CREATE VECTOR INDEX forecast_embedding IF NOT EXISTS FOR (f:Forecast) ON (f.embedding)
   OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}
 ```
 
@@ -428,6 +469,30 @@ RETURN s.symbol AS symbol, r.shares AS shares,
        r.cost_price AS cost_price, r.cost_currency AS cost_currency,
        r.purchase_date AS purchase_date
 ORDER BY s.symbol
+```
+
+### 12. ストレステスト履歴 (KIK-428)
+```cypher
+MATCH (st:StressTest)
+RETURN st.date AS date, st.scenario AS scenario,
+       st.portfolio_impact AS impact, st.var_95 AS var_95
+ORDER BY st.date DESC LIMIT 5
+```
+
+### 13. 特定銘柄のストレステスト履歴 (KIK-428)
+```cypher
+MATCH (st:StressTest)-[r:STRESSED]->(s:Stock {symbol: "7203.T"})
+RETURN st.date AS date, st.scenario AS scenario, r.impact AS impact
+ORDER BY st.date DESC
+```
+
+### 14. フォーキャスト履歴 (KIK-428)
+```cypher
+MATCH (f:Forecast)
+RETURN f.date AS date, f.optimistic AS optimistic,
+       f.base AS base, f.pessimistic AS pessimistic,
+       f.total_value_jpy AS total_value_jpy
+ORDER BY f.date DESC LIMIT 5
 ```
 
 ---

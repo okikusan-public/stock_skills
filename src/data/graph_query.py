@@ -444,12 +444,93 @@ def get_current_holdings() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# 14. Vector similarity search (KIK-420)
+# 14. Stress test history (KIK-428)
+# ---------------------------------------------------------------------------
+
+
+def get_stress_test_history(symbol: str | None = None, limit: int = 5) -> list[dict]:
+    """Get StressTest nodes, optionally filtered by symbol.
+
+    Returns list of {date, scenario, portfolio_impact, var_95, var_99, symbol_count}.
+    """
+    driver = _get_driver()
+    if driver is None:
+        return []
+    try:
+        with driver.session() as session:
+            if symbol:
+                result = session.run(
+                    "MATCH (st:StressTest)-[:STRESSED]->(s:Stock {symbol: $symbol}) "
+                    "RETURN st.date AS date, st.scenario AS scenario, "
+                    "st.portfolio_impact AS portfolio_impact, "
+                    "st.var_95 AS var_95, st.var_99 AS var_99, "
+                    "st.symbol_count AS symbol_count "
+                    "ORDER BY st.date DESC LIMIT $limit",
+                    symbol=symbol, limit=limit,
+                )
+            else:
+                result = session.run(
+                    "MATCH (st:StressTest) "
+                    "RETURN st.date AS date, st.scenario AS scenario, "
+                    "st.portfolio_impact AS portfolio_impact, "
+                    "st.var_95 AS var_95, st.var_99 AS var_99, "
+                    "st.symbol_count AS symbol_count "
+                    "ORDER BY st.date DESC LIMIT $limit",
+                    limit=limit,
+                )
+            return [dict(r) for r in result]
+    except Exception:
+        return []
+
+
+# ---------------------------------------------------------------------------
+# 15. Forecast history (KIK-428)
+# ---------------------------------------------------------------------------
+
+
+def get_forecast_history(symbol: str | None = None, limit: int = 5) -> list[dict]:
+    """Get Forecast nodes, optionally filtered by symbol.
+
+    Returns list of {date, optimistic, base, pessimistic, total_value_jpy, symbol_count}.
+    """
+    driver = _get_driver()
+    if driver is None:
+        return []
+    try:
+        with driver.session() as session:
+            if symbol:
+                result = session.run(
+                    "MATCH (f:Forecast)-[:FORECASTED]->(s:Stock {symbol: $symbol}) "
+                    "RETURN f.date AS date, f.optimistic AS optimistic, "
+                    "f.base AS base, f.pessimistic AS pessimistic, "
+                    "f.total_value_jpy AS total_value_jpy, "
+                    "f.symbol_count AS symbol_count "
+                    "ORDER BY f.date DESC LIMIT $limit",
+                    symbol=symbol, limit=limit,
+                )
+            else:
+                result = session.run(
+                    "MATCH (f:Forecast) "
+                    "RETURN f.date AS date, f.optimistic AS optimistic, "
+                    "f.base AS base, f.pessimistic AS pessimistic, "
+                    "f.total_value_jpy AS total_value_jpy, "
+                    "f.symbol_count AS symbol_count "
+                    "ORDER BY f.date DESC LIMIT $limit",
+                    limit=limit,
+                )
+            return [dict(r) for r in result]
+    except Exception:
+        return []
+
+
+# ---------------------------------------------------------------------------
+# 16. Vector similarity search (KIK-420)
 # ---------------------------------------------------------------------------
 
 _VECTOR_LABELS = [
     "Screen", "Report", "Trade", "Research",
     "HealthCheck", "MarketContext", "Note", "Watchlist",
+    "StressTest", "Forecast",
 ]
 
 

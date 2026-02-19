@@ -61,6 +61,13 @@ try:
 except ImportError:
     generate_recommendations = None
 
+# KIK-428: History auto-save
+try:
+    from src.data.history_store import save_stress_test as _save_stress_test
+    HAS_HISTORY = True
+except ImportError:
+    HAS_HISTORY = False
+
 
 
 # ---------------------------------------------------------------------------
@@ -543,6 +550,43 @@ def main():
         "base_shock": args.base_shock,
     }
     print(json.dumps(raw_data, ensure_ascii=False, indent=2))
+
+    # ------------------------------------------------------------------
+    # KIK-428: Auto-save stress test results
+    # ------------------------------------------------------------------
+    if HAS_HISTORY:
+        try:
+            loaded_symbols = [s.get("symbol", "") for s in portfolio if s.get("symbol")]
+            scenario_name = (
+                scenario_result.get("scenario_name", args.scenario or "auto")
+                if scenario_result
+                else (args.scenario or "auto")
+            )
+            pf_impact = (
+                scenario_result.get("portfolio_impact", 0)
+                if scenario_result
+                else 0
+            )
+            per_stock = (
+                scenario_result.get("per_stock_impacts", [])
+                if scenario_result
+                else []
+            )
+            _save_stress_test(
+                scenario=scenario_name,
+                symbols=loaded_symbols,
+                portfolio_impact=pf_impact,
+                per_stock_impacts=per_stock,
+                var_result=var_result,
+                high_correlation_pairs=(
+                    [{"pair": list(p[0]), "corr": p[1]} for p in high_pairs]
+                    if high_pairs else []
+                ),
+                concentration=conc,
+                recommendations=recommendations,
+            )
+        except Exception:
+            pass  # graceful degradation
 
 
 if __name__ == "__main__":

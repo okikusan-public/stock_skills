@@ -233,3 +233,46 @@ def build_watchlist_summary(
     if symbols:
         parts.append(", ".join(symbols[:10]))
     return _trunc(" ".join(parts))
+
+
+def build_stress_test_summary(
+    test_date: str,
+    scenario: str = "",
+    portfolio_impact: float = 0,
+    symbol_count: int = 0,
+) -> str:
+    """Build summary for a StressTest node (KIK-428).
+
+    Example: "2026-02-19 ストレステスト / トリプル安 / 14銘柄 / PF影響+1.1%"
+    """
+    parts = [f"{test_date} ストレステスト"]
+    if scenario:
+        parts.append(scenario)
+    if symbol_count:
+        parts.append(f"{symbol_count}銘柄")
+    if portfolio_impact:
+        parts.append(f"PF影響{portfolio_impact * 100:+.1f}%")
+    return _trunc(" / ".join(parts))
+
+
+def build_forecast_summary(
+    forecast_date: str,
+    optimistic: float | None = None,
+    base: float | None = None,
+    pessimistic: float | None = None,
+    symbol_count: int = 0,
+) -> str:
+    """Build summary for a Forecast node (KIK-428).
+
+    Example: "2026-02-19 フォーキャスト / 14銘柄 / ベース+14.4%"
+    """
+    parts = [f"{forecast_date} フォーキャスト"]
+    if symbol_count:
+        parts.append(f"{symbol_count}銘柄")
+    if base is not None:
+        parts.append(f"ベース{base * 100:+.1f}%")
+    if optimistic is not None:
+        parts.append(f"楽観{optimistic * 100:+.1f}%")
+    if pessimistic is not None:
+        parts.append(f"悲観{pessimistic * 100:+.1f}%")
+    return _trunc(" / ".join(parts))
