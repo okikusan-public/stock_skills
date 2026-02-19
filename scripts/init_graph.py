@@ -269,8 +269,7 @@ def import_research(history_dir: str) -> int:
             if HAS_EMBEDDING:
                 try:
                     summary_text = summary_builder.build_research_summary(
-                        research_type, target,
-                        {"summary": data.get("summary", "")})
+                        research_type, target, data)
                     emb = _get_embedding(summary_text)
                 except Exception:
                     pass
