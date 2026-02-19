@@ -143,6 +143,28 @@ def freshness_action(label: str) -> str:
     }.get(label, "新規取得")
 
 
+def _action_directive(label: str) -> str:
+    """Return action directive string for a freshness label.
+
+    Placed at the top of context output so LLM immediately knows
+    whether to run a skill or use existing context (KIK-428).
+    """
+    return {
+        "FRESH": "⛔ FRESH — スキル実行不要。このコンテキストのみで回答。",
+        "RECENT": "⚡ RECENT — 差分モードで軽量更新。",
+        "STALE": "🔄 STALE — フル再取得。スキルを実行。",
+        "NONE": "🆕 NONE — データなし。スキルを実行。",
+    }.get(label, "🆕 NONE — データなし。スキルを実行。")
+
+
+def _best_freshness(labels: list[str]) -> str:
+    """Return the freshest (best) label from a list."""
+    priority = {"FRESH": 0, "RECENT": 1, "STALE": 2, "NONE": 3}
+    if not labels:
+        return "NONE"
+    return min(labels, key=lambda l: priority.get(l, 3))
+
+
 def _has_bought_not_sold(history: dict) -> bool:
     """Check if there are BOUGHT trades but no matching SOLD trades."""
     trades = history.get("trades", [])
@@ -246,7 +268,7 @@ def _recommend_skill(history: dict, is_bookmarked: bool,
 
 def _format_context(symbol: str, history: dict, skill: str, reason: str,
                     relationship: str) -> str:
-    """Format graph context as markdown with freshness labels (KIK-427)."""
+    """Format graph context as markdown with freshness labels (KIK-427/428)."""
     lines = [f"## 過去の経緯: {symbol} ({relationship})"]
 
     # Track freshness by data type for summary
@@ -314,6 +336,10 @@ def _format_context(symbol: str, history: dict, skill: str, reason: str,
         for dtype, fl in freshness_map.items():
             lines.append(f"- {dtype}: [{fl}] → {freshness_action(fl)}")
 
+    # KIK-428: Prepend action directive based on overall freshness
+    overall = _best_freshness(list(freshness_map.values())) if freshness_map else "NONE"
+    lines.insert(0, _action_directive(overall) + "\n")
+
     lines.append(f"\n**推奨**: {skill} ({reason})")
     return "\n".join(lines)
 
@@ -323,10 +349,11 @@ def _format_context(symbol: str, history: dict, skill: str, reason: str,
 # ---------------------------------------------------------------------------
 
 def _format_market_context(mc: dict) -> str:
-    """Format market context as markdown with freshness label (KIK-427)."""
+    """Format market context as markdown with freshness label (KIK-427/428)."""
     d = mc.get("date", "?")
     fl = freshness_label(d)
-    lines = [f"## 直近の市況コンテキスト [{fl}]"]
+    lines = [_action_directive(fl) + "\n"]
+    lines.append(f"## 直近の市況コンテキスト [{fl}]")
     lines.append(f"- 取得日: {d} → {freshness_action(fl)}")
     for idx in mc.get("indices", [])[:5]:
         if isinstance(idx, dict):
@@ -427,9 +454,13 @@ def _merge_context(
         return symbol_context
 
     if not symbol_context and vector_results:
+        # KIK-428: Prepend action directive based on best freshness
+        labels = [freshness_label(r.get("date", "")) for r in vector_results[:5]]
+        overall = _best_freshness(labels) if labels else "NONE"
         return {
             "symbol": "",
-            "context_markdown": _format_vector_results(vector_results),
+            "context_markdown": (_action_directive(overall) + "\n\n"
+                                 + _format_vector_results(vector_results)),
             "recommended_skill": _infer_skill_from_vectors(vector_results),
             "recommendation_reason": "ベクトル類似検索",
             "relationship": "関連",

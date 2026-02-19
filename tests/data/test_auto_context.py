@@ -11,6 +11,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.data.auto_context import (
+    _action_directive,
+    _best_freshness,
     _check_bookmarked,
     _days_since,
     _extract_symbol,
@@ -416,6 +418,53 @@ class TestFreshnessAction:
 
 
 # ===================================================================
+# KIK-428: Action directive tests
+# ===================================================================
+
+class TestActionDirective:
+    def test_fresh(self):
+        d = _action_directive("FRESH")
+        assert "⛔" in d
+        assert "スキル実行不要" in d
+
+    def test_recent(self):
+        d = _action_directive("RECENT")
+        assert "⚡" in d
+        assert "差分モード" in d
+
+    def test_stale(self):
+        d = _action_directive("STALE")
+        assert "🔄" in d
+        assert "フル再取得" in d
+
+    def test_none(self):
+        d = _action_directive("NONE")
+        assert "🆕" in d
+        assert "スキルを実行" in d
+
+    def test_unknown_falls_back_to_none(self):
+        d = _action_directive("UNKNOWN")
+        assert "🆕" in d
+
+
+class TestBestFreshness:
+    def test_empty(self):
+        assert _best_freshness([]) == "NONE"
+
+    def test_single(self):
+        assert _best_freshness(["STALE"]) == "STALE"
+
+    def test_fresh_wins(self):
+        assert _best_freshness(["STALE", "FRESH", "RECENT"]) == "FRESH"
+
+    def test_recent_over_stale(self):
+        assert _best_freshness(["STALE", "RECENT"]) == "RECENT"
+
+    def test_all_none(self):
+        assert _best_freshness(["NONE", "NONE"]) == "NONE"
+
+
+# ===================================================================
 # Context formatting tests
 # ===================================================================
 
@@ -442,15 +491,21 @@ class TestFormatContext:
         assert "[FRESH]" in md
         assert "鮮度サマリー" in md
         assert "コンテキスト利用" in md
+        # KIK-428: action directive at the top
+        assert md.startswith("⛔ FRESH")
+        assert "スキル実行不要" in md
 
     def test_empty_history(self):
-        """空の履歴 → 過去データなし"""
+        """空の履歴 → 過去データなし + NONE directive"""
         history = {}
         md = _format_context("AAPL", history, "report", "未知", "未知")
         assert "AAPL" in md
         assert "過去データなし" in md
         # No freshness summary when no data
         assert "鮮度サマリー" not in md
+        # KIK-428: NONE directive
+        assert md.startswith("🆕 NONE")
+        assert "スキルを実行" in md
 
     def test_notes_truncated(self):
         """長いメモ → 50文字に切り詰め"""
@@ -460,7 +515,7 @@ class TestFormatContext:
         assert "A" * 51 not in md
 
     def test_stale_data_shows_stale_label(self):
-        """古いデータ → [STALE] ラベル + フル再取得推奨"""
+        """古いデータ → [STALE] ラベル + フル再取得推奨 + STALE directive"""
         old_date = (date.today() - timedelta(days=30)).isoformat()
         history = {
             "reports": [{"date": old_date, "score": 50, "verdict": "適正"}],
@@ -468,9 +523,11 @@ class TestFormatContext:
         md = _format_context("7203.T", history, "report", "既知", "既知")
         assert "[STALE]" in md
         assert "フル再取得推奨" in md
+        # KIK-428: STALE directive
+        assert md.startswith("🔄 STALE")
 
     def test_recent_data_shows_recent_label(self):
-        """3日前のデータ → [RECENT] ラベル + 差分モード推奨"""
+        """3日前のデータ → [RECENT] ラベル + 差分モード推奨 + RECENT directive"""
         recent_date = (date.today() - timedelta(days=3)).isoformat()
         history = {
             "researches": [{"date": recent_date, "research_type": "stock",
@@ -479,6 +536,8 @@ class TestFormatContext:
         md = _format_context("7203.T", history, "report", "既知", "既知")
         assert "[RECENT]" in md
         assert "差分モード推奨" in md
+        # KIK-428: RECENT directive
+        assert md.startswith("⚡ RECENT")
 
 
 class TestFormatMarketContext:
@@ -498,6 +557,9 @@ class TestFormatMarketContext:
         # KIK-427: freshness label
         assert "[FRESH]" in md
         assert "コンテキスト利用" in md
+        # KIK-428: action directive at the top
+        assert md.startswith("⛔ FRESH")
+        assert "スキル実行不要" in md
 
     def test_empty_indices(self):
         mc = {"date": "2026-02-17", "indices": []}
@@ -505,12 +567,14 @@ class TestFormatMarketContext:
         assert "2026-02-17" in md
 
     def test_stale_market_context(self):
-        """古い市況データ → [STALE]"""
+        """古い市況データ → [STALE] + STALE directive"""
         old_date = (date.today() - timedelta(days=30)).isoformat()
         mc = {"date": old_date, "indices": []}
         md = _format_market_context(mc)
         assert "[STALE]" in md
         assert "フル再取得推奨" in md
+        # KIK-428: STALE directive
+        assert md.startswith("🔄 STALE")
 
 
 # ===================================================================
@@ -842,6 +906,10 @@ class TestMergeContext:
         assert result["symbol"] == ""
         assert "関連する過去の記録" in result["context_markdown"]
         assert result["recommendation_reason"] == "ベクトル類似検索"
+        # KIK-428: action directive present
+        assert "FRESH" in result["context_markdown"] or \
+               "RECENT" in result["context_markdown"] or \
+               "STALE" in result["context_markdown"]
 
     def test_both_merged(self):
         ctx = {

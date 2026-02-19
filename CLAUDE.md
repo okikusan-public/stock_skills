@@ -208,12 +208,13 @@ Skills (.claude/skills/*/SKILL.md → scripts/*.py)
                       カタリスト/バリュエーション推移/
                       イベント/指標推移(KIK-413))
                      auto_context.py
-                     (自動コンテキスト注入エンジン(KIK-411/420),
+                     (自動コンテキスト注入エンジン(KIK-411/420/428),
                       ハイブリッド検索: ベクトル+シンボルベース,
                       ティッカー検出+企業名逆引き,
                       グラフ状態判定→スキル推奨,
                       HOLDS関係による保有判定(KIK-414),
                       保有/ウォッチ/注目/未知の関係性判定,
+                      アクション指示出力(⛔FRESH/⚡RECENT/🔄STALE/🆕NONE)(KIK-428),
                       graceful degradation)
                      embedding_client.py
                      (TEI REST APIクライアント(KIK-420),
