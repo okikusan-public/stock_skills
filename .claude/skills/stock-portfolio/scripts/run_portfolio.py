@@ -313,6 +313,13 @@ def _save_trade_market_context() -> None:
 # Command: buy
 # ---------------------------------------------------------------------------
 
+def _fmt_conf_price(price: float, currency: str) -> str:
+    """Format a price for confirmation messages (KIK-444)."""
+    if currency == "JPY":
+        return f"¥{price:,.0f}"
+    return f"${price:,.2f}"
+
+
 def cmd_buy(
     csv_path: str,
     symbol: str,
@@ -321,10 +328,30 @@ def cmd_buy(
     currency: str = "JPY",
     purchase_date: Optional[str] = None,
     memo: str = "",
+    yes: bool = False,
 ) -> None:
     """Add a purchase record to the portfolio CSV."""
     if purchase_date is None:
         purchase_date = date.today().isoformat()
+
+    # KIK-444: 確認ステップ（--yes なしの場合はプレビューのみ）
+    if not yes:
+        total = shares * price if price else None
+        lines = ["## 購入確認", "",
+                 "以下の内容で購入記録を追加します:", ""]
+        lines.append(f"  銘柄:     {symbol}")
+        lines.append(f"  株数:     {shares:,}株")
+        if price:
+            lines.append(f"  購入価格: {_fmt_conf_price(price, currency)}")
+        lines.append(f"  購入日:   {purchase_date}")
+        if total:
+            lines.append(f"  取得額:   {_fmt_conf_price(total, currency)}")
+        if memo:
+            lines.append(f"  メモ:     {memo}")
+        lines.append("")
+        lines.append("記録しますか？ `--yes` をつけて再実行してください。")
+        print("\n".join(lines))
+        return
 
     if HAS_PORTFOLIO_MANAGER:
         result = add_position(csv_path, symbol, shares, price, currency, purchase_date, memo)
@@ -402,8 +429,43 @@ def cmd_sell(
     shares: int,
     sell_price: float | None = None,
     sell_date: str | None = None,
+    yes: bool = False,
 ) -> None:
-    """Record a sale (reduce shares for a symbol). KIK-441: sell_price/sell_date added."""
+    """Record a sale (reduce shares for a symbol). KIK-441: sell_price/sell_date added. KIK-444: yes flag added."""
+    # KIK-444: 確認ステップ（--yes なしの場合はプレビューのみ）
+    if not yes:
+        lines = ["## 売却確認", "",
+                 "以下の内容で売却記録を追加します:", ""]
+        lines.append(f"  銘柄:     {symbol}")
+        lines.append(f"  株数:     {shares:,}株")
+        cost_price = None
+        currency = "JPY"
+        try:
+            holdings = _fallback_load_csv(csv_path)
+            matching = [h for h in holdings if h.get("symbol") == symbol]
+            if matching:
+                cost_price = matching[0].get("cost_price")
+                currency = matching[0].get("cost_currency", "JPY")
+        except Exception:
+            pass
+        if cost_price is not None:
+            lines.append(f"  取得単価: {_fmt_conf_price(cost_price, currency)}")
+        if sell_price:
+            lines.append(f"  売却単価: {_fmt_conf_price(sell_price, currency)}")
+            if cost_price:  # cost_price=0.0 は意図的にスキップ（ゼロ除算回避）
+                pnl = (sell_price - cost_price) * shares
+                pnl_rate = (sell_price - cost_price) / cost_price
+                sign = "+" if pnl >= 0 else ""
+                lines.append(
+                    f"  推定実現損益: {sign}{_fmt_conf_price(pnl, currency)}"
+                    f" ({sign}{pnl_rate * 100:.2f}%)"
+                )
+        lines.append(f"  売却日:   {sell_date or date.today().isoformat()}")
+        lines.append("")
+        lines.append("記録しますか？ `--yes` をつけて再実行してください。")
+        print("\n".join(lines))
+        return
+
     if HAS_PORTFOLIO_MANAGER:
         try:
             result = sell_position(csv_path, symbol, shares,
@@ -1052,6 +1114,8 @@ def main():
     buy_parser.add_argument("--currency", default="JPY", help="通貨コード (デフォルト: JPY)")
     buy_parser.add_argument("--date", default=None, help="購入日 (YYYY-MM-DD)")
     buy_parser.add_argument("--memo", default="", help="メモ")
+    buy_parser.add_argument("-y", "--yes", action="store_true", default=False,
+                            help="確認をスキップして直接記録する (KIK-444)")
 
     # sell
     sell_parser = subparsers.add_parser("sell", help="売却記録")
@@ -1061,6 +1125,8 @@ def main():
                              help="売却単価 (KIK-441, 例: 138.5)")
     sell_parser.add_argument("--date", default=None,
                              help="売却日 (KIK-441, YYYY-MM-DD, デフォルト: 今日)")
+    sell_parser.add_argument("-y", "--yes", action="store_true", default=False,
+                             help="確認をスキップして直接記録する (KIK-444)")
 
     # review (KIK-441)
     review_parser = subparsers.add_parser("review", help="売買パフォーマンスレビュー (KIK-441)")
@@ -1184,6 +1250,7 @@ def main():
             currency=args.currency,
             purchase_date=args.date,
             memo=args.memo,
+            yes=args.yes,
         )
     elif args.command == "sell":
         cmd_sell(
@@ -1192,6 +1259,7 @@ def main():
             shares=args.shares,
             sell_price=getattr(args, "price", None),
             sell_date=getattr(args, "date", None),
+            yes=args.yes,
         )
     elif args.command == "analyze":
         cmd_analyze(csv_path)
