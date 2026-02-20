@@ -1,4 +1,4 @@
-"""Output formatters for deep research results (KIK-367/426)."""
+"""Output formatters for deep research results (KIK-367)."""
 
 from typing import Optional
 
@@ -47,32 +47,6 @@ def _fmt_market_cap(value: Optional[float]) -> str:
     if value >= 1e6:
         return f"{value / 1e6:.1f}M"
     return _fmt_int(value)
-
-
-def _format_citations(citations: list) -> list[str]:
-    """Format a list of citation URLs as numbered markdown lines."""
-    lines: list[str] = []
-    if not citations:
-        return lines
-    lines.append("**引用元:**")
-    for i, url in enumerate(citations[:10], 1):
-        if isinstance(url, str) and url.strip():
-            lines.append(f"{i}. {url.strip()}")
-    return lines
-
-
-def _has_perplexity_content(pplx: dict) -> bool:
-    """Return True if the Perplexity result contains meaningful content."""
-    if not pplx:
-        return False
-    for key, value in pplx.items():
-        if key in ("raw_response", "citations"):
-            continue
-        if isinstance(value, str) and value:
-            return True
-        if isinstance(value, list) and value:
-            return True
-    return False
 
 
 # ---------------------------------------------------------------------------
@@ -249,49 +223,6 @@ def format_stock_research(data: dict) -> str:
         )
         lines.append("")
 
-    # --- Perplexity research (KIK-426) ---
-    pplx = data.get("perplexity_research", {})
-    if _has_perplexity_content(pplx):
-        lines.append("## Perplexity リサーチ")
-        lines.append("")
-
-        summary = pplx.get("summary", "")
-        if summary:
-            lines.append(summary)
-            lines.append("")
-
-        developments = pplx.get("recent_developments", [])
-        if developments:
-            lines.append("### 最近の動向")
-            for d in developments:
-                lines.append(f"- {d}")
-            lines.append("")
-
-        consensus = pplx.get("analyst_consensus", "")
-        if consensus:
-            lines.append("### アナリストコンセンサス")
-            lines.append(consensus)
-            lines.append("")
-
-        risks = pplx.get("risks_and_concerns", [])
-        if risks:
-            lines.append("### リスク・懸念")
-            for r in risks:
-                lines.append(f"- {r}")
-            lines.append("")
-
-        catalysts = pplx.get("catalysts", [])
-        if catalysts:
-            lines.append("### 今後の材料")
-            for c in catalysts:
-                lines.append(f"- {c}")
-            lines.append("")
-
-        citation_lines = _format_citations(pplx.get("citations", []))
-        if citation_lines:
-            lines.extend(citation_lines)
-            lines.append("")
-
     return "\n".join(lines)
 
 
@@ -322,8 +253,8 @@ def format_industry_research(data: dict) -> str:
         lines.append(f"# {theme} - 業界リサーチ")
         lines.append("")
         lines.append(
-            "*業界リサーチにはGrok APIまたはPerplexity APIが必要です。"
-            "XAI_API_KEY または PERPLEXITY_API_KEY 環境変数を設定してください。*"
+            "*業界リサーチにはGrok APIが必要です。"
+            "XAI_API_KEY 環境変数を設定してください。*"
         )
         lines.append("")
         return "\n".join(lines)
@@ -400,49 +331,6 @@ def format_industry_research(data: dict) -> str:
     else:
         lines.append("情報なし")
     lines.append("")
-
-    # --- Perplexity research (KIK-426) ---
-    pplx = data.get("perplexity_research", {})
-    if _has_perplexity_content(pplx):
-        lines.append("## Perplexity リサーチ")
-        lines.append("")
-
-        overview = pplx.get("overview", "")
-        if overview:
-            lines.append(overview)
-            lines.append("")
-
-        trends = pplx.get("trends", [])
-        if trends:
-            lines.append("### トレンド")
-            for t in trends:
-                lines.append(f"- {t}")
-            lines.append("")
-
-        players = pplx.get("key_players", [])
-        if players:
-            lines.append("### 主要プレイヤー")
-            for p in players:
-                lines.append(f"- {p}")
-            lines.append("")
-
-        outlook = pplx.get("growth_outlook", "")
-        if outlook:
-            lines.append("### 成長見通し")
-            lines.append(outlook)
-            lines.append("")
-
-        risks = pplx.get("risks", [])
-        if risks:
-            lines.append("### リスク")
-            for r in risks:
-                lines.append(f"- {r}")
-            lines.append("")
-
-        citation_lines = _format_citations(pplx.get("citations", []))
-        if citation_lines:
-            lines.extend(citation_lines)
-            lines.append("")
 
     return "\n".join(lines)
 
@@ -574,48 +462,6 @@ def format_market_research(data: dict) -> str:
         lines.append("情報なし")
     lines.append("")
 
-    # --- Perplexity research (KIK-426) ---
-    pplx = data.get("perplexity_research", {})
-    if _has_perplexity_content(pplx):
-        lines.append("## Perplexity リサーチ")
-        lines.append("")
-
-        summary = pplx.get("summary", "")
-        if summary:
-            lines.append(summary)
-            lines.append("")
-
-        drivers = pplx.get("key_drivers", [])
-        if drivers:
-            lines.append("### 主な変動要因")
-            for d in drivers:
-                lines.append(f"- {d}")
-            lines.append("")
-
-        sentiment = pplx.get("sentiment", "")
-        if sentiment:
-            lines.append("### センチメント")
-            lines.append(sentiment)
-            lines.append("")
-
-        outlook = pplx.get("outlook", "")
-        if outlook:
-            lines.append("### 見通し")
-            lines.append(outlook)
-            lines.append("")
-
-        risks = pplx.get("risks", [])
-        if risks:
-            lines.append("### リスク")
-            for r in risks:
-                lines.append(f"- {r}")
-            lines.append("")
-
-        citation_lines = _format_citations(pplx.get("citations", []))
-        if citation_lines:
-            lines.extend(citation_lines)
-            lines.append("")
-
     return "\n".join(lines)
 
 
@@ -648,8 +494,8 @@ def format_business_research(data: dict) -> str:
         lines.append(f"# {title} - ビジネスモデル分析")
         lines.append("")
         lines.append(
-            "*ビジネスモデル分析にはGrok APIまたはPerplexity APIが必要です。"
-            "XAI_API_KEY または PERPLEXITY_API_KEY 環境変数を設定してください。*"
+            "*ビジネスモデル分析にはGrok APIが必要です。"
+            "XAI_API_KEY 環境変数を設定してください。*"
         )
         lines.append("")
         return "\n".join(lines)
@@ -728,60 +574,5 @@ def format_business_research(data: dict) -> str:
     else:
         lines.append("情報なし")
     lines.append("")
-
-    # --- Perplexity Deep Research (KIK-426) ---
-    pplx = data.get("perplexity_research", {})
-    if _has_perplexity_content(pplx):
-        lines.append("## Perplexity Deep Research")
-        lines.append("")
-
-        pplx_overview = pplx.get("overview", "")
-        if pplx_overview:
-            lines.append(pplx_overview)
-            lines.append("")
-
-        pplx_segments = pplx.get("segments", [])
-        if pplx_segments:
-            lines.append("### 事業セグメント (Perplexity)")
-            lines.append("| セグメント | 売上比率 | 概要 |")
-            lines.append("|:-----------|:---------|:-----|")
-            for seg in pplx_segments:
-                if isinstance(seg, dict):
-                    seg_name = seg.get("name", "-")
-                    share = seg.get("revenue_share", "-")
-                    desc = seg.get("description", "-")
-                    lines.append(f"| {seg_name} | {share} | {desc} |")
-            lines.append("")
-
-        pplx_revenue = pplx.get("revenue_model", "")
-        if pplx_revenue:
-            lines.append("### 収益モデル (Perplexity)")
-            lines.append(pplx_revenue)
-            lines.append("")
-
-        comp_pos = pplx.get("competitive_position", "")
-        if comp_pos:
-            lines.append("### 競争ポジション")
-            lines.append(comp_pos)
-            lines.append("")
-
-        pplx_strategy = pplx.get("growth_strategy", [])
-        if pplx_strategy:
-            lines.append("### 成長戦略 (Perplexity)")
-            for s in pplx_strategy:
-                lines.append(f"- {s}")
-            lines.append("")
-
-        pplx_risks = pplx.get("risks", [])
-        if pplx_risks:
-            lines.append("### リスク (Perplexity)")
-            for r in pplx_risks:
-                lines.append(f"- {r}")
-            lines.append("")
-
-        citation_lines = _format_citations(pplx.get("citations", []))
-        if citation_lines:
-            lines.extend(citation_lines)
-            lines.append("")
 
     return "\n".join(lines)

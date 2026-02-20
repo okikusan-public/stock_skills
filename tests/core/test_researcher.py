@@ -1,7 +1,7 @@
-"""Tests for src/core/researcher.py (KIK-367/426).
+"""Tests for src/core/researcher.py (KIK-367).
 
 Tests for research_stock, research_industry, research_market, research_business.
-All external calls (yahoo_client, grok_client, perplexity_client) are mocked.
+All external calls (yahoo_client, grok_client) are mocked.
 """
 
 import sys
@@ -18,7 +18,6 @@ from src.core.research.researcher import (
     research_market,
     research_business,
     _grok_warned,
-    _perplexity_warned,
 )
 
 
@@ -30,7 +29,6 @@ from src.core.research.researcher import (
 def _reset_warned_flags():
     """Reset the module-level warned flags before each test."""
     _grok_warned[0] = False
-    _perplexity_warned[0] = False
     yield
 
 
@@ -84,59 +82,6 @@ def _sample_sentiment():
     }
 
 
-def _sample_perplexity_stock():
-    """Sample Perplexity stock research result."""
-    return {
-        "summary": "Toyota is well positioned",
-        "recent_developments": ["Strong Q3", "EV push"],
-        "analyst_consensus": "Buy consensus",
-        "risks_and_concerns": ["China risk"],
-        "catalysts": ["New model launch"],
-        "raw_response": "...",
-        "citations": ["https://example.com/1"],
-    }
-
-
-def _sample_perplexity_industry():
-    """Sample Perplexity industry research result."""
-    return {
-        "overview": "Semiconductor overview",
-        "trends": ["AI chips"],
-        "key_players": ["TSMC"],
-        "growth_outlook": "Strong",
-        "risks": ["Geopolitics"],
-        "raw_response": "...",
-        "citations": ["https://example.com/semi"],
-    }
-
-
-def _sample_perplexity_market():
-    """Sample Perplexity market research result."""
-    return {
-        "summary": "Market overview",
-        "key_drivers": ["BOJ"],
-        "sentiment": "Optimistic",
-        "outlook": "Moderate growth",
-        "risks": ["Inflation"],
-        "raw_response": "...",
-        "citations": ["https://example.com/market"],
-    }
-
-
-def _sample_perplexity_business():
-    """Sample Perplexity business research result."""
-    return {
-        "overview": "Canon business overview",
-        "segments": [{"name": "Printing", "revenue_share": "55%", "description": "Printers"}],
-        "revenue_model": "Hardware + consumables",
-        "competitive_position": "Market leader",
-        "growth_strategy": ["Medical expansion"],
-        "risks": ["Print decline"],
-        "raw_response": "...",
-        "citations": ["https://example.com/canon"],
-    }
-
-
 # ===================================================================
 # research_stock
 # ===================================================================
@@ -144,9 +89,8 @@ def _sample_perplexity_business():
 class TestResearchStock:
 
     def test_basic_research(self, monkeypatch):
-        """Returns fundamentals and value score from yfinance data only (Grok + Perplexity off)."""
+        """Returns fundamentals and value score from yfinance data only (Grok off)."""
         monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
 
         mock_yc = _make_mock_yahoo_client(
             info=_sample_stock_info(),
@@ -165,9 +109,6 @@ class TestResearchStock:
         # Grok unavailable => empty results
         assert result["grok_research"]["recent_news"] == []
         assert result["x_sentiment"]["positive"] == []
-        # Perplexity unavailable => empty results
-        assert result["perplexity_research"]["summary"] == ""
-        assert result["citations"] == []
 
     def test_with_grok(self, monkeypatch):
         """Integrates yfinance data with Grok API deep research + sentiment."""
@@ -229,45 +170,6 @@ class TestResearchStock:
         # Fundamentals should still work
         assert result["fundamentals"]["per"] == 10.5
 
-    def test_with_perplexity(self, monkeypatch):
-        """Integrates Perplexity API research when available."""
-        monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test-key")
-
-        from src.data import perplexity_client
-        monkeypatch.setattr(perplexity_client, "is_available", lambda: True)
-        monkeypatch.setattr(
-            perplexity_client, "search_stock",
-            lambda symbol, name="", timeout=30: _sample_perplexity_stock(),
-        )
-
-        mock_yc = _make_mock_yahoo_client(info=_sample_stock_info())
-        result = research_stock("7203.T", mock_yc)
-
-        assert result["perplexity_research"]["summary"] == "Toyota is well positioned"
-        assert len(result["perplexity_research"]["recent_developments"]) == 2
-        assert result["citations"] == ["https://example.com/1"]
-        # Grok still empty
-        assert result["grok_research"]["recent_news"] == []
-
-    def test_perplexity_error(self, monkeypatch):
-        """Graceful degradation when Perplexity API raises an exception."""
-        monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test-key")
-
-        from src.data import perplexity_client
-        monkeypatch.setattr(perplexity_client, "is_available", lambda: True)
-        monkeypatch.setattr(
-            perplexity_client, "search_stock",
-            MagicMock(side_effect=RuntimeError("API down")),
-        )
-
-        mock_yc = _make_mock_yahoo_client(info=_sample_stock_info())
-        result = research_stock("7203.T", mock_yc)
-
-        assert result["perplexity_research"]["summary"] == ""
-        assert result["fundamentals"]["per"] == 10.5
-
 
 # ===================================================================
 # research_industry
@@ -305,36 +207,14 @@ class TestResearchIndustry:
         assert len(result["grok_research"]["key_players"]) == 1
 
     def test_api_unavailable(self, monkeypatch):
-        """Returns api_unavailable=True when both Grok and Perplexity are not set."""
+        """Returns api_unavailable=True when Grok is not set."""
         monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
 
         result = research_industry("EV")
 
         assert result["theme"] == "EV"
         assert result["type"] == "industry"
         assert result["api_unavailable"] is True
-        assert result["grok_research"]["trends"] == []
-        assert result["perplexity_research"]["overview"] == ""
-
-    def test_with_perplexity(self, monkeypatch):
-        """Integrates Perplexity API research when available."""
-        monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test-key")
-
-        from src.data import perplexity_client
-        monkeypatch.setattr(perplexity_client, "is_available", lambda: True)
-        monkeypatch.setattr(
-            perplexity_client, "search_industry",
-            lambda theme, timeout=30: _sample_perplexity_industry(),
-        )
-
-        result = research_industry("半導体")
-
-        assert result["api_unavailable"] is False  # Perplexity available
-        assert result["perplexity_research"]["overview"] == "Semiconductor overview"
-        assert result["citations"] == ["https://example.com/semi"]
-        # Grok still empty
         assert result["grok_research"]["trends"] == []
 
 
@@ -374,9 +254,8 @@ class TestResearchMarket:
         assert "macro_indicators" in result
 
     def test_api_unavailable(self, monkeypatch):
-        """Returns api_unavailable=True when both Grok and Perplexity are not set."""
+        """Returns api_unavailable=True when Grok is not set."""
         monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
 
         result = research_market("S&P500")
 
@@ -385,7 +264,6 @@ class TestResearchMarket:
         assert result["api_unavailable"] is True
         assert result["grok_research"]["price_action"] == ""
         assert result["grok_research"]["macro_factors"] == []
-        assert result["perplexity_research"]["summary"] == ""
         assert "macro_indicators" in result
 
     def test_with_macro_indicators(self, monkeypatch):
@@ -418,7 +296,6 @@ class TestResearchMarket:
     def test_grok_unavailable_still_has_macro(self, monkeypatch):
         """Grok API unavailable but macro_indicators still returned."""
         monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
 
         mock_yc = MagicMock()
         mock_yc.get_macro_indicators.return_value = [
@@ -431,24 +308,6 @@ class TestResearchMarket:
         assert result["api_unavailable"] is True
         assert len(result["macro_indicators"]) == 1
         assert result["macro_indicators"][0]["name"] == "VIX"
-
-    def test_with_perplexity(self, monkeypatch):
-        """Integrates Perplexity API research when available."""
-        monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test-key")
-
-        from src.data import perplexity_client
-        monkeypatch.setattr(perplexity_client, "is_available", lambda: True)
-        monkeypatch.setattr(
-            perplexity_client, "search_market",
-            lambda market, timeout=30: _sample_perplexity_market(),
-        )
-
-        result = research_market("日経平均")
-
-        assert result["api_unavailable"] is False
-        assert result["perplexity_research"]["summary"] == "Market overview"
-        assert result["citations"] == ["https://example.com/market"]
 
 
 # ===================================================================
@@ -490,9 +349,8 @@ class TestResearchBusiness:
         assert len(result["grok_research"]["segments"]) == 1
 
     def test_api_unavailable(self, monkeypatch):
-        """Returns api_unavailable=True when both Grok and Perplexity are not set."""
+        """Returns api_unavailable=True when Grok is not set."""
         monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
 
         mock_yc = _make_mock_yahoo_client(info={"name": "Canon Inc."})
         result = research_business("7751.T", mock_yc)
@@ -503,12 +361,10 @@ class TestResearchBusiness:
         assert result["api_unavailable"] is True
         assert result["grok_research"]["overview"] == ""
         assert result["grok_research"]["segments"] == []
-        assert result["perplexity_research"]["overview"] == ""
 
     def test_grok_error(self, monkeypatch):
         """Graceful degradation when Grok API raises an exception."""
         monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
-        monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
 
         from src.data import grok_client
         monkeypatch.setattr(grok_client, "is_available", lambda: True)
@@ -526,7 +382,6 @@ class TestResearchBusiness:
     def test_stock_not_found(self, monkeypatch):
         """Returns empty name when yahoo_client returns None."""
         monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
 
         mock_yc = _make_mock_yahoo_client(info=None)
         result = research_business("INVALID", mock_yc)
@@ -534,22 +389,3 @@ class TestResearchBusiness:
         assert result["symbol"] == "INVALID"
         assert result["name"] == ""
         assert result["api_unavailable"] is True
-
-    def test_with_perplexity(self, monkeypatch):
-        """Integrates Perplexity Deep Research when available."""
-        monkeypatch.delenv("XAI_API_KEY", raising=False)
-        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test-key")
-
-        from src.data import perplexity_client
-        monkeypatch.setattr(perplexity_client, "is_available", lambda: True)
-        monkeypatch.setattr(
-            perplexity_client, "search_business",
-            lambda symbol, name="", timeout=120: _sample_perplexity_business(),
-        )
-
-        mock_yc = _make_mock_yahoo_client(info={"name": "Canon Inc."})
-        result = research_business("7751.T", mock_yc)
-
-        assert result["api_unavailable"] is False
-        assert result["perplexity_research"]["overview"] == "Canon business overview"
-        assert result["citations"] == ["https://example.com/canon"]

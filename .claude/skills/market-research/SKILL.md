@@ -48,18 +48,11 @@ python3 /Users/kikuchihiroyuki/stock-skills/.claude/skills/market-research/scrip
 - XAI_API_KEY 環境変数が設定されている場合のみ Grok API を利用
 - 未設定時は yfinance データのみでレポート生成（stock の場合）
 
-### Perplexity API (KIK-426)
-- PERPLEXITY_API_KEY 環境変数が設定されている場合のみ利用
-- stock / industry / market: sonar-pro（高速応答、引用元URL付き）
-- business: sonar-deep-research（多段階調査、詳細レポート）
-- 未設定時はスキップ（Grok API のみ、または yfinance のみで動作）
-
-### 3層構成
+### 2層構成
 1. **Layer 1 (yfinance)**: 常に利用可能（ファンダメンタルズ・株価データ）
 2. **Layer 2 (Grok API)**: XAI_API_KEY 設定時（X投稿・Web検索による深掘り分析）
-3. **Layer 3 (Perplexity API)**: PERPLEXITY_API_KEY 設定時（引用元付き高品質リサーチ）
 
-- industry / market / business は Layer 2 または Layer 3 のいずれかが必要。両方未設定時はその旨を表示
+- industry / market / business は Layer 2 が必要。未設定時はその旨を表示
 
 ## 出力の補足
 
