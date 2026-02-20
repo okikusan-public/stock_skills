@@ -28,14 +28,18 @@ python3 .../run_portfolio.py snapshot
 ### buy -- 購入記録追加
 
 ```bash
-python3 .../run_portfolio.py buy --symbol <sym> --shares <n> --price <p> [--currency JPY] [--date YYYY-MM-DD] [--memo テキスト]
+python3 .../run_portfolio.py buy --symbol <sym> --shares <n> --price <p> [--currency JPY] [--date YYYY-MM-DD] [--memo テキスト] [--yes]
 ```
+
+`--yes` (`-y`) を省略すると購入内容の確認プレビューを表示して終了する。`--yes` を指定すると確認をスキップして直接記録する（KIK-444）。
 
 ### sell -- 売却記録
 
 ```bash
-python3 .../run_portfolio.py sell --symbol <sym> --shares <n> [--price <売却単価>] [--date YYYY-MM-DD]
+python3 .../run_portfolio.py sell --symbol <sym> --shares <n> [--price <売却単価>] [--date YYYY-MM-DD] [--yes]
 ```
+
+`--yes` (`-y`) を省略すると売却内容の確認プレビュー（取得単価・推定実現損益）を表示して終了する。`--yes` を指定すると確認をスキップして直接記録する（KIK-444）。
 
 `--price` を指定すると実現損益・損益率・税引後概算を計算して表示し、`data/history/trade/*.json` に保存する（KIK-441）。
 
