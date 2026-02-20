@@ -39,7 +39,7 @@ def _make_raw_quotes(n: int) -> list[dict]:
 class TestQueryScreenerMaxResults:
     """Verify QueryScreener passes correct max_results to screen_stocks."""
 
-    @patch("src.core.screening.screener.build_query")
+    @patch("src.core.screening.query_screener.build_query")
     def test_normal_mode(self, mock_build_query, mock_yahoo_client):
         """top_n=20, no pullback -> max_results = 20 * 5 = 100."""
         mock_build_query.return_value = MagicMock()
@@ -52,7 +52,7 @@ class TestQueryScreenerMaxResults:
         call_kwargs = mock_yahoo_client.screen_stocks.call_args
         assert call_kwargs.kwargs.get("max_results", call_kwargs[1].get("max_results")) == 100
 
-    @patch("src.core.screening.screener.build_query")
+    @patch("src.core.screening.query_screener.build_query")
     def test_pullback_mode(self, mock_build_query, mock_yahoo_client):
         """top_n=20, with_pullback=True -> max_results = max(100, 250) = 250."""
         mock_build_query.return_value = MagicMock()
@@ -65,7 +65,7 @@ class TestQueryScreenerMaxResults:
         call_kwargs = mock_yahoo_client.screen_stocks.call_args
         assert call_kwargs.kwargs.get("max_results", call_kwargs[1].get("max_results")) == 250
 
-    @patch("src.core.screening.screener.build_query")
+    @patch("src.core.screening.query_screener.build_query")
     def test_large_top_n_normal(self, mock_build_query, mock_yahoo_client):
         """top_n=200 -> max_results = 200 * 5 = 1000."""
         mock_build_query.return_value = MagicMock()
@@ -77,7 +77,7 @@ class TestQueryScreenerMaxResults:
         call_kwargs = mock_yahoo_client.screen_stocks.call_args
         assert call_kwargs.kwargs.get("max_results", call_kwargs[1].get("max_results")) == 1000
 
-    @patch("src.core.screening.screener.build_query")
+    @patch("src.core.screening.query_screener.build_query")
     def test_large_top_n_pullback(self, mock_build_query, mock_yahoo_client):
         """top_n=200, with_pullback=True -> max_results = max(1000, 250) = 1000."""
         mock_build_query.return_value = MagicMock()
@@ -99,7 +99,7 @@ class TestQueryScreenerMaxResults:
 class TestPullbackScreenerMaxResults:
     """Verify PullbackScreener passes correct max_results to screen_stocks."""
 
-    @patch("src.core.screening.screener.build_query")
+    @patch("src.core.screening.pullback_screener.build_query")
     def test_default_top_n(self, mock_build_query, mock_yahoo_client):
         """top_n=20 -> max_results = max(100, 250) = 250."""
         mock_build_query.return_value = MagicMock()
@@ -111,7 +111,7 @@ class TestPullbackScreenerMaxResults:
         call_kwargs = mock_yahoo_client.screen_stocks.call_args
         assert call_kwargs.kwargs.get("max_results", call_kwargs[1].get("max_results")) == 250
 
-    @patch("src.core.screening.screener.build_query")
+    @patch("src.core.screening.pullback_screener.build_query")
     def test_large_top_n(self, mock_build_query, mock_yahoo_client):
         """top_n=100 -> max_results = max(500, 250) = 500."""
         mock_build_query.return_value = MagicMock()
@@ -132,7 +132,7 @@ class TestPullbackScreenerMaxResults:
 class TestAlphaScreenerMaxResults:
     """Verify AlphaScreener passes correct max_results to screen_stocks."""
 
-    @patch("src.core.screening.screener.build_query")
+    @patch("src.core.screening.alpha_screener.build_query")
     def test_default_top_n(self, mock_build_query, mock_yahoo_client):
         """top_n=20 -> max_results = max(100, 250) = 250."""
         mock_build_query.return_value = MagicMock()
@@ -144,7 +144,7 @@ class TestAlphaScreenerMaxResults:
         call_kwargs = mock_yahoo_client.screen_stocks.call_args
         assert call_kwargs.kwargs.get("max_results", call_kwargs[1].get("max_results")) == 250
 
-    @patch("src.core.screening.screener.build_query")
+    @patch("src.core.screening.alpha_screener.build_query")
     def test_large_top_n(self, mock_build_query, mock_yahoo_client):
         """top_n=100 -> max_results = max(500, 250) = 500."""
         mock_build_query.return_value = MagicMock()

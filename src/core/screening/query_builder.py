@@ -1,8 +1,38 @@
 """Build yfinance EquityQuery objects from screening criteria dicts."""
 
+from pathlib import Path
 from typing import Optional
 
+import yaml
 from yfinance import EquityQuery
+
+_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent.parent / "config" / "screening_presets.yaml"
+
+
+def load_preset(preset_name: str) -> dict:
+    """Load screening criteria from the presets YAML file.
+
+    Parameters
+    ----------
+    preset_name : str
+        Name of the preset (e.g. 'value', 'alpha', 'growth').
+
+    Returns
+    -------
+    dict
+        Criteria dict ready for use with ``build_query`` or screeners.
+
+    Raises
+    ------
+    ValueError
+        If the preset is not found.
+    """
+    with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    presets = config.get("presets", {})
+    if preset_name not in presets:
+        raise ValueError(f"Unknown preset: '{preset_name}'. Available: {list(presets.keys())}")
+    return presets[preset_name].get("criteria", {})
 
 
 # ---------------------------------------------------------------------------

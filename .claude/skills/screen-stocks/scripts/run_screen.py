@@ -301,6 +301,11 @@ def run_query_mode(args):
 
 def run_legacy_mode(args):
     """Run screening using the original ValueScreener."""
+    print(
+        "⚠️  [DEPRECATED] --mode legacy は非推奨です。"
+        " QueryScreener (デフォルト) を使用してください。"
+        " --mode legacy は将来削除予定です。"
+    )
     # Map region to legacy market names
     region_to_market = {
         "japan": "japan",
