@@ -36,13 +36,19 @@ RSI_PREV_THRESHOLD = th("health", "rsi_prev_threshold", 50)
 RSI_DROP_THRESHOLD = th("health", "rsi_drop_threshold", 40)
 
 
-def check_trend_health(hist: Optional[pd.DataFrame]) -> dict:
+def check_trend_health(
+    hist: Optional[pd.DataFrame],
+    cross_lookback: int | None = None,
+) -> dict:
     """Analyze trend health from price history.
 
     Parameters
     ----------
     hist : pd.DataFrame or None
         DataFrame with Close and Volume columns.
+    cross_lookback : int or None
+        Override cross event lookback window (KIK-438: 30 for small caps).
+        Defaults to th("health", "cross_lookback", 60).
 
     Returns
     -------
@@ -93,7 +99,7 @@ def check_trend_health(hist: Optional[pd.DataFrame]) -> dict:
     dead_cross = not sma50_above_sma200
 
     # --- Cross event detection (lookback N trading days) ---
-    _CROSS_LOOKBACK = th("health", "cross_lookback", 60)
+    _CROSS_LOOKBACK = cross_lookback if cross_lookback is not None else th("health", "cross_lookback", 60)
     cross_signal = "none"
     days_since_cross = None
     cross_date = None
@@ -400,10 +406,16 @@ def compute_alert_level(
     change_quality: dict,
     stock_detail=None,
     return_stability: dict | None = None,
+    is_small_cap: bool = False,
 ) -> dict:
     """Compute 3-level alert from trend and change quality.
 
     Level priority: exit > caution > early_warning > none.
+
+    Parameters
+    ----------
+    is_small_cap : bool
+        If True, escalate early_warning to caution (KIK-438).
 
     Returns
     -------
@@ -519,6 +531,11 @@ def compute_alert_level(
             if reason_str not in reasons:
                 reasons.append(reason_str)
 
+    # Small-cap escalation (KIK-438): early_warning -> caution
+    if is_small_cap and level == ALERT_EARLY_WARNING:
+        level = ALERT_CAUTION
+        reasons.append("[小型] 小型株のため注意に引き上げ")
+
     level_map = {
         ALERT_NONE: ("", "なし"),
         ALERT_EARLY_WARNING: ("\u26a1", "早期警告"),
@@ -556,6 +573,8 @@ def run_health_check(csv_path: str, client) -> dict:
         Keys: positions, alerts (non-none only), summary.
     """
     from src.core.portfolio.portfolio_manager import get_snapshot
+    from src.core.portfolio.small_cap import classify_market_cap, check_small_cap_allocation
+    from src.core.ticker_utils import infer_region_code
 
     snapshot = get_snapshot(csv_path, client)
     positions = snapshot.get("positions", [])
@@ -582,9 +601,19 @@ def run_health_check(csv_path: str, client) -> dict:
         if _is_cash(symbol):
             continue
 
-        # 1. Trend analysis
+        # 0. Small-cap classification (KIK-438)
+        region_code = infer_region_code(symbol)
+        size_class = classify_market_cap(pos.get("market_cap"), region_code)
+        is_small_cap = size_class == "小型"
+
+        # 1. Trend analysis (small caps use shorter cross lookback)
         hist = client.get_price_history(symbol, period="1y")
-        trend_health = check_trend_health(hist)
+        cross_lb = (
+            th("health", "small_cap_cross_lookback", 30)
+            if is_small_cap
+            else None
+        )
+        trend_health = check_trend_health(hist, cross_lookback=cross_lb)
 
         # 2. Change quality
         stock_detail = client.get_stock_detail(symbol)
@@ -597,11 +626,12 @@ def run_health_check(csv_path: str, client) -> dict:
         sh_history = calculate_shareholder_return_history(stock_detail)
         sh_stability = assess_return_stability(sh_history)
 
-        # 4. Alert level
+        # 4. Alert level (small-cap escalation: KIK-438)
         alert = compute_alert_level(
             trend_health, change_quality,
             stock_detail=stock_detail,
             return_stability=sh_stability,
+            is_small_cap=is_small_cap,
         )
 
         # 5. Long-term suitability (KIK-371, enhanced KIK-403)
@@ -616,6 +646,8 @@ def run_health_check(csv_path: str, client) -> dict:
             "symbol": symbol,
             "name": pos.get("name") or pos.get("memo", ""),
             "pnl_pct": pos.get("pnl_pct", 0),
+            "size_class": size_class,
+            "is_small_cap": is_small_cap,
             "trend_health": trend_health,
             "change_quality": change_quality,
             "alert": alert,
@@ -632,6 +664,22 @@ def run_health_check(csv_path: str, client) -> dict:
         else:
             counts["healthy"] += 1
 
+    # Portfolio-level small-cap allocation (KIK-438)
+    # Build symbol -> evaluation_jpy lookup from snapshot positions
+    eval_by_symbol = {
+        p["symbol"]: p.get("evaluation_jpy", 0)
+        for p in positions
+        if not _is_cash(p["symbol"])
+    }
+    total_value = sum(eval_by_symbol.values())
+    small_cap_value = sum(
+        eval_by_symbol.get(r["symbol"], 0)
+        for r in results
+        if r.get("is_small_cap")
+    )
+    small_cap_weight = small_cap_value / total_value if total_value > 0 else 0.0
+    small_cap_alloc = check_small_cap_allocation(small_cap_weight)
+
     return {
         "positions": results,
         "alerts": alerts,
@@ -639,4 +687,5 @@ def run_health_check(csv_path: str, client) -> dict:
             "total": len(results),
             **counts,
         },
+        "small_cap_allocation": small_cap_alloc,
     }

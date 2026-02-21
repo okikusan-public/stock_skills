@@ -66,6 +66,8 @@ def format_health_check(health_data: dict) -> str:
 
     for pos in positions:
         symbol = pos.get("symbol", "-")
+        if pos.get("is_small_cap"):
+            symbol += " [小型]"
         pnl_pct = pos.get("pnl_pct", 0)
         pnl_str = _fmt_pct_sign(pnl_pct) if pnl_pct is not None else "-"
 
@@ -114,6 +116,14 @@ def format_health_check(health_data: dict) -> str:
         f"\U0001f6a8\u64a4\u9000 {exit_count}"
     )
     lines.append("")
+
+    # Small-cap allocation (KIK-438)
+    small_cap_alloc = health_data.get("small_cap_allocation")
+    if small_cap_alloc:
+        level = small_cap_alloc["level"]
+        emoji = {"ok": "\u2705", "warning": "\u26a0\ufe0f", "critical": "\U0001f534"}[level]
+        lines.append(f"{emoji} {small_cap_alloc['message']}")
+        lines.append("")
 
     # Alert details
     if alerts:

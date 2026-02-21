@@ -77,6 +77,23 @@ def format_structure_analysis(analysis: dict) -> str:
     lines.append(f"HHI: {_fmt_float(currency_hhi, 4)} {_hhi_bar(currency_hhi)} ({_classify_hhi(currency_hhi)})")
     lines.append("")
 
+    # --- Size breakdown (KIK-438) ---
+    lines.append("### \u898f\u6a21\u5225\u69cb\u6210")
+    size_hhi = analysis.get("size_hhi", 0.0)
+    size_breakdown = analysis.get("size_breakdown", {})
+
+    if size_breakdown:
+        lines.append("")
+        lines.append("| \u898f\u6a21 | \u6bd4\u7387 | \u30d0\u30fc |")
+        lines.append("|:-----|-----:|:-----|")
+        for size_class, weight in sorted(size_breakdown.items(), key=lambda x: -x[1]):
+            bar_len = int(round(weight * 20))
+            bar = "\u2588" * bar_len
+            lines.append(f"| {size_class} | {_fmt_pct(weight)} | {bar} |")
+        lines.append("")
+        lines.append(f"HHI: {_fmt_float(size_hhi, 4)} {_hhi_bar(size_hhi)} ({_classify_hhi(size_hhi)})")
+        lines.append("")
+
     # --- Overall judgment ---
     lines.append("### \u7dcf\u5408\u5224\u5b9a")
     max_hhi = analysis.get("max_hhi", 0.0)
@@ -88,6 +105,7 @@ def format_structure_analysis(analysis: dict) -> str:
         "sector": "\u30bb\u30af\u30bf\u30fc",
         "region": "\u5730\u57df",
         "currency": "\u901a\u8ca8",
+        "size": "\u898f\u6a21",
     }
     axis_display = axis_labels.get(max_axis, max_axis)
 

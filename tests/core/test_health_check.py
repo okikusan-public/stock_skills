@@ -1205,3 +1205,113 @@ class TestReturnStabilityAlertIntegration:
             return_stability=stability,
         )
         assert result["level"] == ALERT_NONE
+
+
+# ===================================================================
+# Small-cap alert escalation tests (KIK-438)
+# ===================================================================
+
+
+class TestSmallCapAlertEscalation:
+    """Tests for is_small_cap parameter in compute_alert_level (KIK-438)."""
+
+    def _healthy_trend(self):
+        return {
+            "trend": "上昇",
+            "price_above_sma50": True,
+            "dead_cross": False,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+            "cross_signal": "none",
+            "days_since_cross": None,
+            "cross_date": None,
+        }
+
+    def test_small_cap_early_warning_escalates_to_caution(self):
+        """Small-cap with early_warning should escalate to caution."""
+        trend = {
+            "trend": "横ばい",
+            "price_above_sma50": False,
+            "dead_cross": False,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+            "cross_signal": "none",
+            "days_since_cross": None,
+            "cross_date": None,
+            "current_price": 98.0,
+            "sma50": 100.0,
+        }
+        change = {"quality_label": "良好"}
+        result = compute_alert_level(trend, change, is_small_cap=True)
+        assert result["level"] == ALERT_CAUTION
+        assert any("[小型]" in r for r in result["reasons"])
+
+    def test_non_small_cap_early_warning_stays(self):
+        """Non-small-cap with early_warning should stay as early_warning."""
+        trend = {
+            "trend": "横ばい",
+            "price_above_sma50": False,
+            "dead_cross": False,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+            "cross_signal": "none",
+            "days_since_cross": None,
+            "cross_date": None,
+            "current_price": 98.0,
+            "sma50": 100.0,
+        }
+        change = {"quality_label": "良好"}
+        result = compute_alert_level(trend, change, is_small_cap=False)
+        assert result["level"] == ALERT_EARLY_WARNING
+
+    def test_small_cap_none_not_escalated(self):
+        """Small-cap with no alert should stay none."""
+        change = {"quality_label": "良好"}
+        result = compute_alert_level(self._healthy_trend(), change, is_small_cap=True)
+        assert result["level"] == ALERT_NONE
+
+    def test_small_cap_caution_not_escalated_further(self):
+        """Small-cap already at caution should not escalate further."""
+        trend = {
+            "trend": "下降",
+            "price_above_sma50": False,
+            "dead_cross": False,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": True,
+            "cross_signal": "none",
+            "days_since_cross": None,
+            "cross_date": None,
+        }
+        change = {"quality_label": "1指標↓"}
+        result = compute_alert_level(trend, change, is_small_cap=True)
+        assert result["level"] == ALERT_CAUTION
+
+    def test_small_cap_exit_not_changed(self):
+        """Small-cap at exit should remain exit."""
+        trend = {
+            "trend": "下降",
+            "price_above_sma50": False,
+            "dead_cross": True,
+            "rsi_drop": False,
+            "sma50_approaching_sma200": False,
+            "cross_signal": "none",
+            "days_since_cross": None,
+            "cross_date": None,
+        }
+        change = {"quality_label": "複数悪化"}
+        result = compute_alert_level(trend, change, is_small_cap=True)
+        assert result["level"] == ALERT_EXIT
+
+    def test_small_cap_one_indicator_down_escalates(self):
+        """Small-cap with 1指標↓ (early_warning) should escalate to caution."""
+        change = {"quality_label": "1指標↓"}
+        result = compute_alert_level(self._healthy_trend(), change, is_small_cap=True)
+        assert result["level"] == ALERT_CAUTION
+        assert any("[小型]" in r for r in result["reasons"])
+
+    def test_cross_lookback_parameter(self):
+        """check_trend_health with cross_lookback should override default."""
+        hist = _make_uptrend_hist(300)
+        result = check_trend_health(hist, cross_lookback=30)
+        # Should not crash; cross_signal should be valid
+        assert result["cross_signal"] in ("none", "golden_cross", "death_cross")

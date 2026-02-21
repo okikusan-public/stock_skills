@@ -106,6 +106,39 @@ def infer_currency(symbol: str, info: dict | None = None) -> str:
     return "USD"
 
 
+# Suffix -> lowercase region code mapping (KIK-438)
+SUFFIX_TO_REGION_CODE = {
+    ".T": "jp", ".SI": "sg", ".BK": "th", ".KL": "my", ".JK": "id",
+    ".PS": "ph", ".HK": "hk", ".KS": "kr", ".KQ": "kr",
+    ".TW": "tw", ".TWO": "tw", ".SS": "cn", ".SZ": "cn",
+    ".L": "gb", ".DE": "de", ".PA": "fr", ".TO": "ca",
+    ".AX": "au", ".SA": "br", ".NS": "in", ".BO": "in",
+}
+
+
+def infer_region_code(symbol: str) -> str:
+    """Infer lowercase region code from ticker suffix (KIK-438).
+
+    Examples: "jp", "us", "sg", "hk".
+    """
+    if is_cash(symbol):
+        cur = cash_currency(symbol)
+        if cur == "JPY":
+            return "jp"
+        if cur == "USD":
+            return "us"
+        for suffix, c in SUFFIX_TO_CURRENCY.items():
+            if c == cur:
+                return SUFFIX_TO_REGION_CODE.get(suffix, "us")
+        return "us"
+    for suffix, code in SUFFIX_TO_REGION_CODE.items():
+        if symbol.upper().endswith(suffix.upper()):
+            return code
+    if "." not in symbol:
+        return "us"
+    return "us"
+
+
 def infer_country(symbol: str, info: dict | None = None) -> str:
     """Infer the country/region from the ticker symbol suffix.
 

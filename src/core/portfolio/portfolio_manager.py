@@ -540,10 +540,12 @@ def get_snapshot(csv_path: str, client) -> dict:
         sector = None
         market_currency = _infer_currency(symbol)
 
+        market_cap = None
         if info is not None:
             current_price = info.get("price")
             name = info.get("name")
             sector = info.get("sector")
+            market_cap = info.get("market_cap")
             # Use the currency from yfinance if available
             if info.get("currency"):
                 market_currency = info["currency"]
@@ -578,6 +580,7 @@ def get_snapshot(csv_path: str, client) -> dict:
             "cost_currency": cost_currency,
             "current_price": current_price,
             "market_currency": market_currency,
+            "market_cap": market_cap,
             "evaluation": evaluation,
             "evaluation_jpy": round(evaluation_jpy, 0),
             "cost_jpy": round(cost_jpy, 0),
@@ -640,6 +643,8 @@ def get_structure_analysis(csv_path: str, client) -> dict:
         }
     """
     from src.core.portfolio.concentration import analyze_concentration
+    from src.core.portfolio.small_cap import classify_market_cap
+    from src.core.ticker_utils import infer_region_code
 
     # Get snapshot first (this also fetches current prices and FX rates)
     snapshot = get_snapshot(csv_path, client)
@@ -650,9 +655,11 @@ def get_structure_analysis(csv_path: str, client) -> dict:
             "region_breakdown": {},
             "sector_breakdown": {},
             "currency_breakdown": {},
+            "size_breakdown": {},
             "region_hhi": 0.0,
             "sector_hhi": 0.0,
             "currency_hhi": 0.0,
+            "size_hhi": 0.0,
             "concentration_multiplier": 1.0,
             "risk_level": "分散",
         }
@@ -671,11 +678,13 @@ def get_structure_analysis(csv_path: str, client) -> dict:
     # Build portfolio_data for analyze_concentration
     portfolio_data: list[dict] = []
     for pos in positions:
+        region_code = infer_region_code(pos["symbol"])
         stock_data = {
             "symbol": pos["symbol"],
             "sector": pos.get("sector") or "Unknown",
             "country": _infer_country(pos["symbol"]),
             "currency": pos.get("market_currency") or _infer_currency(pos["symbol"]),
+            "size_class": classify_market_cap(pos.get("market_cap"), region_code),
         }
         portfolio_data.append(stock_data)
 
@@ -686,9 +695,11 @@ def get_structure_analysis(csv_path: str, client) -> dict:
         "region_breakdown": conc.get("region_breakdown", {}),
         "sector_breakdown": conc.get("sector_breakdown", {}),
         "currency_breakdown": conc.get("currency_breakdown", {}),
+        "size_breakdown": conc.get("size_breakdown", {}),
         "region_hhi": conc.get("region_hhi", 0.0),
         "sector_hhi": conc.get("sector_hhi", 0.0),
         "currency_hhi": conc.get("currency_hhi", 0.0),
+        "size_hhi": conc.get("size_hhi", 0.0),
         "concentration_multiplier": conc.get("concentration_multiplier", 1.0),
         "risk_level": conc.get("risk_level", "分散"),
     }

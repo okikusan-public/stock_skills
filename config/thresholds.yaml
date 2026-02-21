@@ -15,6 +15,11 @@ health:
   rsi_drop_threshold: 40           # Current RSI level indicating a drop
   cross_lookback: 60               # Trading days to scan for cross events
 
+  # Small-cap allocation rules (KIK-438)
+  small_cap_warn_pct: 0.25       # 小型株比率 > 25% で警告
+  small_cap_crit_pct: 0.35       # 小型株比率 > 35% で危険
+  small_cap_cross_lookback: 30   # 小型株のクロスルックバック（通常60→30）
+
   # Long-term suitability (KIK-371)
   lt_roe_high: 0.15
   lt_roe_low: 0.10

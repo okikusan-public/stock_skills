@@ -121,14 +121,16 @@ def analyze_concentration(
 ) -> dict:
     """Perform multi-axis concentration analysis on a portfolio.
 
-    Evaluates concentration along three axes -- sector, region (country),
-    and currency -- then identifies the weakest (most concentrated) axis.
+    Evaluates concentration along four axes -- sector, region (country),
+    currency, and size (KIK-438) -- then identifies the weakest
+    (most concentrated) axis.
 
     Parameters
     ----------
     portfolio_data : list[dict]
         Per-stock data dicts.  Expected keys per stock:
-        ``sector``, ``country`` (or ``region``), ``currency``.
+        ``sector``, ``country`` (or ``region``), ``currency``,
+        ``size_class`` (optional, KIK-438).
     weights : list[float]
         Portfolio weights aligned with ``portfolio_data``.
         Should sum to approximately 1.0.
@@ -140,13 +142,15 @@ def analyze_concentration(
             "sector_hhi": float,
             "region_hhi": float,
             "currency_hhi": float,
+            "size_hhi": float,
             "max_hhi": float,
-            "max_hhi_axis": str,          # "sector", "region", or "currency"
-            "concentration_multiplier": float,  # 1.0 .. 1.6
+            "max_hhi_axis": str,
+            "concentration_multiplier": float,
             "sector_breakdown": dict,
             "region_breakdown": dict,
             "currency_breakdown": dict,
-            "risk_level": str,            # "分散", "やや集中", "危険な集中"
+            "size_breakdown": dict,
+            "risk_level": str,
         }
     """
     # Sector HHI
@@ -169,12 +173,20 @@ def analyze_concentration(
         portfolio_data, weights, "currency", default_label="不明"
     )
 
+    # Size HHI (KIK-438)
+    size_hhi, size_breakdown = _compute_axis_hhi(
+        portfolio_data, weights, "size_class", default_label="不明"
+    )
+
     # Determine the axis with the highest HHI
+    # Exclude size axis from max_hhi if all entries are "不明" (no data)
     axes = {
         "sector": sector_hhi,
         "region": region_hhi,
         "currency": currency_hhi,
     }
+    if set(size_breakdown.keys()) != {"不明"}:
+        axes["size"] = size_hhi
     max_hhi_axis = max(axes, key=axes.get)
     max_hhi = axes[max_hhi_axis]
 
@@ -185,11 +197,13 @@ def analyze_concentration(
         "sector_hhi": round(sector_hhi, 4),
         "region_hhi": round(region_hhi, 4),
         "currency_hhi": round(currency_hhi, 4),
+        "size_hhi": round(size_hhi, 4),
         "max_hhi": round(max_hhi, 4),
         "max_hhi_axis": max_hhi_axis,
         "concentration_multiplier": round(concentration_multiplier, 4),
         "sector_breakdown": sector_breakdown,
         "region_breakdown": region_breakdown,
         "currency_breakdown": currency_breakdown,
+        "size_breakdown": size_breakdown,
         "risk_level": risk_level,
     }

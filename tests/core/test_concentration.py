@@ -227,9 +227,10 @@ class TestAnalyzeConcentration:
         result = analyze_concentration(portfolio, weights)
 
         expected_keys = [
-            "sector_hhi", "region_hhi", "currency_hhi",
+            "sector_hhi", "region_hhi", "currency_hhi", "size_hhi",
             "max_hhi", "max_hhi_axis", "concentration_multiplier",
             "sector_breakdown", "region_breakdown", "currency_breakdown",
+            "size_breakdown",
             "risk_level",
         ]
         for key in expected_keys:
@@ -266,3 +267,58 @@ class TestAnalyzeConcentration:
             val = result[key]
             # Check it has at most 4 decimal places
             assert val == round(val, 4)
+
+    # --- Size axis tests (KIK-438) ---
+
+    def test_size_axis_with_data(self):
+        """Size axis should compute HHI when size_class is provided."""
+        portfolio = [
+            {"sector": "Tech", "country": "US", "currency": "USD", "size_class": "大型"},
+            {"sector": "Tech", "country": "US", "currency": "USD", "size_class": "小型"},
+        ]
+        weights = [0.5, 0.5]
+        result = analyze_concentration(portfolio, weights)
+
+        assert result["size_hhi"] == pytest.approx(0.5)
+        assert "大型" in result["size_breakdown"]
+        assert "小型" in result["size_breakdown"]
+
+    def test_size_axis_all_unknown_excluded_from_max(self):
+        """When all size_class are 不明, size should not dominate max_hhi."""
+        portfolio = [
+            {"sector": "Tech", "country": "US", "currency": "USD"},
+            {"sector": "Healthcare", "country": "JP", "currency": "JPY"},
+            {"sector": "Finance", "country": "SG", "currency": "SGD"},
+            {"sector": "Energy", "country": "GB", "currency": "GBP"},
+        ]
+        weights = [0.25, 0.25, 0.25, 0.25]
+        result = analyze_concentration(portfolio, weights)
+
+        # size_hhi = 1.0 (all "不明") but should NOT be max_hhi_axis
+        assert result["size_hhi"] == pytest.approx(1.0)
+        assert result["max_hhi_axis"] != "size"
+
+    def test_size_axis_mixed_includes_in_max(self):
+        """When size_class has mixed data, size axis participates in max_hhi."""
+        portfolio = [
+            {"sector": "Tech", "country": "US", "currency": "USD", "size_class": "小型"},
+            {"sector": "Tech", "country": "US", "currency": "USD", "size_class": "小型"},
+        ]
+        weights = [0.5, 0.5]
+        result = analyze_concentration(portfolio, weights)
+
+        # All small-cap -> size_hhi = 1.0, should participate in max
+        assert result["size_hhi"] == pytest.approx(1.0)
+
+    def test_size_breakdown_sums_to_one(self):
+        """Size breakdown should sum to ~1.0."""
+        portfolio = [
+            {"sector": "A", "country": "X", "currency": "C1", "size_class": "大型"},
+            {"sector": "B", "country": "Y", "currency": "C2", "size_class": "中型"},
+            {"sector": "C", "country": "Z", "currency": "C3", "size_class": "小型"},
+        ]
+        weights = [0.5, 0.3, 0.2]
+        result = analyze_concentration(portfolio, weights)
+
+        total = sum(result["size_breakdown"].values())
+        assert total == pytest.approx(1.0, abs=0.001)
