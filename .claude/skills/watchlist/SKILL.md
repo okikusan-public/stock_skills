@@ -14,3 +14,10 @@ python3 /Users/kikuchihiroyuki/stock-skills/.claude/skills/watchlist/scripts/man
 ```
 
 結果をそのまま表示してください。
+
+## 前提知識統合ルール (KIK-466)
+
+get_context.py の出力がある場合、ウォッチリスト操作と統合:
+
+- **add**: 追加銘柄の過去経緯（スクリーニング出現・レポート履歴）があれば要約を付記
+- **list**: 各銘柄の最新状態（鮮度ラベル・直近アクション）をコンテキストから補足

@@ -69,3 +69,10 @@ python3 .../manage_note.py delete --id note_2025-02-17_7203_T_abc12345
 ## 自然言語ルーティング
 
 自然言語→スキル判定は [.claude/rules/intent-routing.md](../../rules/intent-routing.md) を参照。
+
+## 前提知識統合ルール (KIK-466)
+
+get_context.py の出力がある場合、メモ操作と統合:
+
+- **save**: 保存対象銘柄の直近状態（最新レポート・ヘルスチェック結果）を参照し、メモ内容の文脈を補強
+- **list**: メモ一覧表示時、対象銘柄の現在の保有状態（保有中/売却済み/ウォッチ中）を付記
