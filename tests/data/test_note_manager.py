@@ -68,7 +68,7 @@ class TestSaveNote:
             save_note("7203.T", "invalid_type", "content", base_dir=str(tmp_path))
 
     def test_save_note_valid_types(self):
-        assert _VALID_TYPES == {"thesis", "observation", "concern", "review", "target", "lesson"}
+        assert _VALID_TYPES == {"thesis", "observation", "concern", "review", "target", "lesson", "journal"}
 
     def test_save_note_lesson_type(self, tmp_path):
         """lesson タイプのノートが保存できること (KIK-408)."""
@@ -150,6 +150,81 @@ class TestSaveNote:
         with patch("src.data.graph_store.merge_note"):
             note = save_note("7203.T", "thesis", "test", category="invalid", base_dir=str(tmp_path))
         assert note["category"] == "stock"
+
+
+# ===================================================================
+# KIK-473: journal note type tests
+# ===================================================================
+
+class TestSaveNoteJournal:
+    def test_journal_type_in_valid_types(self):
+        """journal が _VALID_TYPES に含まれること."""
+        assert "journal" in _VALID_TYPES
+
+    def test_journal_without_symbol_or_category(self, tmp_path):
+        """journal タイプは symbol/category なしで保存できること."""
+        with patch("src.data.graph_store.merge_note"):
+            note = save_note(note_type="journal", content="Today was quiet", base_dir=str(tmp_path))
+        assert note["type"] == "journal"
+        assert note["category"] == "general"
+        assert note["symbol"] == ""
+
+    def test_journal_auto_detects_symbols(self, tmp_path):
+        """journal の content からティッカーシンボルを自動検出すること."""
+        with patch("src.data.graph_store.merge_note"):
+            note = save_note(
+                note_type="journal",
+                content="NVDAが急騰。7203.Tは下落した",
+                base_dir=str(tmp_path),
+            )
+        detected = note.get("detected_symbols", [])
+        assert set(detected) == {"NVDA", "7203.T"}
+
+    def test_journal_no_symbols_detected(self, tmp_path):
+        """シンボルなしの journal では detected_symbols がないこと."""
+        with patch("src.data.graph_store.merge_note"):
+            note = save_note(
+                note_type="journal",
+                content="今日はトレードしない",
+                base_dir=str(tmp_path),
+            )
+        assert "detected_symbols" not in note
+
+    def test_journal_with_explicit_symbol(self, tmp_path):
+        """journal でも symbol 指定時は category が stock になること."""
+        with patch("src.data.graph_store.merge_note"):
+            note = save_note(
+                symbol="AAPL",
+                note_type="journal",
+                content="AAPL earnings coming up",
+                base_dir=str(tmp_path),
+            )
+        assert note["category"] == "stock"
+        assert note["symbol"] == "AAPL"
+        # With explicit symbol, no auto-detection
+        assert "detected_symbols" not in note
+
+    def test_journal_with_category(self, tmp_path):
+        """journal でも category 指定を尊重すること."""
+        with patch("src.data.graph_store.merge_note"):
+            note = save_note(
+                note_type="journal",
+                content="Market reflections",
+                category="market",
+                base_dir=str(tmp_path),
+            )
+        assert note["category"] == "market"
+
+    def test_journal_detected_symbols_max_3(self, tmp_path):
+        """detected_symbols は最大3件に制限されること."""
+        with patch("src.data.graph_store.merge_note"):
+            note = save_note(
+                note_type="journal",
+                content="NVDA AAPL MSFT GOOGL TSLA all up today",
+                base_dir=str(tmp_path),
+            )
+        detected = note.get("detected_symbols", [])
+        assert len(detected) <= 3
 
 
 # ===================================================================

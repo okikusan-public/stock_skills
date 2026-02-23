@@ -13,7 +13,7 @@ from typing import Optional
 
 
 _NOTES_DIR = "data/notes"
-_VALID_TYPES = {"thesis", "observation", "concern", "review", "target", "lesson"}
+_VALID_TYPES = {"thesis", "observation", "concern", "review", "target", "lesson", "journal"}
 _VALID_CATEGORIES = {"stock", "portfolio", "market", "general"}
 
 
@@ -63,6 +63,8 @@ def save_note(
         resolved_category = "stock"
     elif category and category in _VALID_CATEGORIES:
         resolved_category = category
+    elif note_type == "journal" and not category:
+        resolved_category = "general"
     else:
         resolved_category = "general"
 
@@ -91,6 +93,17 @@ def save_note(
         "content": content,
         "source": source,
     }
+
+    # KIK-473: journal type auto-detects symbols from content
+    detected_symbols: list[str] = []
+    if note_type == "journal" and not symbol and content:
+        try:
+            from src.core.ticker_utils import extract_all_symbols
+            detected_symbols = extract_all_symbols(content)[:3]
+        except Exception:
+            pass
+        if detected_symbols:
+            note["detected_symbols"] = detected_symbols
 
     # 1. Write to JSON file (master)
     d = _notes_dir(base_dir)
@@ -124,16 +137,35 @@ def save_note(
             content=content,
             symbol=symbol or None,
             source=source,
+            category=resolved_category,
             semantic_summary=sem_summary,
             embedding=emb,
         )
+        # KIK-473: Create ABOUT relationships for detected symbols in journal notes
+        if detected_symbols:
+            from src.data.graph_store import _get_mode, _get_driver
+            if _get_mode() != "off":
+                driver = _get_driver()
+                if driver is not None:
+                    with driver.session() as session:
+                        for ds in detected_symbols:
+                            session.run(
+                                "MATCH (n:Note {id: $note_id}) "
+                                "MERGE (s:Stock {symbol: $symbol}) "
+                                "MERGE (n)-[:ABOUT]->(s)",
+                                note_id=note_id, symbol=ds,
+                            )
     except Exception:
         pass  # Neo4j unavailable, JSON is the master
 
     # KIK-434: AI graph linking (graceful degradation)
     try:
         from src.data.graph_linker import link_note
-        link_note(note_id, symbol, note_type, content)
+        if detected_symbols:
+            for ds in detected_symbols:
+                link_note(note_id, ds, note_type, content)
+        else:
+            link_note(note_id, symbol, note_type, content)
     except Exception:
         pass
 

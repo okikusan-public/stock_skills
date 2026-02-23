@@ -76,9 +76,10 @@
 |:---|:---|:---|
 | id | string (UNIQUE) | UUID |
 | date | string | 作成日 |
-| type | string | thesis/observation/concern/review/target/lesson |
+| type | string | thesis/observation/concern/review/target/lesson/journal |
 | content | string | メモ内容 |
 | source | string | 情報ソース |
+| category | string | カテゴリ (stock/portfolio/market/general) (KIK-473) |
 
 ### Theme
 銘柄に付けられたテーマタグ。

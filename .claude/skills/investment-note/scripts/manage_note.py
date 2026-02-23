@@ -13,7 +13,8 @@ from src.data.note_manager import save_note, load_notes, delete_note
 
 def cmd_save(args):
     """Save a note."""
-    if not args.symbol and not args.category:
+    # KIK-473: journal type does not require --symbol or --category
+    if args.type != "journal" and not args.symbol and not args.category:
         print("Error: --symbol または --category のいずれかは必須です。")
         sys.exit(1)
     if not args.content:
@@ -32,6 +33,10 @@ def cmd_save(args):
     print(f"メモを保存しました: {note['id']}")
     print(f"  対象: {label} / タイプ: {note['type']} / カテゴリ: {note.get('category', '-')}")
     print(f"  内容: {note['content']}")
+    # KIK-473: show detected symbols for journal notes
+    detected = note.get("detected_symbols", [])
+    if detected:
+        print(f"  検出銘柄: {', '.join(detected)}")
     print_suggestions(
         symbol=args.symbol or "",
         context_summary=f"メモ保存: {args.type} {label}",
@@ -68,6 +73,9 @@ def cmd_list(args):
         short = content[:50] + "..." if len(content) > 50 else content
         short = short.replace("|", "\\|").replace("\n", " ")
         target = n.get("symbol") or n.get("category", "-")
+        # KIK-473: show detected symbols for journal notes without explicit symbol
+        if n.get("type") == "journal" and not n.get("symbol") and n.get("detected_symbols"):
+            target = ", ".join(n["detected_symbols"])
         cat = n.get("category", "-")
         print(f"| {n.get('date', '-')} | {target} | {cat} | {n.get('type', '-')} | {short} |")
 
@@ -98,7 +106,7 @@ def main():
                         help="カテゴリ (symbol未指定時に使用)")
     p_save.add_argument(
         "--type", default="observation",
-        choices=["thesis", "observation", "concern", "review", "target", "lesson"],
+        choices=["thesis", "observation", "concern", "review", "target", "lesson", "journal"],
         help="メモタイプ",
     )
     p_save.add_argument("--content", required=True, help="メモ内容")
