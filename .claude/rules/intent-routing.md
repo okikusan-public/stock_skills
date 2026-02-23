@@ -242,6 +242,9 @@
 「AAPLのメモ」                    → /investment-note list --symbol AAPL
 「PFのメモ」                      → /investment-note list --category portfolio
 「メモ削除」                       → /investment-note delete --id NOTE_ID
+「日記」「投資日記」「今日の振り返り」     → /investment-note save --type journal
+「今週はトレードしない」「ノートレード」    → /investment-note save --type journal --content ...
+「雑感」「つぶやき」                     → /investment-note save --type journal
 ```
 
 **タイプ推定**:
@@ -254,6 +257,7 @@
 | 振り返り、レビュー | review |
 | 目標株価、ターゲット | target |
 | 学び、反省、教訓 | lesson |
+| 日記、ジャーナル、振り返り日記、フリーメモ、雑感、つぶやき | journal |
 
 ### 知識ドメイン → `/graph-query`
 

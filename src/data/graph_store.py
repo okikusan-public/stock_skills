@@ -432,6 +432,7 @@ def merge_health(health_date: str, summary: dict, symbols: list[str],
 def merge_note(
     note_id: str, note_date: str, note_type: str, content: str,
     symbol: Optional[str] = None, source: str = "",
+    category: str = "",
     semantic_summary: str = "", embedding: list[float] | None = None,
 ) -> bool:
     """Create a Note node and ABOUT relationship to a stock."""
@@ -445,9 +446,10 @@ def merge_note(
             session.run(
                 "MERGE (n:Note {id: $id}) "
                 "SET n.date = $date, n.type = $type, "
-                "n.content = $content, n.source = $source",
+                "n.content = $content, n.source = $source, "
+                "n.category = $category",
                 id=note_id, date=note_date, type=note_type,
-                content=content, source=source,
+                content=content, source=source, category=category,
             )
             if symbol:
                 session.run(

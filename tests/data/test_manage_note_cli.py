@@ -250,3 +250,83 @@ class TestManageNoteFunctions:
         captured = capsys.readouterr()
         assert "market" in captured.out
         assert "メモはありません" in captured.out
+
+
+# ===================================================================
+# KIK-473: journal type tests
+# ===================================================================
+
+class TestManageNoteJournal:
+    def test_cmd_save_journal_without_symbol_or_category(self, capsys):
+        """journal タイプは symbol/category なしで保存できること."""
+        mod = _load_module()
+
+        mock_return = {
+            "id": "note_20260223_general_journal_001",
+            "symbol": "",
+            "type": "journal",
+            "content": "Quiet day",
+            "date": "2026-02-23",
+            "source": "manual",
+            "category": "general",
+        }
+        with patch.object(mod, "save_note", return_value=mock_return):
+            args = types.SimpleNamespace(
+                symbol=None, type="journal", content="Quiet day", source="manual", category=None,
+            )
+            mod.cmd_save(args)
+
+        captured = capsys.readouterr()
+        assert "保存しました" in captured.out
+
+    def test_cmd_save_journal_shows_detected_symbols(self, capsys):
+        """journal で検出銘柄がある場合に表示されること."""
+        mod = _load_module()
+
+        mock_return = {
+            "id": "note_20260223_general_journal_002",
+            "symbol": "",
+            "type": "journal",
+            "content": "NVDAが急騰",
+            "date": "2026-02-23",
+            "source": "manual",
+            "category": "general",
+            "detected_symbols": ["NVDA"],
+        }
+        with patch.object(mod, "save_note", return_value=mock_return):
+            args = types.SimpleNamespace(
+                symbol=None, type="journal", content="NVDAが急騰", source="manual", category=None,
+            )
+            mod.cmd_save(args)
+
+        captured = capsys.readouterr()
+        assert "検出銘柄" in captured.out
+        assert "NVDA" in captured.out
+
+    def test_cmd_save_non_journal_requires_symbol_or_category(self, capsys):
+        """journal 以外は symbol/category なしで sys.exit(1) すること."""
+        mod = _load_module()
+
+        args = types.SimpleNamespace(
+            symbol=None, type="observation", content="test", source="manual", category=None,
+        )
+        with pytest.raises(SystemExit, match="1"):
+            mod.cmd_save(args)
+
+    def test_cmd_list_journal_shows_detected_symbols(self, capsys):
+        """journal の一覧で検出銘柄が target 列に表示されること."""
+        mod = _load_module()
+
+        mock_notes = [
+            {
+                "date": "2026-02-23", "symbol": "", "type": "journal",
+                "content": "NVDAが急騰した", "category": "general",
+                "detected_symbols": ["NVDA"],
+            },
+        ]
+        with patch.object(mod, "load_notes", return_value=mock_notes):
+            args = types.SimpleNamespace(symbol=None, type=None, category=None)
+            mod.cmd_list(args)
+
+        captured = capsys.readouterr()
+        assert "NVDA" in captured.out

@@ -25,6 +25,11 @@ def extract_symbol(text: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def extract_all_symbols(text: str) -> list[str]:
+    """Extract all unique ticker symbols from text."""
+    return list(set(SYMBOL_PATTERN.findall(text)))
+
+
 # Comprehensive suffix -> region mapping (from portfolio_manager.py)
 SUFFIX_TO_REGION = {
     ".T": "Japan",
