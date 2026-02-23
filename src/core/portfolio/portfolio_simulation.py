@@ -356,6 +356,20 @@ def _compute_judgment(
             alert_label = alert.get("label", level)
             reasons.append(f"撤退/注意対象を売却: {symbol} ({alert_label})")
 
+    # 5. ETF quality signals (KIK-469 Phase 2)
+    for ph in proposed_health:
+        etf_h = ph.get("change_quality", {}).get("etf_health")
+        if etf_h:
+            score = etf_h.get("score", 50)
+            symbol = ph.get("symbol", "")
+            if score >= 75:
+                reasons.append(f"ETF\u54c1\u8cea\u826f\u597d: {symbol} (\u30b9\u30b3\u30a2 {score}/100)")
+            elif score < 40:
+                has_warning = True
+                reasons.append(f"ETF\u54c1\u8cea\u4f4e: {symbol} (\u30b9\u30b3\u30a2 {score}/100)")
+            for etf_alert in etf_h.get("alerts", []):
+                reasons.append(f"ETF\u6ce8\u610f: {symbol} - {etf_alert}")
+
     # Judgment logic
     if has_exit or (hhi_worsened and ret_worsened):
         recommendation = "not_recommended"

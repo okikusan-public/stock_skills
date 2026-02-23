@@ -114,6 +114,7 @@ def _estimate_from_analyst(stock_detail: dict) -> dict:
         "target_low": target_low,
         "recommendation_mean": stock_detail.get("recommendation_mean"),
         "forward_per": stock_detail.get("forward_per"),
+        "annualized_volatility": None,  # KIK-469 P2: not computed for analyst method
     }
 
 
@@ -198,6 +199,7 @@ def _estimate_from_history(stock_detail: dict) -> dict:
         "recommendation_mean": None,
         "forward_per": None,
         "data_months": n,
+        "annualized_volatility": round(annual_std, 4),  # KIK-469 P2
     }
 
 
@@ -214,6 +216,7 @@ def _empty_estimate(method: str) -> dict:
         "target_low": None,
         "recommendation_mean": None,
         "forward_per": None,
+        "annualized_volatility": None,  # KIK-469 P2
     }
 
 
@@ -299,6 +302,7 @@ def estimate_stock_return(
         "currency": stock_detail.get("currency") or "USD",
         "dividend_yield": stock_detail.get("dividend_yield"),
         "buyback_yield": _compute_buyback_yield(stock_detail),
+        "is_etf": _is_etf_base(stock_detail),  # KIK-469 P2
         **estimate,
         "news": news or [],
         "x_sentiment": x_sentiment,

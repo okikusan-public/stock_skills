@@ -223,6 +223,15 @@ def _fmt_health_section(health_list: list[dict], title: str) -> list[str]:
             lines.append(f"⚠️ {symbol}: {label}")
         elif level == "exit":
             lines.append(f"🚨 {symbol}: {label}")
+        # KIK-469 Phase 2: ETF info
+        etf_h = ph.get("change_quality", {}).get("etf_health")
+        if etf_h:
+            exp = etf_h.get("expense_label", "-")
+            aum = etf_h.get("aum_label", "-")
+            score = etf_h.get("score", "-")
+            lines.append(f"  ETF: \u7d4c\u8cbb\u7387 {exp} / AUM {aum} / \u30b9\u30b3\u30a2 {score}/100")
+            for etf_alert in etf_h.get("alerts", []):
+                lines.append(f"  \u26a0\ufe0f {etf_alert}")
     lines.append("")
     return lines
 

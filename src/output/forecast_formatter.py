@@ -160,7 +160,8 @@ def format_return_estimate(estimate: dict) -> str:
 
         # Header
         base_str = _fmt_pct_sign(base_ret) if base_ret is not None else "-"
-        lines.append(f"### {symbol} \u671f\u5f85\u30ea\u30bf\u30fc\u30f3: {base_str}\uff08\u30d9\u30fc\u30b9\uff09")
+        etf_badge = " [ETF]" if pos.get("is_etf") else ""  # KIK-469 P2
+        lines.append(f"### {symbol}{etf_badge} \u671f\u5f85\u30ea\u30bf\u30fc\u30f3: {base_str}\uff08\u30d9\u30fc\u30b9\uff09")
         lines.append("")
 
         # Quantitative section
@@ -190,6 +191,10 @@ def format_return_estimate(estimate: dict) -> str:
                 f"\u3010\u5b9a\u91cf\u3011\u904e\u53bb\u30ea\u30bf\u30fc\u30f3\u5206\u5e03"
                 f"\uff08{data_months}\u30f6\u6708\u5206\uff09"
             )
+            # KIK-469 Phase 2: ETF volatility display
+            vol = pos.get("annualized_volatility")
+            if vol is not None:
+                lines.append(f"  \u5e74\u7387\u30dc\u30e9\u30c6\u30a3\u30ea\u30c6\u30a3: {vol * 100:.1f}%")
 
         # News and sentiment sections (skip for no_data)
         if method != "no_data":

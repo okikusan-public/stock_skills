@@ -757,8 +757,20 @@ def run_health_check(csv_path: str, client) -> dict:
     small_cap_weight = small_cap_value / total_value if total_value > 0 else 0.0
     small_cap_alloc = check_small_cap_allocation(small_cap_weight)
 
+    # KIK-469 Phase 2: Partition positions into stocks and ETFs
+    stock_positions = [
+        r for r in results
+        if not r.get("change_quality", {}).get("is_etf")
+    ]
+    etf_positions = [
+        r for r in results
+        if r.get("change_quality", {}).get("is_etf")
+    ]
+
     return {
         "positions": results,
+        "stock_positions": stock_positions,
+        "etf_positions": etf_positions,
         "alerts": alerts,
         "summary": {
             "total": len(results),

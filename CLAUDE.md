@@ -50,9 +50,9 @@ pip install -r requirements.txt
 ### レイヤー概要
 ```
 Skills (.claude/skills/*/SKILL.md → scripts/*.py) — 8スキル
-Core   (src/core/) — screening/ portfolio/ risk/ research/ + proactive_engine (KIK-435), health_check (KIK-469: ETF対応), ...
+Core   (src/core/) — screening/ portfolio/ risk/ research/ + proactive_engine (KIK-435), health_check (KIK-469: ETF対応+PF統合), return_estimate (KIK-469 P2: volatility+is_etf), ...
 Data   (src/data/) — yahoo_client/ (KIK-449: submodule分割, KIK-469: ETFフィールド), grok_client, history_store, graph_store, graph_linker (KIK-434), ...
-Output (src/output/) — formatter, stress_formatter, portfolio_formatter, research_formatter
+Output (src/output/) — formatter, stress_formatter, portfolio_formatter, research_formatter, health_formatter (KIK-469 P2: stock/ETFテーブル分離)
 
 Config: config/screening_presets.yaml (12 presets), config/exchanges.yaml (60+ regions)
 Rules:  .claude/rules/ (graph-context, intent-routing, workflow, development, screening, portfolio, testing)

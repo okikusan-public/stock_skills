@@ -60,6 +60,10 @@ def format_structure_analysis(analysis: dict) -> str:
     lines.append("")
     lines.append(f"HHI: {_fmt_float(sector_hhi, 4)} {_hhi_bar(sector_hhi)} ({_classify_hhi(sector_hhi)})")
     lines.append("")
+    # KIK-469 Phase 2: ETF note
+    if "ETF" in sector_breakdown:
+        lines.append("\u203b ETF\u306f\u4fdd\u6709\u9280\u67c4\u3068\u30571\u30bb\u30af\u30bf\u30fc\u306b\u5206\u985e\u3002\u5185\u90e8\u69cb\u6210\u306e\u30eb\u30c3\u30af\u30b9\u30eb\u30fc\u306f\u672a\u5bfe\u5fdc\u3002")
+        lines.append("")
 
     # --- Currency breakdown ---
     lines.append("### \u901a\u8ca8\u5225\u914d\u5206")
@@ -93,6 +97,10 @@ def format_structure_analysis(analysis: dict) -> str:
         lines.append("")
         lines.append(f"HHI: {_fmt_float(size_hhi, 4)} {_hhi_bar(size_hhi)} ({_classify_hhi(size_hhi)})")
         lines.append("")
+        # KIK-469 Phase 2: ETF note
+        if "ETF" in size_breakdown:
+            lines.append("\u203b ETF\u306f\u500b\u5225\u306e\u6642\u4fa1\u7dcf\u984d\u5206\u985e\u3067\u306f\u306a\u304f\u300cETF\u300d\u3068\u3057\u3066\u8868\u793a\u3002")
+            lines.append("")
 
     # --- Overall judgment ---
     lines.append("### \u7dcf\u5408\u5224\u5b9a")

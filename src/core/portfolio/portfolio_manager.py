@@ -589,6 +589,7 @@ def get_snapshot(csv_path: str, client) -> dict:
             "pnl_jpy": round(pnl_jpy, 0),
             "purchase_date": pos.get("purchase_date", ""),
             "memo": pos.get("memo", ""),
+            "quoteType": info.get("quoteType") if info else None,  # KIK-469 P2
         }
         positions.append(position_detail)
 
@@ -679,12 +680,16 @@ def get_structure_analysis(csv_path: str, client) -> dict:
     portfolio_data: list[dict] = []
     for pos in positions:
         region_code = infer_region_code(pos["symbol"])
+        # KIK-469 Phase 2: ETF sector classification
+        is_etf_pos = pos.get("quoteType") == "ETF"
+        sector = pos.get("sector") or ("ETF" if is_etf_pos else "Unknown")
         stock_data = {
             "symbol": pos["symbol"],
-            "sector": pos.get("sector") or "Unknown",
+            "sector": sector,
             "country": _infer_country(pos["symbol"]),
             "currency": pos.get("market_currency") or _infer_currency(pos["symbol"]),
-            "size_class": classify_market_cap(pos.get("market_cap"), region_code),
+            "size_class": "ETF" if is_etf_pos else classify_market_cap(pos.get("market_cap"), region_code),
+            "is_etf": is_etf_pos,
         }
         portfolio_data.append(stock_data)
 
