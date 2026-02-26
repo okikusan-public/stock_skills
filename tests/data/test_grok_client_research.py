@@ -476,3 +476,84 @@ class TestSearchBusiness:
         assert result["segments"][0]["name"] == "Division A"
         assert result["segments"][0]["revenue_share"] == ""
         assert result["segments"][1]["description"] == "B desc"
+
+
+# ===================================================================
+# Context injection (KIK-488)
+# ===================================================================
+
+class TestContextInjection:
+    """Tests that context parameter is included in Grok API prompts."""
+
+    @patch("src.data.grok_client.requests.post")
+    def test_stock_deep_context_in_prompt(self, mock_post, monkeypatch):
+        """search_stock_deep passes context to prompt."""
+        monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
+        mock_post.return_value = _make_grok_response("{}")
+
+        ctx = "[INVESTOR CONTEXT]\n- Status: Currently held"
+        search_stock_deep("NVDA", "NVIDIA Corp", context=ctx)
+
+        payload = mock_post.call_args[1]["json"]
+        assert "[INVESTOR CONTEXT]" in payload["input"]
+        assert "Currently held" in payload["input"]
+
+    @patch("src.data.grok_client.requests.post")
+    def test_stock_deep_empty_context(self, mock_post, monkeypatch):
+        """search_stock_deep with empty context does not add context block."""
+        monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
+        mock_post.return_value = _make_grok_response("{}")
+
+        search_stock_deep("NVDA", "NVIDIA Corp", context="")
+
+        payload = mock_post.call_args[1]["json"]
+        assert "[INVESTOR CONTEXT]" not in payload["input"]
+
+    @patch("src.data.grok_client.requests.post")
+    def test_sentiment_context_in_prompt(self, mock_post, monkeypatch):
+        """search_x_sentiment passes context to prompt."""
+        monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
+        mock_post.return_value = _make_grok_response("{}")
+
+        from src.data.grok_client import search_x_sentiment
+        ctx = "[INVESTOR CONTEXT]\n- Thesis: AI leader"
+        search_x_sentiment("NVDA", "NVIDIA Corp", context=ctx)
+
+        payload = mock_post.call_args[1]["json"]
+        assert "AI leader" in payload["input"]
+
+    @patch("src.data.grok_client.requests.post")
+    def test_industry_context_in_prompt(self, mock_post, monkeypatch):
+        """search_industry passes context to prompt."""
+        monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
+        mock_post.return_value = _make_grok_response("{}")
+
+        ctx = "[INVESTOR CONTEXT]\n- Investor holds: NVDA, AVGO"
+        search_industry("semiconductor", context=ctx)
+
+        payload = mock_post.call_args[1]["json"]
+        assert "NVDA, AVGO" in payload["input"]
+
+    @patch("src.data.grok_client.requests.post")
+    def test_market_context_in_prompt(self, mock_post, monkeypatch):
+        """search_market passes context to prompt."""
+        monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
+        mock_post.return_value = _make_grok_response("{}")
+
+        ctx = "[INVESTOR CONTEXT]\n- Portfolio sectors: Technology(3)"
+        search_market("S&P500", context=ctx)
+
+        payload = mock_post.call_args[1]["json"]
+        assert "Technology(3)" in payload["input"]
+
+    @patch("src.data.grok_client.requests.post")
+    def test_business_context_in_prompt(self, mock_post, monkeypatch):
+        """search_business passes context to prompt."""
+        monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
+        mock_post.return_value = _make_grok_response("{}")
+
+        ctx = "[INVESTOR CONTEXT]\n- Status: Currently held"
+        search_business("AAPL", "Apple Inc.", context=ctx)
+
+        payload = mock_post.call_args[1]["json"]
+        assert "Currently held" in payload["input"]

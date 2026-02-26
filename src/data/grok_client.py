@@ -320,10 +320,12 @@ def _parse_json_array_response(raw_text: str):
 # Prompt builders
 # ---------------------------------------------------------------------------
 
-def _build_sentiment_prompt(symbol: str, company_name: str = "") -> str:
+def _build_sentiment_prompt(symbol: str, company_name: str = "", context: str = "") -> str:
     """Build the prompt for sentiment analysis."""
     name_part = f" ({company_name})" if company_name else ""
+    context_block = f"{context}\n\n" if context else ""
     return (
+        f"{context_block}"
         f"Search X for recent posts about {symbol}{name_part} stock. "
         f"Analyze the sentiment of the posts and provide:\n"
         f"1. A list of positive factors (bullish signals) mentioned\n"
@@ -336,11 +338,13 @@ def _build_sentiment_prompt(symbol: str, company_name: str = "") -> str:
     )
 
 
-def _build_stock_deep_prompt(symbol: str, company_name: str = "") -> str:
+def _build_stock_deep_prompt(symbol: str, company_name: str = "", context: str = "") -> str:
     """Build the prompt for deep stock research."""
     name_part = f" ({company_name})" if company_name else ""
+    context_block = f"{context}\n\n" if context else ""
     if _is_japanese_stock(symbol):
         return (
+            f"{context_block}"
             f"{symbol}{name_part} について、X（Twitter）とWebの最新情報をもとに以下を調査してください。\n\n"
             f"1. 最近の重要ニュース（直近1-2週間）\n"
             f"2. 業績に影響する材料（ポジティブ/ネガティブ）\n"
@@ -364,6 +368,7 @@ def _build_stock_deep_prompt(symbol: str, company_name: str = "") -> str:
             f'}}'
         )
     return (
+        f"{context_block}"
         f"Research {symbol}{name_part} using X (Twitter) and web sources. Provide:\n\n"
         f"1. Key recent news (last 1-2 weeks)\n"
         f"2. Catalysts affecting earnings (positive/negative)\n"
@@ -388,10 +393,12 @@ def _build_stock_deep_prompt(symbol: str, company_name: str = "") -> str:
     )
 
 
-def _build_industry_prompt(industry_or_theme: str) -> str:
+def _build_industry_prompt(industry_or_theme: str, context: str = "") -> str:
     """Build the prompt for industry research."""
+    context_block = f"{context}\n\n" if context else ""
     if _contains_japanese(industry_or_theme):
         return (
+            f"{context_block}"
             f"「{industry_or_theme}」業界・テーマについて、X（Twitter）とWebの最新情報をもとに以下を調査してください。\n\n"
             f"1. 業界の現状と最近のトレンド\n"
             f"2. 主要プレイヤーと注目企業\n"
@@ -411,6 +418,7 @@ def _build_industry_prompt(industry_or_theme: str) -> str:
             f'}}'
         )
     return (
+        f"{context_block}"
         f"Research the \"{industry_or_theme}\" industry/theme using X (Twitter) and web sources. Provide:\n\n"
         f"1. Current trends\n"
         f"2. Key players and notable companies\n"
@@ -491,9 +499,11 @@ def _build_trending_prompt(region: str = "japan", theme: Optional[str] = None) -
     )
 
 
-def _build_market_prompt(market_or_index: str) -> str:
+def _build_market_prompt(market_or_index: str, context: str = "") -> str:
     """Build the prompt for market research."""
+    context_block = f"{context}\n\n" if context else ""
     return (
+        f"{context_block}"
         f"「{market_or_index}」の最新マーケット概況を、X（Twitter）とWebの情報をもとに調査してください。\n\n"
         f"1. 直近の値動きと要因\n"
         f"2. マクロ経済の影響（金利・為替・商品）\n"
@@ -514,11 +524,13 @@ def _build_market_prompt(market_or_index: str) -> str:
     )
 
 
-def _build_business_prompt(symbol: str, company_name: str = "") -> str:
+def _build_business_prompt(symbol: str, company_name: str = "", context: str = "") -> str:
     """Build the prompt for business model analysis."""
     name_part = f" ({company_name})" if company_name else ""
+    context_block = f"{context}\n\n" if context else ""
     if _is_japanese_stock(symbol) or _contains_japanese(company_name):
         return (
+            f"{context_block}"
             f"{symbol}{name_part} のビジネスモデルについて、WebとX（Twitter）の情報をもとに詳しく分析してください。\n\n"
             f"1. 事業概要（何で稼いでいるか）\n"
             f"2. 事業セグメント構成（セグメント名、売上比率、概要）\n"
@@ -541,6 +553,7 @@ def _build_business_prompt(symbol: str, company_name: str = "") -> str:
             f'}}'
         )
     return (
+        f"{context_block}"
         f"Analyze the business model of {symbol}{name_part} using web and X (Twitter) sources. Provide:\n\n"
         f"1. Business overview (how the company makes money)\n"
         f"2. Business segments (name, revenue share, description)\n"
@@ -594,6 +607,7 @@ def search_x_sentiment(
     symbol: str,
     company_name: str = "",
     timeout: int = 30,
+    context: str = "",
 ) -> dict:
     """Search X for stock sentiment using Grok API.
 
@@ -621,7 +635,7 @@ def search_x_sentiment(
         "raw_response": "",
     }
 
-    raw_text = _call_grok_api(_build_sentiment_prompt(symbol, company_name), timeout)
+    raw_text = _call_grok_api(_build_sentiment_prompt(symbol, company_name, context=context), timeout)
     if not raw_text:
         return empty_result
 
@@ -644,6 +658,7 @@ def search_stock_deep(
     symbol: str,
     company_name: str = "",
     timeout: int = 30,
+    context: str = "",
 ) -> dict:
     """Deep research on a stock via X and web search.
 
@@ -661,7 +676,7 @@ def search_stock_deep(
     dict
         See EMPTY_STOCK_DEEP for the schema.
     """
-    raw_text = _call_grok_api(_build_stock_deep_prompt(symbol, company_name), timeout)
+    raw_text = _call_grok_api(_build_stock_deep_prompt(symbol, company_name, context=context), timeout)
     if not raw_text:
         return dict(EMPTY_STOCK_DEEP)
 
@@ -703,6 +718,7 @@ def search_stock_deep(
 def search_industry(
     industry_or_theme: str,
     timeout: int = 30,
+    context: str = "",
 ) -> dict:
     """Research an industry or theme via X and web search.
 
@@ -718,7 +734,7 @@ def search_industry(
     dict
         See EMPTY_INDUSTRY for the schema.
     """
-    raw_text = _call_grok_api(_build_industry_prompt(industry_or_theme), timeout)
+    raw_text = _call_grok_api(_build_industry_prompt(industry_or_theme, context=context), timeout)
     if not raw_text:
         return dict(EMPTY_INDUSTRY)
 
@@ -748,6 +764,7 @@ def search_industry(
 def search_market(
     market_or_index: str,
     timeout: int = 30,
+    context: str = "",
 ) -> dict:
     """Research a market or index via X and web search.
 
@@ -763,7 +780,7 @@ def search_market(
     dict
         See EMPTY_MARKET for the schema.
     """
-    raw_text = _call_grok_api(_build_market_prompt(market_or_index), timeout)
+    raw_text = _call_grok_api(_build_market_prompt(market_or_index, context=context), timeout)
     if not raw_text:
         return dict(EMPTY_MARKET)
 
@@ -882,6 +899,7 @@ def search_business(
     symbol: str,
     company_name: str = "",
     timeout: int = 60,
+    context: str = "",
 ) -> dict:
     """Research a company's business model via X and web search.
 
@@ -899,7 +917,7 @@ def search_business(
     dict
         See EMPTY_BUSINESS for the schema.
     """
-    raw_text = _call_grok_api(_build_business_prompt(symbol, company_name), timeout)
+    raw_text = _call_grok_api(_build_business_prompt(symbol, company_name, context=context), timeout)
     if not raw_text:
         return dict(EMPTY_BUSINESS)
 

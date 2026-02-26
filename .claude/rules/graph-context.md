@@ -142,9 +142,19 @@ CONTEXT_RECENT_HOURS=168    # これ以内 → RECENT / これ超 → STALE
 **条件**: Claude の回答に具体的な投資判断・見解・リスク評価が含まれる場合
 **記録されないもの**: 生データの羅列、ユーザーが既に記録済みの内容
 
+## Grokプロンプト文脈注入 (KIK-488)
+
+`src/data/grok_context.py` がNeo4jから投資家文脈（保有状態・前回レポート・テーゼ・懸念等）をコンパクトに抽出し、Grok APIプロンプトに注入する。
+
+- **注入先**: `researcher.py` → `grok_client.py` の5つのsearch関数（stock_deep, x_sentiment, industry, market, business）
+- **トークン予算**: 最大300トークン（~900文字）。行単位で切り詰め
+- **データ優先度**: 保有状態(高) > 前回レポート(高) > テーゼ/懸念(高) > スクリーニング出現(中) > リサーチ履歴(中) > ヘルスチェック(中) > テーマ(低)
+- **graceful degradation**: Neo4j未接続 → context="" → Grokは文脈なしで通常動作
+
 ## graceful degradation
 
 - Neo4j 未接続時: スクリプトは「コンテキストなし」を出力 → 従来通りの動作
+- Neo4j 未接続時（Grok文脈）: `grok_context` が空文字を返す → Grokプロンプトに文脈なし（KIK-488）
 - TEI 未起動時: ベクトル検索スキップ → シンボルベース検索のみ（KIK-420）
 - スクリプトエラー時: 無視して intent-routing のみで判断
 - シンボル検出できない場合 + TEI 未起動: 「コンテキストなし」→ 通常の intent-routing

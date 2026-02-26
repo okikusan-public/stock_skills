@@ -120,11 +120,11 @@ class TestResearchStock:
         monkeypatch.setattr(grok_client, "is_available", lambda: True)
         monkeypatch.setattr(
             grok_client, "search_stock_deep",
-            lambda symbol, name="", timeout=30: _sample_deep_result(),
+            lambda symbol, name="", timeout=30, **kw: _sample_deep_result(),
         )
         monkeypatch.setattr(
             grok_client, "search_x_sentiment",
-            lambda symbol, name="", timeout=30: _sample_sentiment(),
+            lambda symbol, name="", timeout=30, **kw: _sample_sentiment(),
         )
 
         mock_yc = _make_mock_yahoo_client(info=_sample_stock_info())
@@ -196,7 +196,7 @@ class TestResearchIndustry:
         monkeypatch.setattr(grok_client, "is_available", lambda: True)
         monkeypatch.setattr(
             grok_client, "search_industry",
-            lambda theme, timeout=30: industry_data,
+            lambda theme, timeout=30, **kw: industry_data,
         )
 
         result = research_industry("半導体")
@@ -242,7 +242,7 @@ class TestResearchMarket:
         monkeypatch.setattr(grok_client, "is_available", lambda: True)
         monkeypatch.setattr(
             grok_client, "search_market",
-            lambda market, timeout=30: market_data,
+            lambda market, timeout=30, **kw: market_data,
         )
 
         result = research_market("日経平均")
@@ -336,7 +336,7 @@ class TestResearchBusiness:
         monkeypatch.setattr(grok_client, "is_available", lambda: True)
         monkeypatch.setattr(
             grok_client, "search_business",
-            lambda symbol, name="", timeout=30: business_data,
+            lambda symbol, name="", timeout=30, **kw: business_data,
         )
 
         mock_yc = _make_mock_yahoo_client(info={"name": "Canon Inc."})
@@ -455,11 +455,11 @@ class TestApiStatus:
         monkeypatch.setattr(grok_client, "is_available", lambda: True)
         monkeypatch.setattr(
             grok_client, "search_stock_deep",
-            lambda symbol, name="", timeout=30: _sample_deep_result(),
+            lambda symbol, name="", timeout=30, **kw: _sample_deep_result(),
         )
         monkeypatch.setattr(
             grok_client, "search_x_sentiment",
-            lambda symbol, name="", timeout=30: _sample_sentiment(),
+            lambda symbol, name="", timeout=30, **kw: _sample_sentiment(),
         )
         # Simulate ok state
         monkeypatch.setattr(

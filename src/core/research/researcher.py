@@ -16,6 +16,14 @@ try:
 except ImportError:
     HAS_GROK = False
 
+# Grok context injection from Neo4j (KIK-488)
+try:
+    from src.data import grok_context
+
+    HAS_GROK_CONTEXT = True
+except ImportError:
+    HAS_GROK_CONTEXT = False
+
 _grok_warned = [False]
 
 
@@ -160,14 +168,24 @@ def research_stock(symbol: str, yahoo_client_module) -> dict:
     x_sentiment = _empty_sentiment()
 
     if _grok_available():
+        # KIK-488: inject Neo4j knowledge context into Grok prompts
+        stock_ctx = ""
+        if HAS_GROK_CONTEXT:
+            try:
+                stock_ctx = grok_context.get_stock_context(symbol)
+            except Exception:
+                pass
+
         deep = _safe_grok_call(
-            grok_client.search_stock_deep, symbol, company_name
+            grok_client.search_stock_deep, symbol, company_name,
+            context=stock_ctx,
         )
         if deep is not None:
             grok_research = deep
 
         sent = _safe_grok_call(
-            grok_client.search_x_sentiment, symbol, company_name
+            grok_client.search_x_sentiment, symbol, company_name,
+            context=stock_ctx,
         )
         if sent is not None:
             x_sentiment = sent
@@ -211,7 +229,16 @@ def research_industry(theme: str) -> dict:
     grok_available = False
     if _grok_available():
         grok_available = True
-        result = _safe_grok_call(grok_client.search_industry, theme)
+        # KIK-488: inject Neo4j knowledge context into Grok prompts
+        industry_ctx = ""
+        if HAS_GROK_CONTEXT:
+            try:
+                industry_ctx = grok_context.get_industry_context(theme)
+            except Exception:
+                pass
+        result = _safe_grok_call(
+            grok_client.search_industry, theme, context=industry_ctx,
+        )
         if result is not None:
             grok_result = result
 
@@ -254,7 +281,16 @@ def research_market(market: str, yahoo_client_module=None) -> dict:
     grok_available = False
     if _grok_available():
         grok_available = True
-        result = _safe_grok_call(grok_client.search_market, market)
+        # KIK-488: inject Neo4j knowledge context into Grok prompts
+        market_ctx = ""
+        if HAS_GROK_CONTEXT:
+            try:
+                market_ctx = grok_context.get_market_context()
+            except Exception:
+                pass
+        result = _safe_grok_call(
+            grok_client.search_market, market, context=market_ctx,
+        )
         if result is not None:
             grok_research = result
 
@@ -294,7 +330,17 @@ def research_business(symbol: str, yahoo_client_module) -> dict:
     grok_available = False
     if _grok_available():
         grok_available = True
-        result = _safe_grok_call(grok_client.search_business, symbol, company_name)
+        # KIK-488: inject Neo4j knowledge context into Grok prompts
+        biz_ctx = ""
+        if HAS_GROK_CONTEXT:
+            try:
+                biz_ctx = grok_context.get_business_context(symbol)
+            except Exception:
+                pass
+        result = _safe_grok_call(
+            grok_client.search_business, symbol, company_name,
+            context=biz_ctx,
+        )
         if result is not None:
             grok_result = result
 

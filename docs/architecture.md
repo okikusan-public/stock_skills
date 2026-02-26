@@ -173,6 +173,7 @@ except ImportError:
 |:---|:---|
 | yahoo_client/ | yfinance ラッパー + 24h JSON cache + 異常値ガード (KIK-449: detail/screen/history/macro/\_cache/\_normalize に分割) |
 | grok_client.py | Grok API (X検索/Web検索) + XAI_API_KEY 環境変数 |
+| grok_context.py | Grokプロンプト用コンパクト文脈抽出 (Neo4j→300トークン要約, KIK-488) |
 | history_store.py | スキル実行結果の JSON 自動蓄積 (data/history/) |
 | graph_store.py | Neo4j CRUD (21ノードタイプ, MERGE ベース, ベクトルインデックス(KIK-420)) |
 | graph_query.py | Neo4j 照会ヘルパー (6関数 + vector_search(KIK-420)) |
