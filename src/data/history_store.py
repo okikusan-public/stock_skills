@@ -537,7 +537,12 @@ def save_research(
     def _graph_write(sem_summary, emb):
         from src.data.graph_store import merge_research_full, merge_stock, link_research_supersedes
         if research_type in ("stock", "business"):
-            merge_stock(symbol=target, name=result.get("name", ""))
+            _fundamentals = result.get("fundamentals") or {}
+            merge_stock(
+                symbol=target,
+                name=result.get("name", ""),
+                sector=_fundamentals.get("sector", "") or "",
+            )
         merge_research_full(
             research_date=today, research_type=research_type,
             target=target, summary=summary,

@@ -667,6 +667,45 @@ class TestGraphDualWrite:
             path = save_research("stock", "7203.T", result, base_dir=str(tmp_path))
             assert Path(path).exists()
 
+    @patch("src.data.graph_store.link_research_supersedes")
+    @patch("src.data.graph_store.merge_research_full")
+    @patch("src.data.graph_store.merge_stock")
+    @patch("src.data.graph_store.is_available", return_value=True)
+    def test_research_passes_sector_to_merge_stock(
+        self, mock_avail, mock_merge_stock, mock_merge_research, mock_link, tmp_path,
+    ):
+        """KIK-490: save_research should pass sector from fundamentals to merge_stock."""
+        result = {
+            "type": "stock",
+            "symbol": "7203.T",
+            "name": "Toyota",
+            "fundamentals": {"sector": "Consumer Cyclical", "per": 10.5},
+            "summary": "test",
+        }
+        save_research("stock", "7203.T", result, base_dir=str(tmp_path))
+        mock_merge_stock.assert_called_once_with(
+            symbol="7203.T", name="Toyota", sector="Consumer Cyclical",
+        )
+
+    @patch("src.data.graph_store.link_research_supersedes")
+    @patch("src.data.graph_store.merge_research_full")
+    @patch("src.data.graph_store.merge_stock")
+    @patch("src.data.graph_store.is_available", return_value=True)
+    def test_research_no_fundamentals_passes_empty_sector(
+        self, mock_avail, mock_merge_stock, mock_merge_research, mock_link, tmp_path,
+    ):
+        """KIK-490: business research without fundamentals passes empty sector."""
+        result = {
+            "type": "business",
+            "symbol": "7751.T",
+            "name": "Canon",
+            "grok_research": {"overview": "imaging"},
+        }
+        save_research("business", "7751.T", result, base_dir=str(tmp_path))
+        mock_merge_stock.assert_called_once_with(
+            symbol="7751.T", name="Canon", sector="",
+        )
+
     def test_market_context_graph_failure_still_saves(self, tmp_path):
         with patch("src.data.graph_store.merge_market_context_full", side_effect=Exception("Neo4j down")):
             context = {"indices": [{"name": "VIX", "price": 20.0}]}
