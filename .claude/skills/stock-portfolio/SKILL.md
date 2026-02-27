@@ -97,6 +97,24 @@ python3 .../run_portfolio.py health
 - **注意**: SMA50がSMA200に接近 + 指標悪化 / 変化スコア複数悪化 / **小型株のEARLY_WARNING昇格**
 - **撤退**: **デッドクロス検出** / トレンド崩壊 + 変化スコア悪化
 
+### adjust -- ポートフォリオ調整アドバイザー (KIK-496)
+
+ヘルスチェック結果 + マーケットレジーム判定から、17ルール（P1-P10: ポジション別、F1-F7: PF全体）で具体的な調整アクション（SELL/SWAP/ADD/TRIM_CLASS/FLAG）を生成する。
+
+```bash
+python3 .../run_portfolio.py adjust [--full]
+```
+
+CLIオプション:
+- `--full` : フル分析モード（集中度・相関分析も含む。API負荷が高い）
+
+**出力:**
+- マーケットレジーム（bull/bear/crash/neutral）— SMA50/200、RSI、ドローダウンから判定
+- HIGH/MEDIUM/LOW 優先度別のアクションテーブル（アクション種別/対象/理由/ルールID）
+- サマリー（アクション件数）
+
+**レジーム補正:** crash 時は urgency を1段階引き上げ。bear 時は小型株・下降トレンド系ルールを引き上げ。
+
 ### rebalance -- リバランス提案
 
 現在のポートフォリオ構造を分析し、集中リスクの低減と目標配分への調整案を提示する。
@@ -256,6 +274,13 @@ python3 .../run_portfolio.py list
 - ベンチマーク比較（超過リターン）
 - 勝率・統計値
 
+### adjust の出力項目
+- マーケットレジーム（レジーム名/SMA50 vs SMA200/RSI/ドローダウン）
+- HIGH Priority テーブル: SELL/SWAP/TRIM_CLASS アクション
+- MEDIUM Priority テーブル: FLAG/SELL アクション
+- LOW Priority テーブル: FLAG アクション
+- サマリー（HIGH/MEDIUM/LOW 件数、レジーム）
+
 ### rebalance の出力項目
 - 現状のHHI（セクター/地域/通貨）と目標HHI
 - 売却候補（銘柄・株数・理由）
@@ -305,6 +330,10 @@ python3 .../run_portfolio.py what-if --remove "7203.T:100" --add "9984.T:50:7500
 
 # What-Ifシミュレーション（純売却）(KIK-451)
 python3 .../run_portfolio.py what-if --remove "7203.T:50"
+
+# 調整アドバイザー (KIK-496)
+python3 .../run_portfolio.py adjust
+python3 .../run_portfolio.py adjust --full
 
 # バックテスト
 python3 .../run_portfolio.py backtest --preset alpha --region jp --days 90

@@ -147,6 +147,7 @@
 | **過去検証**: バックテスト、検証、過去の成績 | `backtest` |
 | **What-If**: 追加したら、買ったらどうなる、影響、シミュレーション追加 | `what-if` |
 | **パフォーマンスレビュー**: 売買成績、勝率、損益統計、何%取れた | `review` |
+| **調整アドバイス**: 何を売るべき？、どう直す？、具体的に何をすべき？、処方箋、調整プラン | `adjust` |
 | **売買→記録**: 買った理由を記録したい、投資理由をメモ | `buy` → `/investment-note save --type thesis` |
 | **損切り→学び**: 損切りの学びを記録、反省メモ | `sell` → `/investment-note save --type lesson` |
 
@@ -378,6 +379,7 @@
 | `/screen-stocks shareholder-return` 結果表示後 | 「安定してるやつだけ見たい」 | → 結果から ✅/📈 のみフィルタ |
 | `/stock-portfolio buy` で購入記録 | 「メモしておいて」「投資理由を記録」 | → `/investment-note save --symbol <銘柄> --type thesis --content ...` |
 | `/stock-portfolio health` で EXIT 判定 | 「学びを記録」「反省メモ」 | → `/investment-note save --symbol <銘柄> --type lesson --content ...` |
+| `/stock-portfolio health` で EXIT 判定 | 「具体的にどうすれば？」「処方箋出して」 | → `/stock-portfolio adjust` |
 | `/stock-portfolio health` で EXIT 判定 | 「売って乗り換えたい」「代替を買ったらどうなる？」 | → `what-if --remove "<EXIT銘柄>:SHARES" --add "<代替>:SHARES:PRICE"` |
 | `what-if --remove` 実行後 | 「代替を探して」「乗り換え先を調べて」 | → `/screen-stocks`（同セクターで） |
 | `/graph-query` で過去レポート表示 | 「最新も見たい」「今はどう？」 | → `/stock-report <銘柄>` |

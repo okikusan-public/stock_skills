@@ -13,7 +13,7 @@
 | market-research | 深掘りリサーチ (銘柄/業界/市場/ビジネスモデル) | researcher.py, grok_client |
 | watchlist | ウォッチリスト管理 (add/remove/list) | (直接 JSON) |
 | stress-test | ポートフォリオストレステスト (8シナリオ) | risk/*.py, yahoo_client |
-| stock-portfolio | ポートフォリオ管理 (12サブコマンド) | portfolio/*.py, health_check.py, return_estimate.py |
+| stock-portfolio | ポートフォリオ管理 (13サブコマンド) | portfolio/*.py, health_check.py, return_estimate.py, adjustment_advisor.py |
 | investment-note | 投資メモ管理 (save/list/delete) | note_manager.py, graph_store.py |
 | graph-query | 知識グラフ自然言語照会 | graph_nl_query.py, graph_query.py |
 
@@ -153,7 +153,7 @@ python3 run_stress_test.py --scenario テック暴落
 
 ## 6. stock-portfolio
 
-ポートフォリオ管理。12のサブコマンドで保有管理・分析・シミュレーションを実行。
+ポートフォリオ管理。13のサブコマンドで保有管理・分析・シミュレーションを実行。
 
 **Script**: `.claude/skills/stock-portfolio/scripts/run_portfolio.py`
 
@@ -172,6 +172,7 @@ python3 run_stress_test.py --scenario テック暴落
 | `simulate` | 複利シミュレーション |
 | `what-if` | What-If シミュレーション (銘柄追加の影響) |
 | `backtest` | 過去のスクリーニング結果からリターン検証 |
+| `adjust` | ポートフォリオ調整アドバイザー (17ルール診断→アクション提案, KIK-496) |
 
 **Examples**:
 ```bash
@@ -182,11 +183,13 @@ python3 run_portfolio.py health
 python3 run_portfolio.py simulate --years 5 --monthly-add 50000 --target 15000000
 python3 run_portfolio.py what-if --add "7203.T:100:2850,AAPL:10:250"
 python3 run_portfolio.py backtest --preset alpha --region jp --days 90
+python3 run_portfolio.py adjust
+python3 run_portfolio.py adjust --full
 ```
 
 **Auto-Save** (KIK-428): forecast サブコマンド実行完了時に `data/history/forecast/{date}_forecast.json` へ自動保存。Neo4j にも Forecast ノード + FORECASTED リレーションを dual-write。
 
-**Core Dependencies**: `src/core/portfolio/portfolio_manager.py`, `concentration.py`, `rebalancer.py`, `simulator.py`, `backtest.py`, `portfolio_simulation.py`, `src/core/health_check.py`, `return_estimate.py`, `value_trap.py`, `src/data/history_store.py`
+**Core Dependencies**: `src/core/portfolio/portfolio_manager.py`, `concentration.py`, `rebalancer.py`, `simulator.py`, `backtest.py`, `portfolio_simulation.py`, `adjustment_advisor.py`, `market_regime.py`, `src/core/health_check.py`, `return_estimate.py`, `value_trap.py`, `src/data/history_store.py`
 
 ---
 
@@ -269,7 +272,7 @@ watchlist ──────→ (none - direct JSON)
 stress-test ────→ risk/{correlation,shock_sensitivity,scenario_analysis,scenario_definitions,recommender}
                    yahoo_client
 
-stock-portfolio → portfolio/{portfolio_manager,concentration,rebalancer,simulator,backtest,portfolio_simulation}
+stock-portfolio → portfolio/{portfolio_manager,concentration,rebalancer,simulator,backtest,portfolio_simulation,adjustment_advisor,market_regime}
                    health_check, return_estimate, value_trap
                    yahoo_client
 
