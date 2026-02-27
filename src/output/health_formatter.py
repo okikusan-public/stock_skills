@@ -9,9 +9,9 @@ def _render_stock_table(lines: list[str], positions: list[dict]) -> None:
     lines.append(
         "| 銘柄 | 損益 | トレンド "
         "| 変化の質 | アラート "
-        "| 長期適性 | 還元安定度 |"
+        "| 長期適性 | 還元安定度 | 逆張り |"
     )
-    lines.append("|:-----|-----:|:-------|:--------|:------------|:--------|:--------|")
+    lines.append("|:-----|-----:|:-------|:--------|:------------|:--------|:--------|:-------|")
 
     for pos in positions:
         symbol = pos.get("symbol", "-")
@@ -44,9 +44,18 @@ def _render_stock_table(lines: list[str], positions: list[dict]) -> None:
         rs = pos.get("return_stability", {})
         rs_label = rs.get("label", "-") if rs else "-"
 
+        # Contrarian indicator (KIK-519)
+        ct = pos.get("contrarian")
+        if ct and ct.get("contrarian_score", 0) > 0:
+            ct_grade = ct.get("grade", "-")
+            ct_score = ct["contrarian_score"]
+            ct_str = f"{ct_grade}{ct_score:.0f}"
+        else:
+            ct_str = "-"
+
         lines.append(
             f"| {symbol} | {pnl_str} | {trend} | {quality} "
-            f"| {alert_str} | {lt_label} | {rs_label} |"
+            f"| {alert_str} | {lt_label} | {rs_label} | {ct_str} |"
         )
 
     lines.append("")
@@ -284,6 +293,36 @@ def format_health_check(health_data: dict) -> str:
                     lines.append(
                         f"- {rs.get('label', '')} "
                         f"（{rs.get('reason', '')}）"
+                    )
+
+            # Contrarian signal for alerted stocks (KIK-519)
+            ct = pos.get("contrarian")
+            if ct and ct.get("contrarian_score", 0) > 0:
+                ct_score = ct["contrarian_score"]
+                ct_grade = ct.get("grade", "-")
+                ct_tech = ct.get("technical", {}).get("score", 0)
+                ct_val = ct.get("valuation", {}).get("score", 0)
+                ct_fund = ct.get("fundamental", {}).get("score", 0)
+                ct_sent = ct.get("sentiment", {}).get("score", 0) if ct.get("sentiment") else 0
+                if ct_sent > 0:
+                    lines.append(
+                        f"- 逆張りスコア: {ct_score:.0f}/100 (グレード{ct_grade}) "
+                        f"[テク{ct_tech:.0f} バリュ{ct_val:.0f} ファンダ{ct_fund:.0f} センチ{ct_sent:.0f}]"
+                    )
+                else:
+                    lines.append(
+                        f"- 逆張りスコア: {ct_score:.0f}/100 (グレード{ct_grade}) "
+                        f"[テク{ct_tech:.0f} バリュ{ct_val:.0f} ファンダ{ct_fund:.0f}]"
+                    )
+                if ct_grade in ("A", "B"):
+                    lines.append(
+                        "  → **逆張り買い候補**: "
+                        "ファンダは健全だがセンチメント悪化の可能性"
+                    )
+                elif ct_grade == "C":
+                    lines.append(
+                        "  → 弱い逆張りシグナル: "
+                        "一部条件が整っている"
                     )
 
             # Action suggestion based on alert level

@@ -1,4 +1,4 @@
-"""ContrarianScreener: oversold-but-solid screening pipeline (KIK-504)."""
+"""ContrarianScreener: oversold-but-solid screening pipeline (KIK-504, KIK-519)."""
 
 from typing import Optional
 
@@ -61,7 +61,7 @@ class ContrarianScreener:
         raw_quotes = self.yahoo_client.screen_stocks(
             query,
             size=250,
-            max_results=max(top_n * 5, 250),
+            max_results=max(top_n * 3, 30),
             sort_field="intradaymarketcap",
             sort_asc=False,
         )
@@ -78,6 +78,16 @@ class ContrarianScreener:
 
         # Step 2: Contrarian score calculation
         scored: list[dict] = []
+
+        # Grok sentiment axis (KIK-519, graceful degradation)
+        _grok_available = False
+        _gc = None
+        try:
+            from src.data import grok_client as _gc
+            _grok_available = _gc.is_available()
+        except Exception:
+            _grok_available = False
+
         for stock in fundamentals:
             symbol = stock.get("symbol")
             if not symbol:
@@ -94,7 +104,28 @@ class ContrarianScreener:
             # Merge normalized data with detail for complete picture
             merged = {**stock, **detail}
 
-            ct_result = compute_contrarian_score(hist, merged)
+            # Grok X-sentiment for 4th axis (KIK-519)
+            sentiment_score = None
+            if _grok_available:
+                try:
+                    company_name = stock.get("name", "")
+                    sent_result = _gc.search_x_sentiment(
+                        symbol, company_name, timeout=15,
+                    )
+                    s = sent_result.get("sentiment_score")
+                    # Treat 0.0 with no opinions as unavailable
+                    if s is not None and (
+                        s != 0.0
+                        or sent_result.get("positive")
+                        or sent_result.get("negative")
+                    ):
+                        sentiment_score = s
+                except Exception:
+                    sentiment_score = None
+
+            ct_result = compute_contrarian_score(
+                hist, merged, sentiment_score=sentiment_score,
+            )
 
             if ct_result["contrarian_score"] < self._MIN_CONTRARIAN_SCORE:
                 continue
@@ -110,6 +141,10 @@ class ContrarianScreener:
             stock["sma200_deviation"] = ct_result["technical"].get("sma200_deviation")
             stock["bb_position"] = ct_result["technical"].get("bb_position")
             stock["volume_surge"] = ct_result["technical"].get("volume_surge")
+            # Sentiment axis (KIK-519)
+            if "sentiment" in ct_result:
+                stock["sentiment_score"] = ct_result["sentiment"].get("sentiment_score")
+                stock["sent_score"] = ct_result["sentiment"]["score"]
             scored.append(stock)
 
         if not scored:

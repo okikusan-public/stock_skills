@@ -1,4 +1,4 @@
-"""Tests for src/core/screening/contrarian_screener.py (KIK-504)."""
+"""Tests for src/core/screening/contrarian_screener.py (KIK-504, KIK-519)."""
 
 import pandas as pd
 import numpy as np
@@ -250,3 +250,40 @@ class TestContrarianScreener:
         ))
         results = screener.screen(region="jp")
         assert results == []
+
+
+# ---------------------------------------------------------------------------
+# max_results performance tests (KIK-519)
+# ---------------------------------------------------------------------------
+
+class TestMaxResultsReduction:
+    """Verify max_results is reduced for performance (KIK-519)."""
+
+    def test_max_results_default_top_n(self):
+        """top_n=10 → max_results=max(30, 30)=30."""
+        called_args = {}
+
+        class _SpyClient(_MockYahooClient):
+            def screen_stocks(self, query, size=250, max_results=250, **kw):
+                called_args["max_results"] = max_results
+                return super().screen_stocks(query, size=size, max_results=max_results, **kw)
+
+        quotes = [_make_quote("1001.T")]
+        screener = ContrarianScreener(_SpyClient(
+            quotes=quotes, hist=_make_oversold_hist(), detail=_make_detail(),
+        ))
+        screener.screen(region="jp", top_n=10)
+        assert called_args["max_results"] == 30
+
+    def test_max_results_scales_with_top_n(self):
+        """top_n=20 → max_results=max(60, 30)=60."""
+        called_args = {}
+
+        class _SpyClient(_MockYahooClient):
+            def screen_stocks(self, query, size=250, max_results=250, **kw):
+                called_args["max_results"] = max_results
+                return []
+
+        screener = ContrarianScreener(_SpyClient())
+        screener.screen(region="jp", top_n=20)
+        assert called_args["max_results"] == 60

@@ -141,7 +141,7 @@ except ImportError:
 
 | サブフォルダ | モジュール | 役割 |
 |:---|:---|:---|
-| screening/ | screener.py | 4つのスクリーナー (Query/Value/Pullback/Alpha) |
+| screening/ | screener.py | 8つのスクリーナー (Query/Value/Pullback/Alpha/Growth/Trending/Contrarian/Momentum) |
 | screening/ | indicators.py | バリュースコア (0-100点) + 株主還元率 + 安定度 |
 | screening/ | filters.py | ファンダメンタルズ条件フィルタ |
 | screening/ | query_builder.py | EquityQuery 構築 |
@@ -187,5 +187,5 @@ except ImportError:
 
 | ファイル | 内容 |
 |:---|:---|
-| config/screening_presets.yaml | 11プリセット定義 |
+| config/screening_presets.yaml | 15プリセット定義 |
 | config/exchanges.yaml | 60+ 地域の取引所・閾値定義 |

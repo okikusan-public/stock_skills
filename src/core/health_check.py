@@ -719,6 +719,12 @@ def run_health_check(csv_path: str, client) -> dict:
         # 6. Value trap detection (KIK-381)
         value_trap = _detect_value_trap(stock_detail)
 
+        # 7. Contrarian score for alerted stocks (KIK-519)
+        contrarian_data = None
+        if alert["level"] != ALERT_NONE and not _is_etf(stock_detail):
+            from src.core.screening.contrarian import compute_contrarian_score as _ct_score
+            contrarian_data = _ct_score(hist, stock_detail)
+
         result = {
             "symbol": symbol,
             "name": pos.get("name") or pos.get("memo", ""),
@@ -732,6 +738,7 @@ def run_health_check(csv_path: str, client) -> dict:
             "value_trap": value_trap,
             "shareholder_return": sh_return,
             "return_stability": sh_stability,
+            "contrarian": contrarian_data,
         }
         results.append(result)
 

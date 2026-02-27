@@ -1,4 +1,4 @@
-"""Tests for src/core/screening/contrarian.py (KIK-504)."""
+"""Tests for src/core/screening/contrarian.py (KIK-504, KIK-519)."""
 
 import numpy as np
 import pandas as pd
@@ -8,6 +8,7 @@ from src.core.screening.contrarian import (
     compute_technical_contrarian,
     compute_valuation_contrarian,
     compute_fundamental_divergence,
+    compute_sentiment_contrarian,
     compute_contrarian_score,
 )
 
@@ -325,3 +326,146 @@ class TestCompositeScore:
         assert "score" in result["technical"]
         assert "score" in result["valuation"]
         assert "score" in result["fundamental"]
+
+
+# ---------------------------------------------------------------------------
+# Sentiment contrarian tests (KIK-519)
+# ---------------------------------------------------------------------------
+
+class TestSentimentContrarian:
+    def test_very_negative_max_score(self):
+        result = compute_sentiment_contrarian(-0.7)
+        assert result["score"] == 20.0
+
+    def test_negative_score(self):
+        result = compute_sentiment_contrarian(-0.4)
+        assert result["score"] == 15.0
+
+    def test_slightly_negative_score(self):
+        result = compute_sentiment_contrarian(-0.2)
+        assert result["score"] == 10.0
+
+    def test_neutral_score(self):
+        result = compute_sentiment_contrarian(0.0)
+        assert result["score"] == 5.0
+
+    def test_positive_zero_score(self):
+        result = compute_sentiment_contrarian(0.5)
+        assert result["score"] == 0.0
+
+    def test_none_returns_zero(self):
+        result = compute_sentiment_contrarian(None)
+        assert result["score"] == 0.0
+        assert result["sentiment_score"] is None
+
+    def test_boundary_minus_05(self):
+        """Exactly -0.5 triggers the < -0.5 bracket → 15pt (not 20pt)."""
+        result = compute_sentiment_contrarian(-0.5)
+        assert result["score"] == 15.0  # -0.5 is NOT < -0.5
+
+    def test_boundary_minus_03(self):
+        """Exactly -0.3 is NOT < -0.3, so falls to 10pt bracket."""
+        result = compute_sentiment_contrarian(-0.3)
+        assert result["score"] == 10.0
+
+    def test_boundary_minus_01(self):
+        """Exactly -0.1 is NOT < -0.1, so falls to 5pt bracket."""
+        result = compute_sentiment_contrarian(-0.1)
+        assert result["score"] == 5.0
+
+    def test_boundary_plus_01(self):
+        """Exactly 0.1 is NOT < 0.1, so falls to 0pt bracket."""
+        result = compute_sentiment_contrarian(0.1)
+        assert result["score"] == 0.0
+
+    def test_result_structure(self):
+        result = compute_sentiment_contrarian(-0.3)
+        assert "score" in result
+        assert "sentiment_score" in result
+        assert "details" in result
+        assert result["sentiment_score"] == -0.3
+
+
+# ---------------------------------------------------------------------------
+# 4-axis composite score tests (KIK-519)
+# ---------------------------------------------------------------------------
+
+class TestCompositeScore4Axis:
+    def test_4axis_with_negative_sentiment(self):
+        """4-axis scoring includes sentiment key and boosts on negative sentiment."""
+        data = {
+            "per": 7, "pbr": 0.4, "roe": 0.15, "eps_growth": 0.05,
+            "fcf": 100, "market_cap": 1000,
+            "dividend_yield_trailing": 0.04,
+        }
+        result = compute_contrarian_score(None, data, sentiment_score=-0.6)
+        assert "sentiment" in result
+        assert result["sentiment"]["score"] == 20.0
+
+    def test_4axis_positive_sentiment_no_boost(self):
+        """Positive sentiment → sentiment score 0."""
+        data = {"per": 7, "pbr": 0.4, "roe": 0.10, "eps_growth": 0.05}
+        result = compute_contrarian_score(None, data, sentiment_score=0.5)
+        assert "sentiment" in result
+        assert result["sentiment"]["score"] == 0.0
+
+    def test_backward_compat_no_sentiment(self):
+        """Without sentiment_score, behavior is unchanged (3-axis)."""
+        data = {
+            "per": 7, "pbr": 0.4, "roe": 0.15, "eps_growth": 0.05,
+            "fcf": 100, "market_cap": 1000,
+            "dividend_yield_trailing": 0.04,
+        }
+        result = compute_contrarian_score(None, data)
+        assert "sentiment" not in result
+        # Score is simple sum of valuation + fundamental (tech=0 with None hist)
+        expected = result["valuation"]["score"] + result["fundamental"]["score"]
+        assert result["contrarian_score"] == pytest.approx(expected, abs=0.2)
+
+    def test_4axis_score_capped_at_100(self):
+        """4-axis score should never exceed 100."""
+        hist = _make_oversold_hist()
+        data = {
+            "per": 5, "pbr": 0.3, "roe": 0.20, "eps_growth": 0.15,
+            "fcf": 200, "market_cap": 1000,
+            "dividend_yield_trailing": 0.08,
+        }
+        result = compute_contrarian_score(hist, data, sentiment_score=-0.8)
+        assert result["contrarian_score"] <= 100.0
+
+    def test_4axis_grade_assignment(self):
+        """4-axis grade assignment follows same boundaries."""
+        data = {"per": 7, "pbr": 0.4, "roe": 0.15, "eps_growth": 0.05}
+        result = compute_contrarian_score(None, data, sentiment_score=-0.6)
+        score = result["contrarian_score"]
+        if score >= 70:
+            assert result["grade"] == "A"
+        elif score >= 50:
+            assert result["grade"] == "B"
+        elif score >= 30:
+            assert result["grade"] == "C"
+        else:
+            assert result["grade"] == "D"
+
+    def test_4axis_rescaling(self):
+        """4-axis rescaling: sentiment adds points, 3-axis components scale down."""
+        # With sentiment: tech 30 + val 25 + fund 25 + sent 20 = 100
+        # Without sentiment: tech 40 + val 30 + fund 30 = 100
+        data = {
+            "per": 5, "pbr": 0.3, "roe": 0.20, "eps_growth": 0.15,
+            "fcf": 200, "market_cap": 1000,
+            "dividend_yield_trailing": 0.08,
+        }
+        result_3axis = compute_contrarian_score(None, data)
+        result_4axis = compute_contrarian_score(None, data, sentiment_score=-0.8)
+        # 4-axis should include sentiment component
+        assert "sentiment" in result_4axis
+        assert result_4axis["sentiment"]["score"] == 20.0  # -0.8 → max 20pt
+        # 3-axis val+fund only (no hist → tech=0). 4-axis should also have val+fund
+        assert result_3axis["contrarian_score"] > 0
+        assert result_4axis["contrarian_score"] > result_3axis["contrarian_score"]
+        # The difference should be roughly the sentiment contribution
+        # 3-axis: val + fund raw scores. 4-axis: scaled val + scaled fund + sent 20
+        diff = result_4axis["contrarian_score"] - result_3axis["contrarian_score"]
+        # Sentiment adds ~20pt but scaling reduces other axes, so net gain is positive
+        assert diff > 0

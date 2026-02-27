@@ -1,11 +1,13 @@
-"""Contrarian signal: detect oversold stocks with solid fundamentals (KIK-504).
+"""Contrarian signal: detect oversold stocks with solid fundamentals (KIK-504, KIK-519).
 
-Scores stocks on three axes:
-  1. Technical contrarian (40pt): RSI oversold, SMA200 deviation, BB breach, volume surge
-  2. Valuation contrarian (30pt): low PER/PBR with healthy earnings (inverse of value trap)
-  3. Fundamental divergence (30pt): strong FCF/ROE/dividend despite price drop
+Scores stocks on three or four axes:
+  1. Technical contrarian (40pt / 30pt with sentiment): RSI oversold, SMA200 deviation, BB breach, volume surge
+  2. Valuation contrarian (30pt / 25pt with sentiment): low PER/PBR with healthy earnings (inverse of value trap)
+  3. Fundamental divergence (30pt / 25pt with sentiment): strong FCF/ROE/dividend despite price drop
+  4. Sentiment contrarian (20pt, optional): negative X sentiment as contrarian signal (KIK-519)
 
-Total: 0-100pt.  Grade: A(>=70) B(>=50) C(>=30) D(<30).
+Without Grok: 40+30+30 = 100pt.  With Grok: 30+25+25+20 = 100pt.
+Grade: A(>=70) B(>=50) C(>=30) D(<30).
 """
 
 import numpy as np
@@ -267,26 +269,106 @@ def compute_fundamental_divergence(stock_data: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 4. Sentiment contrarian -- 20 pts (optional, requires Grok API, KIK-519)
+# ---------------------------------------------------------------------------
+
+def compute_sentiment_contrarian(sentiment_score: float | None) -> dict:
+    """Sentiment contrarian score (20pt max, KIK-519).
+
+    Uses Grok X-sentiment score (-1 to 1).
+    Negative sentiment + solid fundamentals = contrarian opportunity.
+
+    Score mapping:
+    - sentiment < -0.5 → 20pt (very negative — strong contrarian signal)
+    - sentiment < -0.3 → 15pt (negative)
+    - sentiment < -0.1 → 10pt (slightly negative)
+    - sentiment < 0.1  → 5pt  (neutral)
+    - sentiment >= 0.1 → 0pt  (positive — no contrarian signal)
+    """
+    default = {
+        "score": 0.0,
+        "sentiment_score": sentiment_score,
+        "details": {},
+    }
+
+    if sentiment_score is None:
+        return default
+
+    if sentiment_score < -0.5:
+        score = 20.0
+    elif sentiment_score < -0.3:
+        score = 15.0
+    elif sentiment_score < -0.1:
+        score = 10.0
+    elif sentiment_score < 0.1:
+        score = 5.0
+    else:
+        score = 0.0
+
+    return {
+        "score": score,
+        "sentiment_score": sentiment_score,
+        "details": {
+            "raw_score": sentiment_score,
+            "contrarian_pts": score,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Composite contrarian score
 # ---------------------------------------------------------------------------
+
+# Weight constants for 4-axis mode (KIK-519)
+_W_TECH_4AXIS = 30
+_W_VAL_4AXIS = 25
+_W_FUND_4AXIS = 25
+_W_SENT_4AXIS = 20
+
+# Original max scores per axis (for normalization)
+_MAX_TECH = 40.0
+_MAX_VAL = 30.0
+_MAX_FUND = 30.0
+_MAX_SENT = 20.0
+
 
 def compute_contrarian_score(
     hist: pd.DataFrame | None,
     stock_data: dict,
+    sentiment_score: float | None = None,
 ) -> dict:
     """Composite contrarian score (0-100pt).
 
-    Technical 40pt + Valuation 30pt + Fundamental divergence 30pt = 100pt.
+    Without Grok: Technical 40pt + Valuation 30pt + Fundamental 30pt = 100pt.
+    With Grok:    Technical 30pt + Valuation 25pt + Fundamental 25pt + Sentiment 20pt = 100pt.
+
+    Parameters
+    ----------
+    sentiment_score : float or None
+        Grok X-sentiment score (-1 to 1). When provided, enables 4-axis scoring.
 
     Returns dict with:
         contrarian_score, technical, valuation, fundamental,
+        sentiment (only when sentiment_score is provided),
         grade ("A"/"B"/"C"/"D"), is_contrarian (score >= 50).
     """
     tech = compute_technical_contrarian(hist)
     val = compute_valuation_contrarian(stock_data)
     fund = compute_fundamental_divergence(stock_data)
 
-    total = tech["score"] + val["score"] + fund["score"]
+    if sentiment_score is not None:
+        sent = compute_sentiment_contrarian(sentiment_score)
+        # 4-axis: normalize each axis to new weight
+        scaled_tech = (tech["score"] / _MAX_TECH) * _W_TECH_4AXIS if tech["score"] > 0 else 0
+        scaled_val = (val["score"] / _MAX_VAL) * _W_VAL_4AXIS if val["score"] > 0 else 0
+        scaled_fund = (fund["score"] / _MAX_FUND) * _W_FUND_4AXIS if fund["score"] > 0 else 0
+        scaled_sent = (sent["score"] / _MAX_SENT) * _W_SENT_4AXIS if sent["score"] > 0 else 0
+        total = scaled_tech + scaled_val + scaled_fund + scaled_sent
+    else:
+        sent = None
+        # 3-axis: original weights (40 + 30 + 30 = 100)
+        total = tech["score"] + val["score"] + fund["score"]
+
     total = min(total, 100.0)
 
     if total >= 70:
@@ -298,7 +380,7 @@ def compute_contrarian_score(
     else:
         grade = "D"
 
-    return {
+    result = {
         "contrarian_score": round(total, 1),
         "technical": tech,
         "valuation": val,
@@ -306,3 +388,7 @@ def compute_contrarian_score(
         "grade": grade,
         "is_contrarian": total >= 50,
     }
+    if sent is not None:
+        result["sentiment"] = sent
+
+    return result
