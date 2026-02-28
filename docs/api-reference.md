@@ -37,11 +37,21 @@ Shared utility functions used across multiple core modules.
 Portfolio health check engine (KIK-356).
 
 - `check_trend_health(hist: Optional[pd.DataFrame], cross_lookback: int | None=None) -> dict` — Analyze trend health from price history.
-- `check_etf_health(stock_detail: dict) -> dict` — ETF固有のヘルスチェック (KIK-469).
 - `check_change_quality(stock_detail: dict) -> dict` — Evaluate change quality (alpha signal) of a holding.
-- `check_long_term_suitability(stock_detail: dict, shareholder_return_data: dict | None=None) -> dict` — Evaluate long-term holding suitability from fundamental data.
 - `compute_alert_level(trend_health: dict, change_quality: dict, stock_detail=None, return_stability: dict | None=None, is_small_cap: bool=False) -> dict` — Compute 3-level alert from trend and change quality.
 - `run_health_check(csv_path: str, client) -> dict` — Run health check on all portfolio holdings.
+
+### src.core.health_etf (KIK-469/512: ETFヘルスチェック)
+
+ETF-specific health check logic (KIK-469).
+
+- `check_etf_health(stock_detail: dict) -> dict` — ETF固有のヘルスチェック (KIK-469).
+
+### src.core.health_labels (KIK-371/512: 長期適性ラベル生成)
+
+Label and verdict generation for portfolio health checks (KIK-371).
+
+- `check_long_term_suitability(stock_detail: dict, shareholder_return_data: dict | None=None) -> dict` — Evaluate long-term holding suitability from fundamental data.
 
 ### src.core.models
 
@@ -876,9 +886,21 @@ Compact knowledge context extraction for Grok API prompt injection (KIK-488).
 - `get_market_context() -> str` — Extract compact context for market research.
 - `get_business_context(symbol: str) -> str` — Extract compact context for business model analysis.
 
-### src.data.history_store (KIK-428)
+### src.data.history_helpers (KIK-512: シリアライズ・埋め込みヘルパー)
 
-History store -- save and load screening/report/trade/health/research JSON files.
+Internal helpers for history store (KIK-512 split).
+
+
+### src.data.history_load (KIK-512: load/query関数群)
+
+History store load/query functions (KIK-512 split).
+
+- `load_history(category: str, days_back: int | None=None, base_dir: str='data/history') -> list[dict]` — Load history files for a category, sorted newest-first.
+- `list_history_files(category: str, base_dir: str='data/history') -> list[str]` — List history file paths for a category, sorted newest-first.
+
+### src.data.history_save (KIK-512: save_*関数群)
+
+History store save functions (KIK-512 split).
 
 - `save_screening(preset: str, region: str, results: list[dict], sector: str | None=None, theme: str | None=None, base_dir: str='data/history') -> str` — Save screening results to JSON.
 - `save_report(symbol: str, data: dict, score: float, verdict: str, base_dir: str='data/history') -> str` — Save a stock report to JSON.
@@ -888,8 +910,11 @@ History store -- save and load screening/report/trade/health/research JSON files
 - `save_market_context(context: dict, base_dir: str='data/history') -> str` — Save market context snapshot to JSON (KIK-405).
 - `save_stress_test(scenario: str, symbols: list[str], portfolio_impact: float, per_stock_impacts: list[dict] | None=None, var_result: dict | None=None, high_correlation_pairs: list | None=None, concentration: dict | None=None, recommendations: list | None=None, base_dir: str='data/history') -> str` — Save stress test results to JSON (KIK-428).
 - `save_forecast(positions: list[dict], total_value_jpy: float=0, base_dir: str='data/history') -> str` — Save forecast results to JSON (KIK-428).
-- `load_history(category: str, days_back: int | None=None, base_dir: str='data/history') -> list[dict]` — Load history files for a category, sorted newest-first.
-- `list_history_files(category: str, base_dir: str='data/history') -> list[str]` — List history file paths for a category, sorted newest-first.
+
+### src.data.history_store (KIK-428)
+
+History store -- save and load screening/report/trade/health/research JSON files.
+
 
 ### src.data.linear_client (KIK-472)
 

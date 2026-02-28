@@ -186,7 +186,7 @@ class TestBuildResearchSummaryEdgeCases:
 
 class TestSaveResearchSummaryIntegration:
 
-    @patch("src.data.history_store.Path.mkdir")
+    @patch("src.data.history_helpers.Path.mkdir")
     @patch("builtins.open", new_callable=MagicMock)
     def test_save_research_generates_summary(self, mock_open, mock_mkdir):
         """save_research should pass auto-generated summary to merge_research_full."""
