@@ -180,6 +180,8 @@ _SCHEMA_CONSTRAINTS = [
     "CREATE CONSTRAINT forecast_id IF NOT EXISTS FOR (f:Forecast) REQUIRE f.id IS UNIQUE",
     # KIK-472 action item
     "CREATE CONSTRAINT action_item_id IF NOT EXISTS FOR (a:ActionItem) REQUIRE a.id IS UNIQUE",
+    # KIK-547 community detection
+    "CREATE CONSTRAINT community_id IF NOT EXISTS FOR (c:Community) REQUIRE c.id IS UNIQUE",
 ]
 
 _SCHEMA_INDEXES = [
@@ -202,6 +204,9 @@ _SCHEMA_INDEXES = [
     # KIK-472 action item indexes
     "CREATE INDEX action_item_status IF NOT EXISTS FOR (a:ActionItem) ON (a.status)",
     "CREATE INDEX action_item_date IF NOT EXISTS FOR (a:ActionItem) ON (a.date)",
+    # KIK-547 community detection indexes
+    "CREATE INDEX community_level IF NOT EXISTS FOR (c:Community) ON (c.level)",
+    "CREATE INDEX community_created IF NOT EXISTS FOR (c:Community) ON (c.created_at)",
 ]
 
 # KIK-420: Vector indexes for semantic search

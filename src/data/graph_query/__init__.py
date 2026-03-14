@@ -61,6 +61,14 @@ from src.data.graph_query.proactive import (  # noqa: F401
     get_concern_notes,
 )
 
+# --- Community detection (KIK-547) ---
+from src.data.graph_query.community import (  # noqa: F401
+    detect_communities,
+    get_communities,
+    get_stock_community,
+    get_similar_stocks,
+)
+
 # --- nl_query.py: Natural language → graph query dispatcher (KIK-409, KIK-517) ---
 from src.data.graph_query.nl_query import (  # noqa: F401
     query,

@@ -4,7 +4,7 @@
 
 ---
 
-## Node Types (22)
+## Node Types (23)
 
 ### Stock
 中心ノード。すべてのアクティビティがこのノードに接続される。
@@ -246,6 +246,17 @@ stock/business: positive/negative。industry: trend/growth_driver/risk/regulator
 | linear_issue_url | string | Linear issue URL |
 | linear_identifier | string | Linear issue 識別子 (e.g. KIK-999) |
 
+### Community (KIK-547)
+銘柄クラスタ。共起シグナル（Screen/Theme/Sector/News）に基づく類似銘柄グループ。
+
+| Property | Type | Description |
+|:---|:---|:---|
+| id | string (UNIQUE) | `community_{level}_{index}` |
+| name | string | 自動命名（共通セクター/テーマから） |
+| size | int | メンバー銘柄数 |
+| level | int | 階層レベル (0 = 最細) |
+| created_at | string | 作成日時 (ISO 8601) |
+
 ---
 
 ## Relationships
@@ -285,6 +296,7 @@ graph LR
     Forecast -- FORECASTED --> Stock
     ActionItem -- TARGETS --> Stock
     HealthCheck -- TRIGGERED --> ActionItem
+    Stock -- BELONGS_TO --> Community
 ```
 
 | Relationship | From | To | Description |
@@ -314,10 +326,11 @@ graph LR
 | HOLDS | Portfolio | Stock | 現在保有中の銘柄 (KIK-414)。プロパティ: shares, cost_price, cost_currency, purchase_date |
 | STRESSED | StressTest | Stock | ストレステスト対象銘柄 (KIK-428)。プロパティ: impact (推定損失率) |
 | FORECASTED | Forecast | Stock | フォーキャスト対象銘柄 (KIK-428)。プロパティ: optimistic, base, pessimistic (各シナリオリターン) |
+| BELONGS_TO | Stock | Community | コミュニティへの所属 (KIK-547) |
 
 ---
 
-## Constraints (22)
+## Constraints (23)
 
 ```cypher
 CREATE CONSTRAINT stock_symbol IF NOT EXISTS FOR (s:Stock) REQUIRE s.symbol IS UNIQUE
@@ -346,9 +359,11 @@ CREATE CONSTRAINT stress_test_id IF NOT EXISTS FOR (st:StressTest) REQUIRE st.id
 CREATE CONSTRAINT forecast_id IF NOT EXISTS FOR (f:Forecast) REQUIRE f.id IS UNIQUE
 -- KIK-472 action items
 CREATE CONSTRAINT action_item_id IF NOT EXISTS FOR (a:ActionItem) REQUIRE a.id IS UNIQUE
+-- KIK-547 community detection
+CREATE CONSTRAINT community_id IF NOT EXISTS FOR (c:Community) REQUIRE c.id IS UNIQUE
 ```
 
-## Indexes (16)
+## Indexes (18)
 
 ```cypher
 CREATE INDEX stock_sector IF NOT EXISTS FOR (s:Stock) ON (s.sector)
@@ -370,6 +385,9 @@ CREATE INDEX forecast_date IF NOT EXISTS FOR (f:Forecast) ON (f.date)
 -- KIK-472 action items
 CREATE INDEX action_item_date IF NOT EXISTS FOR (a:ActionItem) ON (a.date)
 CREATE INDEX action_item_status IF NOT EXISTS FOR (a:ActionItem) ON (a.status)
+-- KIK-547 community detection
+CREATE INDEX community_level IF NOT EXISTS FOR (c:Community) ON (c.level)
+CREATE INDEX community_created IF NOT EXISTS FOR (c:Community) ON (c.created_at)
 ```
 
 ## Vector Indexes (9) — KIK-420/428
