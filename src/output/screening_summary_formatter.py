@@ -75,4 +75,19 @@ def format_screening_summary(context: dict) -> str:
                 )
         lines.append("")
 
+    # --- Community grouping (KIK-549) ---
+    communities_map = context.get("symbol_communities", {})
+    if communities_map:
+        # Group symbols by community name
+        by_community: dict[str, list[str]] = {}
+        for symbol, info in communities_map.items():
+            cname = info.get("name", "?")
+            by_community.setdefault(cname, []).append(symbol)
+
+        lines.append("**コミュニティ（類似銘柄クラスタ）**")
+        for cname, members in sorted(by_community.items(), key=lambda x: -len(x[1])):
+            members_str = "、".join(members)
+            lines.append(f"- {cname}: {members_str}（{len(members)}銘柄）")
+        lines.append("")
+
     return "\n".join(lines)

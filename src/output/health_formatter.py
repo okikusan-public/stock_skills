@@ -200,6 +200,19 @@ def format_health_check(health_data: dict) -> str:
         lines.append(f"{emoji} {small_cap_alloc['message']}")
         lines.append("")
 
+    # Community concentration (KIK-549)
+    community_conc = health_data.get("community_concentration")
+    if community_conc and community_conc.get("warnings"):
+        for w in community_conc["warnings"]:
+            pct = int(w["weight"] * 100)
+            members_str = ", ".join(w["members"])
+            lines.append(
+                f"⚠️ コミュニティ集中: {w['community']} に"
+                f" {w['count']}銘柄（{pct}%）— {w['message']}"
+            )
+            lines.append(f"  対象: {members_str}")
+        lines.append("")
+
     # Alert details
     if alerts:
         lines.append("## アラート詳細")

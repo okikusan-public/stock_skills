@@ -763,6 +763,16 @@ ActionItem graph queries (KIK-472).
 
 - `get_action_item_history(symbol: str | None=None, limit: int=10) -> list[dict]` — Get ActionItem nodes for graph-query skill.
 
+### src.data.graph_query.community (KIK-547: コミュニティ検出)
+
+Community detection via co-occurrence analysis (KIK-547).
+
+- `detect_communities(similarity_cutoff: float=0.3, top_k: int=10, resolution: float=1.0) -> list[dict]` — Run community detection pipeline.
+- `get_communities(level: int=0) -> list[dict]` — Retrieve existing Community nodes from Neo4j.
+- `get_stock_community(symbol: str) -> Optional[dict]` — Get the community a stock belongs to.
+- `get_similar_stocks(symbol: str, top_k: int=5, similarity_cutoff: float=0.3) -> list[dict]` — Get stocks most similar to the given symbol.
+- `update_stock_community(symbol: str, similarity_cutoff: float=0.3) -> Optional[dict]` — Assign a stock to the best-matching existing community.
+
 ### src.data.graph_query.market
 
 MarketContext/Indicator/UpcomingEvent graph queries.

@@ -178,6 +178,78 @@ def get_similar_stocks(
         return []
 
 
+def update_stock_community(
+    symbol: str,
+    similarity_cutoff: float = 0.3,
+) -> Optional[dict]:
+    """Assign a stock to the best-matching existing community.
+
+    Computes similarity against all existing community members and
+    assigns the stock to the community with highest average similarity.
+    Does NOT trigger full re-detection.
+
+    Returns the assigned community dict or None.
+    """
+    driver = _common._get_driver()
+    if driver is None:
+        return None
+    try:
+        from src.data.graph_store import _common as gs_common
+
+        if gs_common._get_mode() == "off":
+            return None
+
+        vectors = _fetch_cooccurrence_vectors(driver)
+        if symbol not in vectors:
+            return None
+
+        # Get existing communities
+        communities = get_communities(level=0)
+        if not communities:
+            return None
+
+        target = vectors[symbol]
+        best_community = None
+        best_avg_sim = 0.0
+
+        for comm in communities:
+            members = comm.get("members", [])
+            if not members:
+                continue
+            sims = []
+            for member in members:
+                if member in vectors:
+                    sim = _jaccard_single(target, vectors[member])
+                    sims.append(sim)
+            if sims:
+                avg_sim = sum(sims) / len(sims)
+                if avg_sim > best_avg_sim and avg_sim >= similarity_cutoff:
+                    best_avg_sim = avg_sim
+                    best_community = comm
+
+        if best_community is None:
+            return None
+
+        # Write BELONGS_TO relationship
+        comm_id = best_community["id"]
+        with driver.session() as session:
+            session.run(
+                "MATCH (s:Stock {symbol: $symbol}) "
+                "MATCH (c:Community {id: $cid}) "
+                "MERGE (s)-[:BELONGS_TO]->(c)",
+                symbol=symbol,
+                cid=comm_id,
+            )
+
+        return {
+            "community_id": comm_id,
+            "name": best_community.get("name", ""),
+            "size": best_community.get("size", 0),
+        }
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------

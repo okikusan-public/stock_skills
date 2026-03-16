@@ -267,6 +267,9 @@ def print_suggestions(
     # Action item processing (KIK-472)
     _process_action_items(suggestions, health_data, context_summary)
 
+    # Community incremental update (KIK-549)
+    _maybe_refresh_communities()
+
 
 def _process_action_items(
     suggestions: list[dict],
@@ -310,5 +313,51 @@ def _process_action_items(
             lines.append(f"- {title} ({status})")
 
         print("\n".join(lines))
+    except Exception:
+        pass  # graceful degradation
+
+
+def _maybe_refresh_communities() -> None:
+    """Check for unclustered stocks and trigger incremental update (KIK-549).
+
+    If new Stock nodes exist that are not in any Community, assign them
+    to their best-matching community. If unclustered count exceeds threshold,
+    trigger a full re-detection.
+    Graceful degradation: no output on any failure.
+    """
+    try:
+        if not HAS_GRAPH_QUERY:
+            return
+        from src.data.graph_query.community import (
+            get_communities,
+            update_stock_community,
+        )
+        from src.data.graph_query._common import _get_driver
+
+        driver = _get_driver()
+        if driver is None:
+            return
+
+        # Find stocks not in any community
+        with driver.session() as session:
+            result = session.run(
+                "MATCH (s:Stock) "
+                "WHERE NOT (s)-[:BELONGS_TO]->(:Community) "
+                "RETURN s.symbol AS symbol LIMIT 20"
+            )
+            unclustered = [r["symbol"] for r in result]
+
+        if not unclustered:
+            return
+
+        # If too many unclustered, trigger full re-detection
+        if len(unclustered) >= 10:
+            from src.data.graph_query.community import detect_communities
+            detect_communities()
+            return
+
+        # Incremental: assign each to best community
+        for sym in unclustered:
+            update_stock_community(sym)
     except Exception:
         pass  # graceful degradation

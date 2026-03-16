@@ -307,6 +307,18 @@ def _format_context(symbol: str, history: dict, skill: str, reason: str,
     if themes:
         lines.append(f"- テーマ: {', '.join(themes[:5])}")
 
+    # Community (KIK-549)
+    try:
+        from src.data.graph_query.community import get_stock_community
+        comm = get_stock_community(symbol)
+        if comm:
+            peers = comm.get("peers", [])[:5]
+            lines.append(f"- コミュニティ: {comm['name']} ({comm['size']}銘柄)")
+            if peers:
+                lines.append(f"  同一クラスタ: {', '.join(peers)}")
+    except Exception:
+        pass
+
     # Researches
     for r in history.get("researches", [])[:2]:
         d = r.get("date", "?")

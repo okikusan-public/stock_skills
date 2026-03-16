@@ -104,4 +104,23 @@ def get_screening_graph_context(
         except Exception:
             pass
 
+    # --- Symbol-level communities (KIK-549) ---
+    if symbols:
+        try:
+            from src.data.graph_query.community import get_stock_community
+
+            symbol_communities: dict = {}
+            for sym in symbols:
+                comm = get_stock_community(sym)
+                if comm:
+                    symbol_communities[sym] = {
+                        "name": comm["name"],
+                        "peers": comm.get("peers", [])[:3],
+                    }
+            if symbol_communities:
+                result["symbol_communities"] = symbol_communities
+                result["has_data"] = True
+        except Exception:
+            pass
+
     return result
