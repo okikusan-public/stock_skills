@@ -17,7 +17,7 @@ from typing import Optional
 # Connection
 # ---------------------------------------------------------------------------
 
-_NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+_NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7688")
 _NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 _NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "password")
 
