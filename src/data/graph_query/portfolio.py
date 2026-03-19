@@ -35,6 +35,53 @@ def get_current_holdings() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Holdings notes — 1-hop traversal (KIK-563)
+# ---------------------------------------------------------------------------
+
+def get_holdings_notes(
+    note_types: list[str] | None = None,
+    limit: int = 10,
+) -> list[dict]:
+    """Get important notes for portfolio holdings via 1-hop traversal.
+
+    Traverses: Portfolio→HOLDS→Stock←ABOUT←Note
+
+    Parameters
+    ----------
+    note_types : list[str], optional
+        Filter by note types. Default: observation, concern, target.
+    limit : int
+        Maximum number of notes to return (default 10).
+
+    Returns
+    -------
+    list[dict]
+        Each dict: {symbol, type, content, date}
+        Empty list if Neo4j unavailable.
+    """
+    driver = _common._get_driver()
+    if driver is None:
+        return []
+    if note_types is None:
+        note_types = ["observation", "concern", "target"]
+    try:
+        with driver.session() as session:
+            result = session.run(
+                "MATCH (p:Portfolio {name: 'default'})-[:HOLDS]->(s:Stock) "
+                "MATCH (n:Note)-[:ABOUT]->(s) "
+                "WHERE n.type IN $types "
+                "RETURN s.symbol AS symbol, n.type AS type, "
+                "n.content AS content, n.date AS date "
+                "ORDER BY n.date DESC LIMIT $limit",
+                types=note_types,
+                limit=limit,
+            )
+            return [dict(r) for r in result]
+    except Exception:
+        return []
+
+
+# ---------------------------------------------------------------------------
 # 14. Stress test history (KIK-428)
 # ---------------------------------------------------------------------------
 

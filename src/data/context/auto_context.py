@@ -579,6 +579,24 @@ def get_context(user_input: str) -> Optional[dict]:
         ctx_lines = ["## ポートフォリオコンテキスト"]
         if mc:
             ctx_lines.append(f"- 直近市況: {mc.get('date', '?')}")
+
+        # KIK-563: 1-hop traversal for holdings notes
+        try:
+            from src.data.graph_query.portfolio import get_holdings_notes
+            notes = get_holdings_notes()
+            if notes:
+                ctx_lines.append("")
+                ctx_lines.append("## 保有銘柄の重要メモ")
+                for n in notes:
+                    sym = n.get("symbol", "?")
+                    ntype = n.get("type", "?")
+                    content = (n.get("content", "") or "")[:60]
+                    ndate = n.get("date", "")
+                    date_part = f" ({ndate})" if ndate else ""
+                    ctx_lines.append(f"- [{sym}] {ntype}: {content}{date_part}")
+        except Exception:
+            pass  # graceful degradation
+
         ctx_lines.append("\n**推奨**: health (ポートフォリオ診断)")
         pf_ctx = {
             "symbol": "",

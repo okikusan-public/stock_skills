@@ -1200,3 +1200,46 @@ class TestGetContextWithLessons:
         result = get_context("PFチェック")
         assert result is not None
         assert "## 投資lesson" not in result["context_markdown"]
+
+    # --- KIK-563: PFクエリで保有銘柄の重要メモ表示 ---
+
+    @patch("src.data.auto_context._load_lessons", return_value=[])
+    @patch("src.data.graph_query.portfolio.get_holdings_notes")
+    @patch("src.data.auto_context.graph_query")
+    def test_pf_query_shows_holdings_notes(self, mock_gq, mock_notes, mock_les):
+        """PFクエリで保有銘柄のNote(observation/concern/target)が表示される (KIK-563)."""
+        mock_gq.get_recent_market_context.return_value = {"date": "2026-03-20"}
+        mock_notes.return_value = [
+            {"symbol": "NFLX", "type": "observation",
+             "content": "追加購入計画の停止 — 30株で打ち止め", "date": "2026-03-19"},
+            {"symbol": "NVDA", "type": "thesis",
+             "content": "AI半導体支配的ポジション、PEG<1", "date": "2026-03-19"},
+        ]
+        result = get_context("ポートフォリオ評価")
+        assert result is not None
+        md = result["context_markdown"]
+        assert "## 保有銘柄の重要メモ" in md
+        assert "[NFLX] observation" in md
+        assert "追加購入計画の停止" in md
+        assert "[NVDA] thesis" in md
+
+    @patch("src.data.auto_context._load_lessons", return_value=[])
+    @patch("src.data.graph_query.portfolio.get_holdings_notes")
+    @patch("src.data.auto_context.graph_query")
+    def test_pf_query_no_notes_no_section(self, mock_gq, mock_notes, mock_les):
+        """保有銘柄にメモがない → セクション非表示."""
+        mock_gq.get_recent_market_context.return_value = None
+        mock_notes.return_value = []
+        result = get_context("PFチェック")
+        assert result is not None
+        assert "## 保有銘柄の重要メモ" not in result["context_markdown"]
+
+    @patch("src.data.auto_context._load_lessons", return_value=[])
+    @patch("src.data.graph_query.portfolio.get_holdings_notes", side_effect=Exception("fail"))
+    @patch("src.data.auto_context.graph_query")
+    def test_pf_query_notes_error_graceful(self, mock_gq, mock_notes, mock_les):
+        """Neo4j未接続時 → graceful degradation（メモセクションなし）."""
+        mock_gq.get_recent_market_context.return_value = None
+        result = get_context("PF ヘルスチェック")
+        assert result is not None
+        assert "## 保有銘柄の重要メモ" not in result["context_markdown"]

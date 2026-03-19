@@ -37,6 +37,7 @@ from src.data.graph_query.research import (  # noqa: F401
 # --- Portfolio/Trade/Forecast queries ---
 from src.data.graph_query.portfolio import (  # noqa: F401
     get_current_holdings,
+    get_holdings_notes,
     get_stress_test_history,
     get_forecast_history,
     get_portfolio_holdings_for_linking,

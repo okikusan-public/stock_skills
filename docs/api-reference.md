@@ -794,6 +794,7 @@ Natural language → graph query dispatcher (KIK-409 Phase 1).
 Portfolio/Trade/HealthCheck/Forecast graph queries.
 
 - `get_current_holdings() -> list[dict]` — Get stocks currently held in portfolio via HOLDS relationship.
+- `get_holdings_notes(note_types: list[str] | None=None, limit: int=10) -> list[dict]` — Get important notes for portfolio holdings via 1-hop traversal.
 - `get_stress_test_history(symbol: str | None=None, limit: int=5) -> list[dict]` — Get StressTest nodes, optionally filtered by symbol.
 - `get_forecast_history(symbol: str | None=None, limit: int=5) -> list[dict]` — Get Forecast nodes, optionally filtered by symbol.
 - `get_portfolio_holdings_for_linking(limit: int=8) -> list[dict]` — Return portfolio holdings enriched with their latest Report for AI linking.
