@@ -85,3 +85,77 @@ def hhi_bar(hhi: float, width: int = 10) -> str:
     filled = int(round(hhi * width))
     filled = max(0, min(filled, width))
     return "[" + "#" * filled + "." * (width - filled) + "]"
+
+
+# ---------------------------------------------------------------------------
+# Screening table renderer (KIK-575)
+# ---------------------------------------------------------------------------
+
+# Column type: (header_name, alignment, cell_fn)
+# cell_fn signature: (rank: int, row: dict) -> str
+
+def render_screening_table(
+    results: list[dict],
+    columns: list[tuple],
+    empty_msg: str = "該当銘柄なし",
+    legends: list[str] | None = None,
+) -> str:
+    """Render a screening result table in Markdown (KIK-575).
+
+    Parameters
+    ----------
+    results : list[dict]
+        Screening result rows.
+    columns : list[tuple]
+        Each tuple: (header: str, align: str, cell_fn: callable)
+        cell_fn(rank, row) -> str
+    empty_msg : str
+        Message when results is empty.
+    legends : list[str] | None
+        Optional footer legend lines.
+
+    Returns
+    -------
+    str
+        Markdown table string.
+    """
+    if not results:
+        return empty_msg
+
+    # Header
+    header = "| " + " | ".join(c[0] for c in columns) + " |"
+    separator = "|" + "|".join(c[1] for c in columns) + "|"
+    lines = [header, separator]
+
+    # Rows
+    for rank, row in enumerate(results, start=1):
+        cells = [c[2](rank, row) for c in columns]
+        lines.append("| " + " | ".join(cells) + " |")
+
+    # Legends
+    if legends:
+        lines.append("")
+        lines.extend(legends)
+
+    # Annotation footer
+    _append_annotation_footer(lines, results)
+
+    return "\n".join(lines)
+
+
+def _append_annotation_footer(lines: list[str], results: list[dict]) -> None:
+    """Append note annotation legend if any results have markers."""
+    has_markers = any(r.get("_note_markers") for r in results)
+    if not has_markers:
+        return
+    lines.append("")
+    lines.append("**マーカー凡例**: ⚠️=懸念メモあり / 📝=学びメモあり / 👀=様子見")
+    noted = [
+        (r.get("symbol", "?"), r.get("_note_summary", ""))
+        for r in results if r.get("_note_summary")
+    ]
+    if noted:
+        lines.append("")
+        lines.append("**メモ詳細**:")
+        for sym, summary in noted:
+            lines.append(f"- **{sym}**: {summary}")

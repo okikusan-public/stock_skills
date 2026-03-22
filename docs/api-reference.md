@@ -1111,6 +1111,7 @@ Shared formatting helpers used across all output formatters (KIK-394).
 - `fmt_float_sign(value: Optional[float], decimals: int=2) -> str` — Format a float with sign and given decimal places.
 - `build_label(row: dict) -> str` — Build stock label with annotation markers (KIK-418/419).
 - `hhi_bar(hhi: float, width: int=10) -> str` — Render a simple text bar for HHI value (0-1 scale).
+- `render_screening_table(results: list[dict], columns: list[tuple], empty_msg: str='該当銘柄なし', legends: list[str] | None=None) -> str` — Render a screening result table in Markdown (KIK-575).
 
 ### src.output._portfolio_utils
 
@@ -1138,17 +1139,17 @@ Forecast / return-estimate output formatter (KIK-447, split from portfolio_forma
 
 ### src.output.formatter
 
-Output formatters for screening results.
+Output formatters for screening results (KIK-575: unified renderer).
 
 - `format_markdown(results: list[dict]) -> str` — Format screening results as a Markdown table.
-- `format_query_markdown(results: list[dict]) -> str` — Format EquityQuery screening results as a Markdown table.
-- `format_pullback_markdown(results: list[dict]) -> str` — Format pullback screening results as a Markdown table.
-- `format_growth_markdown(results: list[dict]) -> str` — Format growth screening results as a Markdown table.
-- `format_alpha_markdown(results: list[dict]) -> str` — Format alpha signal screening results as a Markdown table.
-- `format_shareholder_return_markdown(results: list[dict]) -> str` — Format shareholder-return screening results as Markdown table.
-- `format_trending_markdown(results: list[dict], market_context: str='') -> str` — Format trending stock screening results as a Markdown table.
-- `format_contrarian_markdown(results: list[dict]) -> str` — Format contrarian screening results as a Markdown table (KIK-504).
-- `format_momentum_markdown(results: list[dict]) -> str` — Format momentum/surge screening results as a Markdown table (KIK-506).
+- `format_query_markdown(results: list[dict]) -> str` — Format EquityQuery screening results with sector column.
+- `format_pullback_markdown(results: list[dict]) -> str` — Format pullback screening results.
+- `format_growth_markdown(results: list[dict]) -> str` — Format growth screening results.
+- `format_alpha_markdown(results: list[dict]) -> str` — Format alpha signal screening results (2-axis scoring).
+- `format_shareholder_return_markdown(results: list[dict]) -> str` — Format shareholder-return screening results.
+- `format_trending_markdown(results: list[dict], market_context: str='') -> str` — Format trending stock screening results.
+- `format_contrarian_markdown(results: list[dict]) -> str` — Format contrarian screening results (3-axis scoring).
+- `format_momentum_markdown(results: list[dict]) -> str` — Format momentum/surge screening results.
 - `format_auto_theme_header(themes: list[dict], skipped: list[dict] | None=None) -> str` — Format Grok trending themes header (KIK-440).
 
 ### src.output.health_formatter (KIK-469 P2: stock/ETFテーブル分離)

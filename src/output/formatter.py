@@ -1,455 +1,294 @@
-"""Output formatters for screening results."""
+"""Output formatters for screening results (KIK-575: unified renderer)."""
 
-from typing import Optional
+from src.output._format_helpers import (
+    fmt_pct as _fmt_pct,
+    fmt_float as _fmt_float,
+    build_label as _build_label,
+    render_screening_table,
+)
 
-from src.output._format_helpers import fmt_pct as _fmt_pct
-from src.output._format_helpers import fmt_float as _fmt_float
-from src.output._format_helpers import build_label as _build_label
+
+# ---------------------------------------------------------------------------
+# Common cell helpers
+# ---------------------------------------------------------------------------
+
+def _price_cell(rank, row):
+    return _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
 
 
-def _append_annotation_footer(lines: list[str], results: list[dict]) -> None:
-    """Append marker legend and note details if any results have annotations (KIK-418/419)."""
-    has_markers = any(r.get("_note_markers") for r in results)
-    if not has_markers:
-        return
-
-    lines.append("")
-    lines.append("**マーカー凡例**: \u26a0\ufe0f=懸念メモあり / \U0001f4dd=学びメモあり / \U0001f440=様子見")
-
-    # Collect note summaries for annotated stocks
-    noted = [(r.get("symbol", "?"), r.get("_note_summary", "")) for r in results if r.get("_note_summary")]
-    if noted:
-        lines.append("")
-        lines.append("**メモ詳細**:")
-        for sym, summary in noted:
-            lines.append(f"- **{sym}**: {summary}")
-
+# ---------------------------------------------------------------------------
+# 1. Default (legacy)
+# ---------------------------------------------------------------------------
 
 def format_markdown(results: list[dict]) -> str:
-    """Format screening results as a Markdown table.
+    """Format screening results as a Markdown table."""
+    return render_screening_table(results, columns=[
+        ("順位", "---:", lambda r, row: str(r)),
+        ("銘柄", ":-----", lambda r, row: _build_label(row)),
+        ("株価", "-----:", _price_cell),
+        ("PER", "----:", lambda r, row: _fmt_float(row.get("per"))),
+        ("PBR", "----:", lambda r, row: _fmt_float(row.get("pbr"))),
+        ("配当利回り", "---------:", lambda r, row: _fmt_pct(row.get("dividend_yield"))),
+        ("ROE", "----:", lambda r, row: _fmt_pct(row.get("roe"))),
+        ("スコア", "------:", lambda r, row: _fmt_float(row.get("value_score"))),
+    ], empty_msg="該当する銘柄が見つかりませんでした。")
 
-    Parameters
-    ----------
-    results : list[dict]
-        Each dict should contain: symbol, name, price, per, pbr,
-        dividend_yield, roe, value_score.
 
-    Returns
-    -------
-    str
-        A Markdown-formatted table string.
-    """
-    if not results:
-        return "該当する銘柄が見つかりませんでした。"
-
-    lines = [
-        "| 順位 | 銘柄 | 株価 | PER | PBR | 配当利回り | ROE | スコア |",
-        "|---:|:-----|-----:|----:|----:|---------:|----:|------:|",
-    ]
-
-    for rank, row in enumerate(results, start=1):
-        label = _build_label(row)
-
-        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
-        per = _fmt_float(row.get("per"))
-        pbr = _fmt_float(row.get("pbr"))
-        div_yield = _fmt_pct(row.get("dividend_yield"))
-        roe = _fmt_pct(row.get("roe"))
-        score = _fmt_float(row.get("value_score"))
-
-        lines.append(
-            f"| {rank} | {label} | {price} | {per} | {pbr} | {div_yield} | {roe} | {score} |"
-        )
-
-    _append_annotation_footer(lines, results)
-    return "\n".join(lines)
-
+# ---------------------------------------------------------------------------
+# 2. Query (value, high-dividend, etc.)
+# ---------------------------------------------------------------------------
 
 def format_query_markdown(results: list[dict]) -> str:
-    """Format EquityQuery screening results as a Markdown table.
+    """Format EquityQuery screening results with sector column."""
+    return render_screening_table(results, columns=[
+        ("順位", "---:", lambda r, row: str(r)),
+        ("銘柄", ":-----", lambda r, row: _build_label(row)),
+        ("セクター", ":---------", lambda r, row: row.get("sector") or "-"),
+        ("株価", "-----:", _price_cell),
+        ("PER", "----:", lambda r, row: _fmt_float(row.get("per"))),
+        ("PBR", "----:", lambda r, row: _fmt_float(row.get("pbr"))),
+        ("配当利回り", "---------:", lambda r, row: _fmt_pct(row.get("dividend_yield"))),
+        ("ROE", "----:", lambda r, row: _fmt_pct(row.get("roe"))),
+        ("スコア", "------:", lambda r, row: _fmt_float(row.get("value_score"))),
+    ], empty_msg="該当する銘柄が見つかりませんでした。")
 
-    Includes sector column since QueryScreener results span diverse sectors.
 
-    Parameters
-    ----------
-    results : list[dict]
-        Each dict should contain: symbol, name, price, per, pbr,
-        dividend_yield, roe, value_score, sector.
-
-    Returns
-    -------
-    str
-        A Markdown-formatted table string.
-    """
-    if not results:
-        return "該当する銘柄が見つかりませんでした。"
-
-    lines = [
-        "| 順位 | 銘柄 | セクター | 株価 | PER | PBR | 配当利回り | ROE | スコア |",
-        "|---:|:-----|:---------|-----:|----:|----:|---------:|----:|------:|",
-    ]
-
-    for rank, row in enumerate(results, start=1):
-        label = _build_label(row)
-        sector = row.get("sector") or "-"
-
-        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
-        per = _fmt_float(row.get("per"))
-        pbr = _fmt_float(row.get("pbr"))
-        div_yield = _fmt_pct(row.get("dividend_yield"))
-        roe = _fmt_pct(row.get("roe"))
-        score = _fmt_float(row.get("value_score"))
-
-        lines.append(
-            f"| {rank} | {label} | {sector} | {price} | {per} | {pbr} | {div_yield} | {roe} | {score} |"
-        )
-
-    _append_annotation_footer(lines, results)
-    return "\n".join(lines)
-
+# ---------------------------------------------------------------------------
+# 3. Pullback
+# ---------------------------------------------------------------------------
 
 def format_pullback_markdown(results: list[dict]) -> str:
-    """Format pullback screening results as a Markdown table."""
-    if not results:
-        return "押し目条件に合致する銘柄が見つかりませんでした。（上昇トレンド中の押し目銘柄なし）"
+    """Format pullback screening results."""
+    def _bounce(r, row):
+        bs = row.get("bounce_score")
+        return f"{bs:.0f}点" if bs is not None else "-"
 
-    lines = [
-        "| 順位 | 銘柄 | 株価 | PER | 押し目% | RSI | 出来高比 | SMA50 | SMA200 | スコア | 一致度 | 総合スコア |",
-        "|---:|:-----|-----:|----:|------:|----:|-------:|------:|-------:|------:|:------:|------:|",
-    ]
+    def _match(r, row):
+        return "★完全一致" if row.get("match_type", "full") == "full" else "△部分一致"
 
-    for rank, row in enumerate(results, start=1):
-        label = _build_label(row)
+    return render_screening_table(results, columns=[
+        ("順位", "---:", lambda r, row: str(r)),
+        ("銘柄", ":-----", lambda r, row: _build_label(row)),
+        ("株価", "-----:", _price_cell),
+        ("PER", "----:", lambda r, row: _fmt_float(row.get("per"))),
+        ("押し目%", "------:", lambda r, row: _fmt_pct(row.get("pullback_pct"))),
+        ("RSI", "----:", lambda r, row: _fmt_float(row.get("rsi"), decimals=1)),
+        ("出来高比", "-------:", lambda r, row: _fmt_float(row.get("volume_ratio"))),
+        ("SMA50", "------:", lambda r, row: _fmt_float(row.get("sma50"), decimals=0) if row.get("sma50") is not None else "-"),
+        ("SMA200", "-------:", lambda r, row: _fmt_float(row.get("sma200"), decimals=0) if row.get("sma200") is not None else "-"),
+        ("スコア", "------:", _bounce),
+        ("一致度", ":------:", _match),
+        ("総合スコア", "------:", lambda r, row: _fmt_float(row.get("final_score") or row.get("value_score"))),
+    ], empty_msg="押し目条件に合致する銘柄が見つかりませんでした。（上昇トレンド中の押し目銘柄なし）")
 
-        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
-        per = _fmt_float(row.get("per"))
-        pullback = _fmt_pct(row.get("pullback_pct"))
-        rsi = _fmt_float(row.get("rsi"), decimals=1)
-        vol_ratio = _fmt_float(row.get("volume_ratio"))
-        sma50 = _fmt_float(row.get("sma50"), decimals=0) if row.get("sma50") is not None else "-"
-        sma200 = _fmt_float(row.get("sma200"), decimals=0) if row.get("sma200") is not None else "-"
 
-        # Bounce score
-        bounce_score = row.get("bounce_score")
-        bounce_str = f"{bounce_score:.0f}点" if bounce_score is not None else "-"
-
-        # Match type
-        match_type = row.get("match_type", "full")
-        match_str = "★完全一致" if match_type == "full" else "△部分一致"
-
-        score = _fmt_float(row.get("final_score") or row.get("value_score"))
-
-        lines.append(
-            f"| {rank} | {label} | {price} | {per} | {pullback} | {rsi} | {vol_ratio} | {sma50} | {sma200} | {bounce_str} | {match_str} | {score} |"
-        )
-
-    _append_annotation_footer(lines, results)
-    return "\n".join(lines)
-
+# ---------------------------------------------------------------------------
+# 4. Growth
+# ---------------------------------------------------------------------------
 
 def format_growth_markdown(results: list[dict]) -> str:
-    """Format growth screening results as a Markdown table.
+    """Format growth screening results."""
+    return render_screening_table(results, columns=[
+        ("順位", "---:", lambda r, row: str(r)),
+        ("銘柄", ":-----", lambda r, row: _build_label(row)),
+        ("セクター", ":---------", lambda r, row: row.get("sector") or "-"),
+        ("株価", "-----:", _price_cell),
+        ("PER", "----:", lambda r, row: _fmt_float(row.get("per"))),
+        ("PBR", "----:", lambda r, row: _fmt_float(row.get("pbr"))),
+        ("EPS成長", "-------:", lambda r, row: _fmt_pct(row.get("eps_growth"))),
+        ("売上成長", "--------:", lambda r, row: _fmt_pct(row.get("revenue_growth"))),
+        ("ROE", "----:", lambda r, row: _fmt_pct(row.get("roe"))),
+    ], empty_msg="成長条件に合致する銘柄が見つかりませんでした。")
 
-    Shows EPS growth, revenue growth, and ROE instead of value-centric columns.
-    """
-    if not results:
-        return "成長条件に合致する銘柄が見つかりませんでした。"
 
-    lines = [
-        "| 順位 | 銘柄 | セクター | 株価 | PER | PBR | EPS成長 | 売上成長 | ROE |",
-        "|---:|:-----|:---------|-----:|----:|----:|-------:|--------:|----:|",
-    ]
+# ---------------------------------------------------------------------------
+# 5. Alpha
+# ---------------------------------------------------------------------------
 
-    for rank, row in enumerate(results, start=1):
-        label = _build_label(row)
-        sector = row.get("sector") or "-"
-
-        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
-        per = _fmt_float(row.get("per"))
-        pbr = _fmt_float(row.get("pbr"))
-        eps_g = _fmt_pct(row.get("eps_growth"))
-        rev_g = _fmt_pct(row.get("revenue_growth"))
-        roe = _fmt_pct(row.get("roe"))
-
-        lines.append(
-            f"| {rank} | {label} | {sector} | {price} | {per} | {pbr} | {eps_g} | {rev_g} | {roe} |"
-        )
-
-    _append_annotation_footer(lines, results)
-    return "\n".join(lines)
+def _alpha_indicator(score):
+    """Map change sub-score to indicator: ◎/○/△/×."""
+    if score is None:
+        return "-"
+    if score >= 20:
+        return "◎"
+    if score >= 15:
+        return "○"
+    if score >= 10:
+        return "△"
+    return "×"
 
 
 def format_alpha_markdown(results: list[dict]) -> str:
-    """Format alpha signal screening results as a Markdown table.
+    """Format alpha signal screening results (2-axis scoring)."""
+    def _pullback(r, row):
+        pb = row.get("pullback_match", "none")
+        return "★" if pb == "full" else "△" if pb == "partial" else "-"
 
-    Shows 2-axis scoring: value_score (100pt) + change_score (100pt) = total_score (200pt+).
-    Also shows pullback status and key change indicators.
-    """
-    if not results:
-        return "アルファシグナル条件に合致する銘柄が見つかりませんでした。"
+    return render_screening_table(results, columns=[
+        ("順位", "---:", lambda r, row: str(r)),
+        ("銘柄", ":-----", lambda r, row: _build_label(row)),
+        ("株価", "-----:", _price_cell),
+        ("PER", "----:", lambda r, row: _fmt_float(row.get("per"))),
+        ("PBR", "----:", lambda r, row: _fmt_float(row.get("pbr"))),
+        ("割安", "----:", lambda r, row: _fmt_float(row.get("value_score"))),
+        ("変化", "----:", lambda r, row: _fmt_float(row.get("change_score"))),
+        ("総合", "----:", lambda r, row: _fmt_float(row.get("total_score"))),
+        ("押し目", ":------:", _pullback),
+        ("ア", ":--:", lambda r, row: _alpha_indicator(row.get("accruals_score"))),
+        ("加速", ":---:", lambda r, row: _alpha_indicator(row.get("rev_accel_score"))),
+        ("FCF", ":---:", lambda r, row: _alpha_indicator(row.get("fcf_yield_score"))),
+        ("ROE趨勢", ":------:", lambda r, row: _alpha_indicator(row.get("roe_trend_score"))),
+    ], empty_msg="アルファシグナル条件に合致する銘柄が見つかりませんでした。", legends=[
+        "**凡例**: 割安=割安スコア(100点) / 変化=変化スコア(100点) / 総合=割安+変化(+押し目ボーナス)",
+        "**変化指標**: ア=アクルーアルズ(利益の質) / 加速=売上成長加速度 / FCF=FCF利回り / ROE趨勢=ROE改善トレンド",
+        "**判定**: ◎=優秀(20+) ○=良好(15+) △=普通(10+) ×=不足(<10)",
+    ])
 
-    lines = [
-        "| 順位 | 銘柄 | 株価 | PER | PBR | 割安 | 変化 | 総合 | 押し目 | ア | 加速 | FCF | ROE趨勢 |",
-        "|---:|:-----|-----:|----:|----:|----:|----:|----:|:------:|:--:|:---:|:---:|:------:|",
-    ]
 
-    for rank, row in enumerate(results, start=1):
-        label = _build_label(row)
-
-        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
-        per = _fmt_float(row.get("per"))
-        pbr = _fmt_float(row.get("pbr"))
-
-        value_score = _fmt_float(row.get("value_score"))
-        change_score = _fmt_float(row.get("change_score"))
-        total_score = _fmt_float(row.get("total_score"))
-
-        # Pullback status
-        pullback = row.get("pullback_match", "none")
-        if pullback == "full":
-            pb_str = "★"
-        elif pullback == "partial":
-            pb_str = "△"
-        else:
-            pb_str = "-"
-
-        # Change indicators: ◎(>=20) ○(>=15) △(>=10) ×(<10)
-        def _indicator(score):
-            if score is None:
-                return "-"
-            if score >= 20:
-                return "◎"
-            if score >= 15:
-                return "○"
-            if score >= 10:
-                return "△"
-            return "×"
-
-        accruals = _indicator(row.get("accruals_score"))
-        rev_accel = _indicator(row.get("rev_accel_score"))
-        fcf = _indicator(row.get("fcf_yield_score"))
-        roe_trend = _indicator(row.get("roe_trend_score"))
-
-        lines.append(
-            f"| {rank} | {label} | {price} | {per} | {pbr} "
-            f"| {value_score} | {change_score} | {total_score} | {pb_str} "
-            f"| {accruals} | {rev_accel} | {fcf} | {roe_trend} |"
-        )
-
-    # Legend
-    lines.append("")
-    lines.append("**凡例**: 割安=割安スコア(100点) / 変化=変化スコア(100点) / 総合=割安+変化(+押し目ボーナス)")
-    lines.append("**変化指標**: ア=アクルーアルズ(利益の質) / 加速=売上成長加速度 / FCF=FCF利回り / ROE趨勢=ROE改善トレンド")
-    lines.append("**判定**: ◎=優秀(20+) ○=良好(15+) △=普通(10+) ×=不足(<10)")
-
-    _append_annotation_footer(lines, results)
-    return "\n".join(lines)
-
+# ---------------------------------------------------------------------------
+# 6. Shareholder Return
+# ---------------------------------------------------------------------------
 
 def format_shareholder_return_markdown(results: list[dict]) -> str:
-    """Format shareholder-return screening results as Markdown table."""
-    if not results:
-        return "_該当銘柄なし_"
-    lines = []
-    lines.append("| # | 銘柄 | セクター | PER | ROE | 配当利回り | 自社株買い | 総還元率 | 安定度 |")
-    lines.append("|--:|:-----|:--------|----:|----:|----------:|---------:|--------:|:------|")
-    for i, s in enumerate(results, 1):
-        name = s.get("name", s.get("symbol", "?"))
-        symbol = s.get("symbol", "")
-        markers = s.get("_note_markers", "")
-        sector = s.get("sector", "-")
-        per = s.get("per") or s.get("trailingPE")
-        roe = s.get("roe") or s.get("returnOnEquity")
-        div_yield = s.get("dividend_yield_trailing") or s.get("dividend_yield")
-        buyback = s.get("buyback_yield")
-        total_sr = s.get("total_shareholder_return")
-        stability_label = s.get("return_stability_label", "-")
-        stability_reason = s.get("return_stability_reason")
-        if stability_reason:
-            stability_label = f"{stability_label}（{stability_reason}）"
+    """Format shareholder-return screening results."""
+    def _sr_label(r, row):
+        name = row.get("name", row.get("symbol", "?"))
+        symbol = row.get("symbol", "")
+        markers = row.get("_note_markers", "")
+        suffix = f" {markers}" if markers else ""
+        return f"{name} ({symbol}){suffix}"
 
-        per_str = f"{per:.1f}" if per else "-"
-        roe_str = f"{roe*100:.1f}%" if roe else "-"
-        div_str = f"{div_yield*100:.2f}%" if div_yield else "-"
-        bb_str = f"{buyback*100:.2f}%" if buyback else "-"
-        sr_str = f"**{total_sr*100:.2f}%**" if total_sr else "-"
+    def _pct_manual(val):
+        return f"{val*100:.2f}%" if val else "-"
 
-        marker_suffix = f" {markers}" if markers else ""
-        lines.append(f"| {i} | {name} ({symbol}){marker_suffix} | {sector} | {per_str} | {roe_str} | {div_str} | {bb_str} | {sr_str} | {stability_label} |")
+    def _stability(r, row):
+        label = row.get("return_stability_label", "-")
+        reason = row.get("return_stability_reason")
+        return f"{label}（{reason}）" if reason else label
 
-    _append_annotation_footer(lines, results)
-    return "\n".join(lines)
+    return render_screening_table(results, columns=[
+        ("#", "--:", lambda r, row: str(r)),
+        ("銘柄", ":-----", _sr_label),
+        ("セクター", ":--------", lambda r, row: row.get("sector", "-")),
+        ("PER", "----:", lambda r, row: f"{(row.get('per') or row.get('trailingPE') or 0):.1f}" if (row.get('per') or row.get('trailingPE')) else "-"),
+        ("ROE", "----:", lambda r, row: f"{(row.get('roe') or row.get('returnOnEquity') or 0)*100:.1f}%" if (row.get('roe') or row.get('returnOnEquity')) else "-"),
+        ("配当利回り", "----------:", lambda r, row: _pct_manual(row.get("dividend_yield_trailing") or row.get("dividend_yield"))),
+        ("自社株買い", "---------:", lambda r, row: _pct_manual(row.get("buyback_yield"))),
+        ("総還元率", "--------:", lambda r, row: f"**{row.get('total_shareholder_return',0)*100:.2f}%**" if row.get("total_shareholder_return") else "-"),
+        ("安定度", ":------", _stability),
+    ], empty_msg="_該当銘柄なし_")
 
+
+# ---------------------------------------------------------------------------
+# 7. Trending
+# ---------------------------------------------------------------------------
 
 def format_trending_markdown(results: list[dict], market_context: str = "") -> str:
-    """Format trending stock screening results as a Markdown table."""
-    if not results:
-        return "X上でトレンド中の銘柄が見つかりませんでした。"
+    """Format trending stock screening results."""
+    def _cls(r, row):
+        c = row.get("classification", "")
+        if "データ不足" in c:
+            return "⚪不足"
+        if "割安" in c:
+            return "🟢割安"
+        if "適正" in c:
+            return "🟡適正"
+        return "🔴割高"
 
-    lines = []
-
-    if market_context:
-        lines.append(f"> **X市場センチメント**: {market_context}")
-        lines.append("")
-
-    lines.append(
-        "| 順位 | 銘柄 | 話題の理由 | 株価 | PER | PBR | 配当利回り | ROE | スコア | 判定 |"
-    )
-    lines.append(
-        "|---:|:-----|:---------|-----:|----:|----:|---------:|----:|------:|:----:|"
-    )
-
-    for rank, row in enumerate(results, start=1):
-        label = _build_label(row)
-
+    def _reason(r, row):
         reason = row.get("trending_reason") or "-"
-        if len(reason) > 40:
-            reason = reason[:37] + "..."
+        return reason[:37] + "..." if len(reason) > 40 else reason
 
-        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
-        per = _fmt_float(row.get("per"))
-        pbr = _fmt_float(row.get("pbr"))
-        div_yield = _fmt_pct(row.get("dividend_yield"))
-        roe = _fmt_pct(row.get("roe"))
-        score = _fmt_float(row.get("value_score"))
+    prefix = ""
+    if market_context:
+        prefix = f"> **X市場センチメント**: {market_context}\n\n"
 
-        classification = row.get("classification", "")
-        if "データ不足" in classification:
-            cls_str = "⚪不足"
-        elif "割安" in classification:
-            cls_str = "🟢割安"
-        elif "適正" in classification:
-            cls_str = "🟡適正"
-        else:
-            cls_str = "🔴割高"
+    table = render_screening_table(results, columns=[
+        ("順位", "---:", lambda r, row: str(r)),
+        ("銘柄", ":-----", lambda r, row: _build_label(row)),
+        ("話題の理由", ":---------", _reason),
+        ("株価", "-----:", _price_cell),
+        ("PER", "----:", lambda r, row: _fmt_float(row.get("per"))),
+        ("PBR", "----:", lambda r, row: _fmt_float(row.get("pbr"))),
+        ("配当利回り", "---------:", lambda r, row: _fmt_pct(row.get("dividend_yield"))),
+        ("ROE", "----:", lambda r, row: _fmt_pct(row.get("roe"))),
+        ("スコア", "------:", lambda r, row: _fmt_float(row.get("value_score"))),
+        ("判定", ":----:", _cls),
+    ], empty_msg="X上でトレンド中の銘柄が見つかりませんでした。", legends=[
+        "**判定基準**: 🟢割安(スコア60+) / 🟡適正(スコア30-59) / 🔴割高(スコア30未満) / ⚪不足(データ取得失敗)",
+        "**データソース**: X (Twitter) トレンド → Yahoo Finance ファンダメンタルズ",
+    ])
+    return prefix + table if prefix else table
 
-        lines.append(
-            f"| {rank} | {label} | {reason} | {price} | {per} | {pbr} "
-            f"| {div_yield} | {roe} | {score} | {cls_str} |"
-        )
 
-    lines.append("")
-    lines.append("**判定基準**: 🟢割安(スコア60+) / 🟡適正(スコア30-59) / 🔴割高(スコア30未満) / ⚪不足(データ取得失敗)")
-    lines.append("**データソース**: X (Twitter) トレンド → Yahoo Finance ファンダメンタルズ")
+# ---------------------------------------------------------------------------
+# 8. Contrarian
+# ---------------------------------------------------------------------------
 
-    _append_annotation_footer(lines, results)
-    return "\n".join(lines)
+_GRADE_ICON = {"A": "\U0001f7e2", "B": "\U0001f7e1", "C": "\u26aa", "D": "\U0001f534"}
 
 
 def format_contrarian_markdown(results: list[dict]) -> str:
-    """Format contrarian screening results as a Markdown table (KIK-504).
+    """Format contrarian screening results (3-axis scoring)."""
+    def _grade(r, row):
+        g = row.get("contrarian_grade", "-")
+        return f"{_GRADE_ICON.get(g, '')}{g}"
 
-    Shows 3-axis scoring: Technical (40pt) + Valuation (30pt) + Fundamental (30pt) = 100pt.
-    """
-    if not results:
-        return "逆張り条件に合致する銘柄が見つかりませんでした。"
+    return render_screening_table(results, columns=[
+        ("順位", "---:", lambda r, row: str(r)),
+        ("銘柄", ":-----", lambda r, row: _build_label(row)),
+        ("株価", "-----:", _price_cell),
+        ("PER", "----:", lambda r, row: _fmt_float(row.get("per"))),
+        ("PBR", "----:", lambda r, row: _fmt_float(row.get("pbr"))),
+        ("RSI", "----:", lambda r, row: _fmt_float(row.get("rsi"), decimals=1)),
+        ("SMA200乖離", "---------:", lambda r, row: _fmt_pct(row.get("sma200_deviation"))),
+        ("テク", "----:", lambda r, row: _fmt_float(row.get("tech_score"), decimals=0)),
+        ("バリュ", "-----:", lambda r, row: _fmt_float(row.get("val_score"), decimals=0)),
+        ("ファンダ", "------:", lambda r, row: _fmt_float(row.get("fund_score"), decimals=0)),
+        ("総合", "----:", lambda r, row: _fmt_float(row.get("contrarian_score"), decimals=0)),
+        ("判定", ":----:", _grade),
+    ], empty_msg="逆張り条件に合致する銘柄が見つかりませんでした。", legends=[
+        "**凡例**: テク=テクニカル逆張り(40pt) / バリュ=バリュエーション逆張り(30pt) / ファンダ=ファンダ乖離(30pt)",
+        "**判定**: \U0001f7e2A(70+)=強い逆張り / \U0001f7e1B(50+)=逆張りあり / \u26aaC(30+)=弱い / \U0001f534D(<30)=なし",
+    ])
 
-    lines = [
-        "| 順位 | 銘柄 | 株価 | PER | PBR | RSI | SMA200乖離 | テク | バリュ | ファンダ | 総合 | 判定 |",
-        "|---:|:-----|-----:|----:|----:|----:|---------:|----:|-----:|------:|----:|:----:|",
-    ]
 
-    _GRADE_ICON = {"A": "\U0001f7e2", "B": "\U0001f7e1", "C": "\u26aa", "D": "\U0001f534"}
+# ---------------------------------------------------------------------------
+# 9. Momentum
+# ---------------------------------------------------------------------------
 
-    for rank, row in enumerate(results, start=1):
-        label = _build_label(row)
-
-        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
-        per = _fmt_float(row.get("per"))
-        pbr = _fmt_float(row.get("pbr"))
-        rsi = _fmt_float(row.get("rsi"), decimals=1)
-        sma_dev = _fmt_pct(row.get("sma200_deviation"))
-        tech = _fmt_float(row.get("tech_score"), decimals=0)
-        val = _fmt_float(row.get("val_score"), decimals=0)
-        fund = _fmt_float(row.get("fund_score"), decimals=0)
-        total = _fmt_float(row.get("contrarian_score"), decimals=0)
-        grade = row.get("contrarian_grade", "-")
-        icon = _GRADE_ICON.get(grade, "")
-        grade_str = f"{icon}{grade}"
-
-        lines.append(
-            f"| {rank} | {label} | {price} | {per} | {pbr} "
-            f"| {rsi} | {sma_dev} | {tech} | {val} | {fund} | {total} | {grade_str} |"
-        )
-
-    lines.append("")
-    lines.append("**凡例**: テク=テクニカル逆張り(40pt) / バリュ=バリュエーション逆張り(30pt) / ファンダ=ファンダ乖離(30pt)")
-    lines.append("**判定**: \U0001f7e2A(70+)=強い逆張り / \U0001f7e1B(50+)=逆張りあり / \u26aaC(30+)=弱い / \U0001f534D(<30)=なし")
-
-    _append_annotation_footer(lines, results)
-    return "\n".join(lines)
+_SURGE_ICONS = {"accelerating": "\U0001f7e2", "surging": "\U0001f7e1", "overheated": "\U0001f534", "none": "\u26aa"}
+_SURGE_LABELS = {"accelerating": "加速", "surging": "急騰", "overheated": "過熱", "none": "-"}
 
 
 def format_momentum_markdown(results: list[dict]) -> str:
-    """Format momentum/surge screening results as a Markdown table (KIK-506).
+    """Format momentum/surge screening results."""
+    def _level(r, row):
+        lv = row.get("surge_level", "none")
+        return f"{_SURGE_ICONS.get(lv, '')}{_SURGE_LABELS.get(lv, '-')}"
 
-    Shows surge-level metrics: 50MA deviation, volume ratio, RSI, 52-week high proximity.
-    """
-    if not results:
-        return "モメンタム条件に合致する銘柄が見つかりませんでした。"
+    return render_screening_table(results, columns=[
+        ("順位", "---:", lambda r, row: str(r)),
+        ("銘柄", ":-----", lambda r, row: _build_label(row)),
+        ("株価", "-----:", _price_cell),
+        ("50MA乖離", "-------:", lambda r, row: _fmt_pct(row.get("ma50_deviation"))),
+        ("出来高比", "-------:", lambda r, row: _fmt_float(row.get("volume_ratio"), decimals=2)),
+        ("RSI", "----:", lambda r, row: _fmt_float(row.get("rsi"), decimals=1)),
+        ("52w高値比", "--------:", lambda r, row: _fmt_pct(row.get("high_change_pct"))),
+        ("スコア", "------:", lambda r, row: _fmt_float(row.get("surge_score"), decimals=0)),
+        ("レベル", ":------:", _level),
+    ], empty_msg="モメンタム条件に合致する銘柄が見つかりませんでした。", legends=[
+        "**レベル**: \U0001f7e2加速(+10~15%)=エントリー好機 / \U0001f7e1急騰(+15~30%)=勢い継続 / \U0001f534過熱(+30%超)=\u26a0\ufe0f利確注意",
+    ])
 
-    lines = [
-        "| 順位 | 銘柄 | 株価 | 50MA乖離 | 出来高比 | RSI | 52w高値比 | スコア | レベル |",
-        "|---:|:-----|-----:|-------:|-------:|----:|--------:|------:|:------:|",
-    ]
 
-    _SURGE_ICONS = {
-        "accelerating": "\U0001f7e2",  # green circle
-        "surging": "\U0001f7e1",       # yellow circle
-        "overheated": "\U0001f534",    # red circle
-        "none": "\u26aa",              # white circle
-    }
-
-    _SURGE_LABELS = {
-        "accelerating": "加速",
-        "surging": "急騰",
-        "overheated": "過熱",
-        "none": "-",
-    }
-
-    for rank, row in enumerate(results, start=1):
-        label = _build_label(row)
-
-        price = _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
-        ma50_dev = _fmt_pct(row.get("ma50_deviation"))
-        vol_ratio = _fmt_float(row.get("volume_ratio"), decimals=2)
-        rsi = _fmt_float(row.get("rsi"), decimals=1)
-        high_change = _fmt_pct(row.get("high_change_pct"))
-        score = _fmt_float(row.get("surge_score"), decimals=0)
-        level = row.get("surge_level", "none")
-        icon = _SURGE_ICONS.get(level, "")
-        level_label = _SURGE_LABELS.get(level, "-")
-        level_str = f"{icon}{level_label}"
-
-        lines.append(
-            f"| {rank} | {label} | {price} "
-            f"| {ma50_dev} | {vol_ratio} | {rsi} | {high_change} | {score} | {level_str} |"
-        )
-
-    lines.append("")
-    lines.append("**レベル**: \U0001f7e2加速(+10~15%)=エントリー好機 / \U0001f7e1急騰(+15~30%)=勢い継続 / \U0001f534過熱(+30%超)=\u26a0\ufe0f利確注意")
-
-    _append_annotation_footer(lines, results)
-    return "\n".join(lines)
-
+# ---------------------------------------------------------------------------
+# Auto-theme header (not a table formatter)
+# ---------------------------------------------------------------------------
 
 def format_auto_theme_header(themes: list[dict], skipped: list[dict] | None = None) -> str:
-    """Format Grok trending themes header (KIK-440).
-
-    Parameters
-    ----------
-    themes : list[dict]
-        Detected themes with keys: theme, reason, confidence.
-    skipped : list[dict] | None
-        Themes that were skipped (not in themes.yaml).
-
-    Returns
-    -------
-    str
-        Formatted header string.
-    """
+    """Format Grok trending themes header (KIK-440)."""
     from datetime import date
-
     lines = [f"\U0001f525 Grok が検出したトレンドテーマ（{date.today().isoformat()}）\n"]
     for i, t in enumerate(themes, 1):
         conf_pct = int(t.get("confidence", 0) * 100)
