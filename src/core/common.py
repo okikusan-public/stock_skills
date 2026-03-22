@@ -2,9 +2,41 @@
 
 Extracted from portfolio_manager, rebalancer, health_check, return_estimate,
 correlation, scenario_analysis, and shock_sensitivity to eliminate duplication.
+KIK-579: Added graceful_degradation decorator.
 """
 
+import functools
 import math
+
+
+def graceful_degradation(default=None):
+    """Decorator that catches all exceptions and returns a default value (KIK-579).
+
+    Mutable defaults (list, dict, set) are copied on each exception to
+    prevent shared-instance bugs.
+
+    Usage:
+        @graceful_degradation(default=[])
+        def get_data():
+            ...  # returns a fresh [] on any exception
+
+        @graceful_degradation()
+        def try_something():
+            ...  # returns None on any exception
+    """
+    _is_mutable = isinstance(default, (list, dict, set))
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception:
+                if _is_mutable:
+                    return default.copy()
+                return default
+        return wrapper
+    return decorator
 
 
 def is_cash(symbol: str) -> bool:

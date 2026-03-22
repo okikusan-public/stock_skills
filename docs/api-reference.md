@@ -27,31 +27,67 @@ Action item detector for proactive suggestions (KIK-472, KIK-489).
 
 Shared utility functions used across multiple core modules.
 
+- `graceful_degradation(default=None)` — Decorator that catches all exceptions and returns a default value (KIK-579).
 - `is_cash(symbol: str) -> bool` — Check if symbol represents a cash position (e.g., JPY.CASH, USD.CASH).
 - `is_etf(stock_detail: dict) -> bool` — Return True if stock_detail looks like an ETF (lacks fundamental data).
 - `finite_or_none(v)` — Return v if finite number, else None.
 - `safe_float(value, default: float=0.0) -> float` — Convert value to float safely, returning default on failure.
 
-### src.core.health_check (KIK-469: ETF対応+PF統合)
+### src.core.health.alert
 
-Portfolio health check engine (KIK-356).
+Alert level computation for portfolio health checks (KIK-576).
 
-- `check_trend_health(hist: Optional[pd.DataFrame], cross_lookback: int | None=None) -> dict` — Analyze trend health from price history.
-- `check_change_quality(stock_detail: dict) -> dict` — Evaluate change quality (alpha signal) of a holding.
 - `compute_alert_level(trend_health: dict, change_quality: dict, stock_detail=None, return_stability: dict | None=None, is_small_cap: bool=False) -> dict` — Compute 3-level alert from trend and change quality.
-- `run_health_check(csv_path: str, client) -> dict` — Run health check on all portfolio holdings.
 
-### src.core.health_etf (KIK-469/512: ETFヘルスチェック)
+### src.core.health.community
 
-ETF-specific health check logic (KIK-469).
+Community concentration analysis for portfolio health checks (KIK-549, KIK-576).
+
+
+### src.core.health.etf
+
+ETF-specific health check logic (KIK-469, KIK-576).
 
 - `check_etf_health(stock_detail: dict) -> dict` — ETF固有のヘルスチェック (KIK-469).
 
-### src.core.health_labels (KIK-371/512: 長期適性ラベル生成)
+### src.core.health.labels
 
-Label and verdict generation for portfolio health checks (KIK-371).
+Label and verdict generation for portfolio health checks (KIK-371, KIK-576).
 
 - `check_long_term_suitability(stock_detail: dict, shareholder_return_data: dict | None=None) -> dict` — Evaluate long-term holding suitability from fundamental data.
+
+### src.core.health.quality
+
+Change quality evaluation for portfolio health checks (KIK-576).
+
+- `check_change_quality(stock_detail: dict) -> dict` — Evaluate change quality (alpha signal) of a holding.
+
+### src.core.health.runner
+
+Portfolio health check orchestrator (KIK-576).
+
+- `run_health_check(csv_path: str, client) -> dict` — Run health check on all portfolio holdings.
+
+### src.core.health.trend
+
+Trend health analysis for portfolio health checks (KIK-576).
+
+- `check_trend_health(hist: Optional[pd.DataFrame], cross_lookback: int | None=None) -> dict` — Analyze trend health from price history.
+
+### src.core.health_check (KIK-469: ETF対応+PF統合)
+
+Backward-compatible re-export (KIK-576). Import from src.core.health directly.
+
+
+### src.core.health_etf (KIK-469/512: ETFヘルスチェック)
+
+Backward-compatible re-export (KIK-576). Import from src.core.health.etf directly.
+
+
+### src.core.health_labels (KIK-371/512: 長期適性ラベル生成)
+
+Backward-compatible re-export (KIK-576). Import from src.core.health.labels directly.
+
 
 ### src.core.market_dashboard
 
@@ -255,15 +291,25 @@ Bridge between portfolio management and stress test skills (KIK-342 -> KIK-339).
 - `portfolio_to_stress_args(csv_path: Optional[str]=None) -> dict` — Generate stress-test arguments from portfolio.csv.
 - `build_stress_test_command(csv_path: Optional[str]=None, scenario: Optional[str]=None, base_shock: float=-0.2) -> str` — Build a full stress-test command string from portfolio CSV.
 
-### src.core.portfolio.portfolio_manager
+### src.core.portfolio.portfolio_io
 
-Portfolio management core logic (KIK-342).
+Portfolio I/O: CSV load/save and position operations (KIK-578 split).
 
 - `load_portfolio(csv_path: str=DEFAULT_CSV_PATH) -> list[dict]` — CSVからポートフォリオを読み込む。
 - `save_portfolio(portfolio: list[dict], csv_path: str=DEFAULT_CSV_PATH) -> None` — ポートフォリオをCSVに保存。
 - `add_position(csv_path: str, symbol: str, shares: int, cost_price: float, cost_currency: str='JPY', purchase_date: Optional[str]=None, memo: str='') -> dict` — 新規ポジション追加 or 既存ポジションへの追加購入。
 - `sell_position(csv_path: str, symbol: str, shares: int, sell_price: Optional[float]=None, sell_date: Optional[str]=None) -> dict` — 売却。shares分を減算。0以下になったら行を削除。
 - `get_performance_review(year: Optional[int]=None, symbol: Optional[str]=None, base_dir: str='data/history') -> dict` — 売買パフォーマンスレビュー集計 (KIK-441)。
+
+### src.core.portfolio.portfolio_manager
+
+Portfolio management core logic (KIK-342).
+
+
+### src.core.portfolio.portfolio_query
+
+Portfolio query: snapshot, structure analysis, and merge (KIK-578 split).
+
 - `get_snapshot(csv_path: str, client) -> dict` — スナップショット生成。
 - `get_structure_analysis(csv_path: str, client) -> dict` — 構造分析。PFの偏りを自動集計。
 - `get_portfolio_shareholder_return(csv_path: str, client) -> dict` — Calculate weighted-average shareholder return for the portfolio.
@@ -691,18 +737,23 @@ Value trap detection (extracted from health_check.py, KIK-392).
 
 ## Data Layer
 
-### src.data.auto_context
-
-Backward-compatible shim (KIK-517). Real module: src.data.context.auto_context
-
-
 ### src.data.context.auto_context (KIK-411/420: ハイブリッド検索)
 
 Auto graph context injection for user prompts (KIK-411/420/427).
 
+- `get_context(user_input: str) -> Optional[dict]` — Auto-detect symbol in user input and retrieve graph context.
+
+### src.data.context.context_formatter
+
+Markdown formatting for graph context output (KIK-411/427/428).
+
+
+### src.data.context.freshness
+
+Freshness label and threshold logic for graph context (KIK-427/428).
+
 - `freshness_label(date_str: str) -> str` — Return freshness label for a date string.
 - `freshness_action(label: str) -> str` — Return recommended action for a freshness label.
-- `get_context(user_input: str) -> Optional[dict]` — Auto-detect symbol in user input and retrieve graph context.
 
 ### src.data.context.grok_context (KIK-488: Neo4j知識→Grokプロンプト注入)
 
@@ -727,6 +778,11 @@ GraphRAG context aggregator for screening output (KIK-452).
 
 - `get_screening_graph_context(symbols: list[str], sectors: list[str], days: int=7) -> dict` — Aggregate knowledge graph context for a set of screened symbols.
 
+### src.data.context.skill_recommender
+
+Graph-state analysis and skill recommendation (KIK-411/414).
+
+
 ### src.data.context.summary_builder (KIK-420: セマンティックサマリー生成)
 
 Semantic summary template builders for Neo4j vector search (KIK-420).
@@ -742,6 +798,11 @@ Semantic summary template builders for Neo4j vector search (KIK-420).
 - `build_stress_test_summary(test_date: str, scenario: str='', portfolio_impact: float=0, symbol_count: int=0) -> str` — Build summary for a StressTest node (KIK-428).
 - `build_forecast_summary(forecast_date: str, optimistic: float | None=None, base: float | None=None, pessimistic: float | None=None, symbol_count: int=0) -> str` — Build summary for a Forecast node (KIK-428).
 
+### src.data.context.vector_search
+
+TEI vector search and result merging for hybrid context retrieval (KIK-420).
+
+
 ### src.data.embedding_client (KIK-420: TEIベクトル検索)
 
 TEI (Text Embeddings Inference) REST API client (KIK-420).
@@ -749,16 +810,6 @@ TEI (Text Embeddings Inference) REST API client (KIK-420).
 - `is_available() -> bool` — Check if TEI service is reachable (result cached for 30s).
 - `get_embedding(text: str) -> list[float] | None` — Get embedding vector from TEI. Returns None on failure.
 - `reset_cache()` — Reset availability cache (for testing).
-
-### src.data.graph_linker
-
-Backward-compatible shim (KIK-517). Real module: src.data.graph_store.linker
-
-
-### src.data.graph_nl_query
-
-Backward-compatible shim (KIK-517). Real module: src.data.graph_query.nl_query
-
 
 ### src.data.graph_query._common
 
@@ -775,14 +826,24 @@ ActionItem graph queries (KIK-472).
 
 Community detection via co-occurrence analysis (KIK-547).
 
+
+### src.data.graph_query.community_detect
+
+Community detection pipeline via co-occurrence analysis (KIK-578 split).
+
 - `detect_communities(similarity_cutoff: float=0.3, top_k: int=10, resolution: float=1.0) -> list[dict]` — Run community detection pipeline.
+- `discover_hidden_themes() -> list[dict]` — Discover hidden themes from community patterns (KIK-550).
+- `label_community(members: list[str], session, fallback_id: int=0) -> dict` — Generate a label for a community with confidence score (KIK-550).
+
+### src.data.graph_query.community_query
+
+Community query functions (KIK-578 split from community.py).
+
 - `get_communities(level: int=0) -> list[dict]` — Retrieve existing Community nodes from Neo4j.
 - `get_stock_community(symbol: str) -> Optional[dict]` — Get the community a stock belongs to.
 - `get_similar_stocks(symbol: str, top_k: int=5, similarity_cutoff: float=0.3) -> list[dict]` — Get stocks most similar to the given symbol.
 - `update_stock_community(symbol: str, similarity_cutoff: float=0.3) -> Optional[dict]` — Assign a stock to the best-matching existing community.
-- `label_community(members: list[str], session, fallback_id: int=0) -> dict` — Generate a label for a community with confidence score (KIK-550).
 - `get_community_lessons(symbol: str, limit: int=3) -> list[dict]` — Get lessons from peer stocks in the same community (KIK-569).
-- `discover_hidden_themes() -> list[dict]` — Discover hidden themes from community patterns (KIK-550).
 
 ### src.data.graph_query.market
 
@@ -953,11 +1014,6 @@ Stock-related Grok API functions: search_stock_deep, search_x_sentiment.
 - `search_x_sentiment(symbol: str, company_name: str='', timeout: int=30, context: str='') -> dict` — Search X for stock sentiment using Grok API.
 - `search_stock_deep(symbol: str, company_name: str='', timeout: int=30, context: str='') -> dict` — Deep research on a stock via X and web search.
 
-### src.data.grok_context
-
-Backward-compatible shim (KIK-517). Real module: src.data.context.grok_context
-
-
 ### src.data.history._helpers
 
 Internal helpers for history store (KIK-512 split).
@@ -972,21 +1028,46 @@ History store load/query functions (KIK-512 split).
 
 ### src.data.history.save
 
-History store save functions (KIK-512 split).
+History store save functions — re-export shim (KIK-578).
 
-- `save_screening(preset: str, region: str, results: list[dict], sector: str | None=None, theme: str | None=None, base_dir: str='data/history') -> str` — Save screening results to JSON.
-- `save_report(symbol: str, data: dict, score: float, verdict: str, base_dir: str='data/history') -> str` — Save a stock report to JSON.
-- `save_trade(symbol: str, trade_type: str, shares: int, price: float, currency: str, date_str: str, memo: str='', base_dir: str='data/history', sell_price: Optional[float]=None, realized_pnl: Optional[float]=None, pnl_rate: Optional[float]=None, hold_days: Optional[int]=None, cost_price: Optional[float]=None, stock_info: Optional[dict]=None) -> str` — Save a trade record to JSON.
+
+### src.data.history.save_health
+
+Save health check results to history (KIK-578 split from save.py).
+
 - `save_health(health_data: dict, base_dir: str='data/history') -> str` — Save health check results to JSON.
-- `save_research(research_type: str, target: str, result: dict, base_dir: str='data/history') -> str` — Save research results to JSON (KIK-405).
-- `save_market_context(context: dict, base_dir: str='data/history') -> str` — Save market context snapshot to JSON (KIK-405).
+
+### src.data.history.save_misc
+
+Save stress test and forecast results to history (KIK-578 split from save.py).
+
 - `save_stress_test(scenario: str, symbols: list[str], portfolio_impact: float, per_stock_impacts: list[dict] | None=None, var_result: dict | None=None, high_correlation_pairs: list | None=None, concentration: dict | None=None, recommendations: list | None=None, base_dir: str='data/history') -> str` — Save stress test results to JSON (KIK-428).
 - `save_forecast(positions: list[dict], total_value_jpy: float=0, base_dir: str='data/history') -> str` — Save forecast results to JSON (KIK-428).
 
-### src.data.history_store
+### src.data.history.save_report
 
-Backward-compatible shim (KIK-517). Real module: src.data.history
+Save report results to history (KIK-578 split from save.py).
 
+- `save_report(symbol: str, data: dict, score: float, verdict: str, base_dir: str='data/history') -> str` — Save a stock report to JSON.
+
+### src.data.history.save_research
+
+Save research and market context results to history (KIK-578 split from save.py).
+
+- `save_research(research_type: str, target: str, result: dict, base_dir: str='data/history') -> str` — Save research results to JSON (KIK-405).
+- `save_market_context(context: dict, base_dir: str='data/history') -> str` — Save market context snapshot to JSON (KIK-405).
+
+### src.data.history.save_screen
+
+Save screening results to history (KIK-578 split from save.py).
+
+- `save_screening(preset: str, region: str, results: list[dict], sector: str | None=None, theme: str | None=None, base_dir: str='data/history') -> str` — Save screening results to JSON.
+
+### src.data.history.save_trade
+
+Save trade records to history (KIK-578 split from save.py).
+
+- `save_trade(symbol: str, trade_type: str, shares: int, price: float, currency: str, date_str: str, memo: str='', base_dir: str='data/history', sell_price: Optional[float]=None, realized_pnl: Optional[float]=None, pnl_rate: Optional[float]=None, hold_days: Optional[int]=None, cost_price: Optional[float]=None, stock_info: Optional[dict]=None) -> str` — Save a trade record to JSON.
 
 ### src.data.lesson_community
 
@@ -1029,21 +1110,6 @@ Note manager -- dual-write to JSON files and Neo4j (KIK-397, KIK-429).
 - `get_exit_rules(symbol: Optional[str]=None, base_dir: str=_NOTES_DIR) -> list[dict]` — Load exit-rule notes, optionally filtered by symbol (KIK-566).
 - `check_exit_rule(symbol: str, pnl_pct: float, base_dir: str=_NOTES_DIR) -> Optional[dict]` — Check if a position has hit any exit-rule threshold (KIK-566).
 - `delete_note(note_id: str, base_dir: str=_NOTES_DIR) -> bool` — Delete a note by ID from JSON files.
-
-### src.data.screen_annotator
-
-Backward-compatible shim (KIK-517). Real module: src.data.context.screen_annotator
-
-
-### src.data.screening_context
-
-Backward-compatible shim (KIK-517). Real module: src.data.context.screening_context
-
-
-### src.data.summary_builder
-
-Backward-compatible shim (KIK-517). Real module: src.data.context.summary_builder
-
 
 ### src.data.yahoo_client._cache
 
