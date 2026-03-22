@@ -113,6 +113,7 @@
 | 最新ニュース、センチメント、深掘り分析 | `/market-research stock` | 定性的な深掘り |
 | 業界の動向、トレンド | `/market-research industry` | 業界名・テーマが対象 |
 | マーケット概況、相場の状況 | `/market-research market` | 市場全体が対象 |
+| 市況チェック、温度感、VIX、F&G、金利推移、イールドカーブ | 定量+定性 同時実行 | 下記KIK-567参照 |
 | ビジネスモデル、事業構造、セグメント、収益構造、何で稼いでる | `/market-research business` | 事業の仕組みが対象 |
 | 過去の分析結果、前回のレポート、以前のスクリーニング | `/graph-query` | 過去データの参照（知識ドメインへ連携） |
 | 似た銘柄、類似銘柄、関連銘柄、同じグループ | `/graph-query` | コミュニティ検索（KIK-547） |
@@ -122,6 +123,14 @@
 - 「〇〇を深掘りして」「〇〇の最新情報」「〇〇のニュース」 → `/market-research stock`
 - 「〇〇のビジネスモデル」「〇〇は何で稼いでる？」「事業構造を教えて」 → `/market-research business`
 - 「〇〇について詳しく」 → 両方実行して統合レポート
+
+**KIK-567 関連（市況チェック — 定量+定性）**:
+- 「市況チェック」「相場の温度感」「VIXは？」「F&Gは？」「金利の推移」「イールドカーブ」 → 2つ同時実行:
+  1. `python3 scripts/market_dashboard.py`（定量: VIX/F&G/金利/イールドカーブ）
+  2. `/market-research market`（定性: Grokでニュース・センチメント）
+  → Claude が両方の出力を統合して回答
+- 「VIXだけ見せて」「金利の推移」 → `python3 scripts/market_dashboard.py` のみ（定量だけ）
+- 「市況ニュース」「最新の相場観」 → `/market-research market` のみ（定性だけ）
 
 **KIK-375 関連**:
 - 「還元率」「自社株買い」「株主還元」「トータルリターン」 → `/stock-report`（株主還元セクションで表示）

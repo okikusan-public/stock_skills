@@ -53,6 +53,14 @@ Label and verdict generation for portfolio health checks (KIK-371).
 
 - `check_long_term_suitability(stock_detail: dict, shareholder_return_data: dict | None=None) -> dict` — Evaluate long-term holding suitability from fundamental data.
 
+### src.core.market_dashboard
+
+Market dashboard — quantitative market overview (KIK-567).
+
+- `compute_fear_greed(client=None) -> dict` — Compute a Fear & Greed score from 6 market indicators.
+- `get_vix_history(client=None, period: str='1mo') -> dict` — Get VIX history with phase classification.
+- `get_yield_curve(client=None) -> dict` — Get US Treasury yield curve with spread analysis.
+
 ### src.core.models
 
 Core data models for portfolio management (KIK-365 Phase 2).
