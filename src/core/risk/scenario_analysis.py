@@ -1,6 +1,5 @@
 """Scenario-based causal chain analysis for portfolio stress testing (KIK-341)."""
 
-import math
 from typing import Optional
 
 from src.core.common import safe_float as _safe_float
@@ -11,22 +10,14 @@ from src.core.risk.scenario_definitions import (
     SUFFIX_TO_REGION,
     ETF_ASSET_CLASS,
 )
-from src.core.ticker_utils import (
-    SUFFIX_TO_CURRENCY as _SUFFIX_TO_CURRENCY_FULL,
-    infer_currency as _infer_currency,
-)
-
-# Module-private aliases for internal use
-_TARGET_TO_SECTORS = TARGET_TO_SECTORS
-_SUFFIX_TO_REGION = SUFFIX_TO_REGION
-_ETF_ASSET_CLASS = ETF_ASSET_CLASS
+from src.core.ticker_utils import infer_currency as _infer_currency
 
 
 def _get_etf_asset_class(symbol: str, stock_info: dict) -> Optional[str]:
     """Return the ETF asset class if the symbol is a known ETF, else None."""
     # Strip suffix for lookup (e.g., "1326.T" -> not in mapping, just use symbol)
     base_symbol = symbol.split(".")[0] if "." in symbol else symbol
-    asset_class = _ETF_ASSET_CLASS.get(base_symbol)
+    asset_class = ETF_ASSET_CLASS.get(base_symbol)
     if asset_class:
         return asset_class
     # quoteType fallback
@@ -40,7 +31,7 @@ def _infer_region(symbol: str, stock_info: dict) -> str:
     country = stock_info.get("country") or stock_info.get("region")
     if country:
         return country
-    for suffix, region in _SUFFIX_TO_REGION.items():
+    for suffix, region in SUFFIX_TO_REGION.items():
         if symbol.endswith(suffix):
             return region
     return "US"
@@ -115,12 +106,12 @@ def _match_target(
     if target == "中国関連株" and region in ("China", "Hong Kong"):
         return True
     if target in ("日本輸出株", "輸出企業") and region == "Japan":
-        sector_list = _TARGET_TO_SECTORS.get(target)
+        sector_list = TARGET_TO_SECTORS.get(target)
         if sector_list is None:
             return True
         return sector in sector_list if sector else False
     if target in ("日本内需株", "内需企業") and region == "Japan":
-        sector_list = _TARGET_TO_SECTORS.get(target)
+        sector_list = TARGET_TO_SECTORS.get(target)
         if sector_list is None:
             return True
         return sector in sector_list if sector else False
@@ -130,7 +121,7 @@ def _match_target(
         return sector not in ("Technology", "Communication Services") if sector else True
 
     # セクターベースのマッチング
-    sector_list = _TARGET_TO_SECTORS.get(target)
+    sector_list = TARGET_TO_SECTORS.get(target)
     if sector_list is not None and sector in (sector_list or []):
         return True
 

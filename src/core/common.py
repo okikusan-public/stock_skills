@@ -47,12 +47,5 @@ def safe_float(value, default: float = 0.0) -> float:
 
     Handles None, NaN, Inf, and non-numeric strings.
     """
-    if value is None:
-        return default
-    try:
-        f = float(value)
-        if math.isnan(f) or math.isinf(f):
-            return default
-        return f
-    except (TypeError, ValueError):
-        return default
+    result = finite_or_none(value)
+    return result if result is not None else default
