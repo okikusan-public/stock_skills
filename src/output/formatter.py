@@ -3,9 +3,11 @@
 from src.output._format_helpers import (
     fmt_pct as _fmt_pct,
     fmt_float as _fmt_float,
+    fmt_currency_value as _fmt_currency_value,
     build_label as _build_label,
     render_screening_table,
 )
+from src.core.ticker_utils import lot_cost as _lot_cost, infer_currency as _infer_currency
 
 
 # ---------------------------------------------------------------------------
@@ -14,6 +16,17 @@ from src.output._format_helpers import (
 
 def _price_cell(rank, row):
     return _fmt_float(row.get("price"), decimals=0) if row.get("price") is not None else "-"
+
+
+def _lot_cost_cell(rank, row):
+    """Format minimum investment amount (lot cost) with currency symbol."""
+    price = row.get("price")
+    symbol = row.get("symbol", "")
+    if price is None or not symbol:
+        return "-"
+    cost = _lot_cost(symbol, price)
+    currency = _infer_currency(symbol)
+    return _fmt_currency_value(cost, currency)
 
 
 # ---------------------------------------------------------------------------
@@ -45,6 +58,7 @@ def format_query_markdown(results: list[dict]) -> str:
         ("銘柄", ":-----", lambda r, row: _build_label(row)),
         ("セクター", ":---------", lambda r, row: row.get("sector") or "-"),
         ("株価", "-----:", _price_cell),
+        ("最低投資額", "---------:", _lot_cost_cell),
         ("PER", "----:", lambda r, row: _fmt_float(row.get("per"))),
         ("PBR", "----:", lambda r, row: _fmt_float(row.get("pbr"))),
         ("配当利回り", "---------:", lambda r, row: _fmt_pct(row.get("dividend_yield"))),

@@ -412,3 +412,126 @@ class TestAnnotationMarkers:
         }]
         output = format_shareholder_return_markdown(results)
         assert "\u26a0\ufe0f" in output
+
+
+# ---------------------------------------------------------------------------
+# Lot cost column in format_query_markdown — KIK-598
+# ---------------------------------------------------------------------------
+
+class TestLotCostColumn:
+    """Tests for lot cost column in format_query_markdown (KIK-598)."""
+
+    def test_jp_stock_lot_cost(self):
+        """Japanese stock lot cost = 100 shares * price."""
+        results = [{
+            "symbol": "7203.T",
+            "name": "Toyota Motor",
+            "sector": "Consumer Cyclical",
+            "price": 2850.0,
+            "per": 10.5,
+            "pbr": 1.2,
+            "dividend_yield": 0.025,
+            "roe": 0.12,
+            "value_score": 72.5,
+        }]
+        output = format_query_markdown(results)
+        assert "| \u6700\u4f4e\u6295\u8cc7\u984d |" in output
+        # 100 * 2850 = 285,000 -> "\u00a5285,000"
+        assert "\u00a5285,000" in output
+
+    def test_us_stock_lot_cost(self):
+        """US stock lot cost = 1 share * price."""
+        results = [{
+            "symbol": "AAPL",
+            "name": "Apple Inc.",
+            "sector": "Technology",
+            "price": 195.0,
+            "per": 28.5,
+            "pbr": 45.0,
+            "dividend_yield": 0.005,
+            "roe": 1.47,
+            "value_score": 35.0,
+        }]
+        output = format_query_markdown(results)
+        assert "| \u6700\u4f4e\u6295\u8cc7\u984d |" in output
+        # 1 * 195 = 195 -> "$195.00"
+        assert "$195.00" in output
+
+    def test_sg_stock_lot_cost(self):
+        """Singapore stock lot cost = 100 shares * price."""
+        results = [{
+            "symbol": "D05.SI",
+            "name": "DBS Group",
+            "sector": "Financial Services",
+            "price": 35.50,
+            "per": 9.0,
+            "pbr": 1.5,
+            "dividend_yield": 0.05,
+            "roe": 0.15,
+            "value_score": 65.0,
+        }]
+        output = format_query_markdown(results)
+        # 100 * 35.50 = 3550 -> "3,550.00 SGD"
+        assert "3,550.00 SGD" in output
+
+    def test_hk_stock_lot_cost(self):
+        """Hong Kong stock lot cost = 100 shares * price."""
+        results = [{
+            "symbol": "0700.HK",
+            "name": "Tencent",
+            "sector": "Technology",
+            "price": 380.0,
+            "per": 20.0,
+            "pbr": 5.0,
+            "dividend_yield": 0.01,
+            "roe": 0.25,
+            "value_score": 40.0,
+        }]
+        output = format_query_markdown(results)
+        # 100 * 380 = 38000 -> "38,000.00 HKD"
+        assert "38,000.00 HKD" in output
+
+    def test_missing_price_shows_dash(self):
+        """When price is None, lot cost shows '-'."""
+        results = [{"symbol": "7203.T", "price": None}]
+        output = format_query_markdown(results)
+        assert "| \u6700\u4f4e\u6295\u8cc7\u984d |" in output
+
+    def test_missing_symbol_shows_dash(self):
+        """When symbol is empty, lot cost shows '-'."""
+        results = [{"symbol": "", "price": 100.0}]
+        output = format_query_markdown(results)
+        # Should gracefully handle empty symbol
+
+    def test_multiple_stocks_different_currencies(self):
+        """Mixed JP and US stocks show correct currency for each."""
+        results = [
+            {
+                "symbol": "7203.T",
+                "name": "Toyota",
+                "sector": "Auto",
+                "price": 2850.0,
+                "per": 10.5,
+                "pbr": 1.2,
+                "dividend_yield": 0.025,
+                "roe": 0.12,
+                "value_score": 72.5,
+            },
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "sector": "Tech",
+                "price": 195.0,
+                "per": 28.5,
+                "pbr": 45.0,
+                "dividend_yield": 0.005,
+                "roe": 1.47,
+                "value_score": 35.0,
+            },
+        ]
+        output = format_query_markdown(results)
+        lines = output.split("\n")
+        # JP stock row: \u00a5285,000
+        assert "\u00a5285,000" in lines[2]
+        # US stock row: $195.00
+        assert "$195.00" in lines[3]
