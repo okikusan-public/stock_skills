@@ -106,3 +106,17 @@ class TestFormatAdjustmentPlan:
         output = format_adjustment_plan(plan)
         assert "Summary" in output
         assert "1 LOW" in output
+
+    def test_lot_size_column(self):
+        """KIK-597: Lot column shows lot size for each action."""
+        actions = [
+            Action(ActionType.SELL, "7203.T", Urgency.HIGH, ["EXIT"], ["P1"]),
+            Action(ActionType.FLAG, "AAPL", Urgency.LOW, ["short-term"], ["P5"]),
+        ]
+        plan = AdjustmentPlan(
+            regime=_regime(), actions=actions, candidates={}, summary="test",
+        )
+        output = format_adjustment_plan(plan)
+        assert "| Lot |" in output  # column header
+        assert "100株" in output    # JP stock lot=100
+        assert "| 1 |" in output    # US stock lot=1

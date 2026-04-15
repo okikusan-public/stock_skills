@@ -7,6 +7,7 @@ from src.core.portfolio.adjustment_advisor import (
     Action,
     Urgency,
 )
+from src.core.ticker_utils import get_lot_size
 
 
 _URGENCY_EMOJI = {
@@ -72,14 +73,16 @@ def format_adjustment_plan(plan: AdjustmentPlan) -> str:
         emoji = _URGENCY_EMOJI[urg]
         label = _URGENCY_LABEL[urg]
         lines.append(f"### {emoji} {label} Priority\n")
-        lines.append("| Action | Target | Reasons | Rules |")
-        lines.append("|:-------|:-------|:--------|:------|")
+        lines.append("| Action | Target | Lot | Reasons | Rules |")
+        lines.append("|:-------|:-------|----:|:--------|:------|")
 
         for a in group:
             action_str = a.type.value
             reasons_str = "; ".join(a.reasons)
             rules_str = ", ".join(a.rule_ids)
-            lines.append(f"| {action_str} | {a.target} | {reasons_str} | {rules_str} |")
+            lot = get_lot_size(a.target)
+            lot_str = f"{lot}株" if lot > 1 else "1"
+            lines.append(f"| {action_str} | {a.target} | {lot_str} | {reasons_str} | {rules_str} |")
 
         lines.append("")
 

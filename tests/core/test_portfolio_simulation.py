@@ -76,6 +76,24 @@ class TestParseAddArg:
         assert result[0]["symbol"] == "7203.T"
         assert result[1]["symbol"] == "AAPL"
 
+    # --- Lot size validation (KIK-597) ---
+
+    def test_invalid_lot_size_jp_raises(self):
+        with pytest.raises(ValueError, match="100株単位"):
+            parse_add_arg("7203.T:50:2850")
+
+    def test_valid_lot_size_jp_passes(self):
+        result = parse_add_arg("7203.T:200:2850")
+        assert result[0]["shares"] == 200
+
+    def test_us_stock_any_lot_passes(self):
+        result = parse_add_arg("AAPL:7:250")
+        assert result[0]["shares"] == 7
+
+    def test_invalid_lot_size_taiwan_raises(self):
+        with pytest.raises(ValueError, match="1000株単位"):
+            parse_add_arg("2330.TW:500:600")
+
 
 # =========================================================================
 # TestMergePositions
@@ -344,7 +362,7 @@ class TestRunWhatIfSimulation:
 
     def test_basic_simulation(self, portfolio_csv, mock_client):
         proposed = [
-            {"symbol": "9984.T", "shares": 50, "cost_price": 7500.0,
+            {"symbol": "9984.T", "shares": 100, "cost_price": 7500.0,
              "cost_currency": "JPY"},
         ]
         result = run_what_if_simulation(
@@ -363,12 +381,12 @@ class TestRunWhatIfSimulation:
             > result["before"]["total_value_jpy"]
         )
 
-        # Required cash for 50 shares @ 7500 JPY
-        assert result["required_cash_jpy"] == pytest.approx(375000.0)
+        # Required cash for 100 shares @ 7500 JPY
+        assert result["required_cash_jpy"] == pytest.approx(750000.0)
 
     def test_temp_csv_cleaned_up(self, portfolio_csv, mock_client):
         proposed = [
-            {"symbol": "9984.T", "shares": 50, "cost_price": 7500.0,
+            {"symbol": "9984.T", "shares": 100, "cost_price": 7500.0,
              "cost_currency": "JPY"},
         ]
 
@@ -390,7 +408,7 @@ class TestRunWhatIfSimulation:
         original = load_portfolio(portfolio_csv)
 
         proposed = [
-            {"symbol": "9984.T", "shares": 50, "cost_price": 7500.0,
+            {"symbol": "9984.T", "shares": 100, "cost_price": 7500.0,
              "cost_currency": "JPY"},
         ]
         run_what_if_simulation(portfolio_csv, proposed, mock_client)
@@ -439,9 +457,23 @@ class TestParseRemoveArg:
             parse_remove_arg("7203.T:0")
 
     def test_spaces_trimmed(self):
-        result = parse_remove_arg(" 7203.T : 50 ")
+        result = parse_remove_arg(" 7203.T : 100 ")
         assert result[0]["symbol"] == "7203.T"
-        assert result[0]["shares"] == 50
+        assert result[0]["shares"] == 100
+
+    # --- Lot size validation (KIK-597) ---
+
+    def test_invalid_lot_size_raises(self):
+        with pytest.raises(ValueError, match="100株単位"):
+            parse_remove_arg("7203.T:50")
+
+    def test_valid_lot_size_passes(self):
+        result = parse_remove_arg("7203.T:200")
+        assert result[0]["shares"] == 200
+
+    def test_us_stock_any_lot_passes(self):
+        result = parse_remove_arg("AAPL:3")
+        assert result[0]["shares"] == 3
 
 
 # =========================================================================
@@ -609,14 +641,14 @@ class TestRunWhatIfSimulationWithRemoval:
 
     def test_remove_only_simulation(self, portfolio_csv, mock_client):
         """--remove のみ（追加なし）でシミュレーション可能。"""
-        removals_parsed = parse_remove_arg("7203.T:50")
+        removals_parsed = parse_remove_arg("7203.T:100")
         result = run_what_if_simulation(
             portfolio_csv, [], mock_client, removals=removals_parsed
         )
         assert "removals" in result
         assert "proceeds_jpy" in result
         assert "net_cash_jpy" in result
-        # 50株売却 → after では 50株のみ
+        # 100株全売却 → after では PF が空
         after_value = result["after"]["total_value_jpy"]
         before_value = result["before"]["total_value_jpy"]
         assert after_value < before_value
@@ -624,7 +656,7 @@ class TestRunWhatIfSimulationWithRemoval:
     def test_swap_simulation(self, portfolio_csv, mock_client):
         """sell 7203.T → buy 9984.T のスワップシミュレーション。"""
         removals_parsed = parse_remove_arg("7203.T:100")
-        proposed = [{"symbol": "9984.T", "shares": 50, "cost_price": 7500.0,
+        proposed = [{"symbol": "9984.T", "shares": 100, "cost_price": 7500.0,
                      "cost_currency": "JPY"}]
         result = run_what_if_simulation(
             portfolio_csv, proposed, mock_client, removals=removals_parsed
@@ -645,7 +677,7 @@ class TestRunWhatIfSimulationWithRemoval:
 
     def test_nonexistent_removal_raises(self, portfolio_csv, mock_client):
         """存在しない銘柄を --remove すると ValueError。"""
-        removals_parsed = parse_remove_arg("9999.T:10")
+        removals_parsed = parse_remove_arg("9999.T:100")
         with pytest.raises(ValueError, match="存在しません"):
             run_what_if_simulation(
                 portfolio_csv, [], mock_client, removals=removals_parsed
@@ -655,7 +687,7 @@ class TestRunWhatIfSimulationWithRemoval:
         """スワップ時も temp CSV が残らないこと。"""
         temp_dir = tempfile.gettempdir()
         before_files = set(os.listdir(temp_dir))
-        removals_parsed = parse_remove_arg("7203.T:50")
+        removals_parsed = parse_remove_arg("7203.T:100")
         run_what_if_simulation(portfolio_csv, [], mock_client, removals=removals_parsed)
         after_files = set(os.listdir(temp_dir))
         new_files = after_files - before_files

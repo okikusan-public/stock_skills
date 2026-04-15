@@ -20,7 +20,7 @@ from src.core.portfolio.portfolio_manager import (
     save_portfolio,
 )
 from src.core.return_estimate import estimate_portfolio_return
-from src.core.ticker_utils import infer_currency
+from src.core.ticker_utils import infer_currency, validate_lot_size
 
 
 def parse_add_arg(add_str: str) -> list[dict]:
@@ -70,6 +70,8 @@ def parse_add_arg(add_str: str) -> list[dict]:
             raise ValueError(
                 f"株数は正の整数を指定してください: {shares} in '{entry}'"
             )
+
+        validate_lot_size(shares, symbol)
 
         try:
             price = float(parts[2].strip())
@@ -142,6 +144,8 @@ def parse_remove_arg(remove_str: str) -> list[dict]:
             raise ValueError(
                 f"株数は正の整数を指定してください: {shares} in '{entry}'"
             )
+
+        validate_lot_size(shares, symbol)
 
         results.append({"symbol": symbol, "shares": shares})
 

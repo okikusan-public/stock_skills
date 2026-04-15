@@ -257,6 +257,7 @@ def _generate_reduce_actions(
                 "ratio": round(reduce_ratio, 2),
                 "reason": f"比率 {w*100:.1f}% → {target_w*100:.1f}% (上限{max_single*100:.0f}%)",
                 "value_jpy": round(value_jpy * reduce_ratio, 0),
+                "current_price": pos.get("price"),
                 "priority": 3,
             })
             already_reduced.add(symbol)
@@ -292,6 +293,7 @@ def _generate_reduce_actions(
                         "ratio": round(reduce_ratio, 2),
                         "reason": f"相関集中 ({sym_a}/{sym_b} r={corr_val:.2f}, 合計{combined_w*100:.0f}%>{max_corr*100:.0f}%)",
                         "value_jpy": round(value_jpy * reduce_ratio, 0),
+                        "current_price": target_pos.get("price"),
                         "priority": 4,
                     })
                     already_reduced.add(target_sym)
@@ -314,6 +316,7 @@ def _generate_reduce_actions(
                     "ratio": reduce_ratio,
                     "reason": f"セクター削減指示 ({reduce_sector})",
                     "value_jpy": round(value_jpy * reduce_ratio, 0),
+                    "current_price": pos.get("price"),
                     "priority": 5,
                 })
                 already_reduced.add(symbol)
@@ -336,6 +339,7 @@ def _generate_reduce_actions(
                     "ratio": reduce_ratio,
                     "reason": f"通貨削減指示 ({reduce_currency})",
                     "value_jpy": round(value_jpy * reduce_ratio, 0),
+                    "current_price": pos.get("price"),
                     "priority": 5,
                 })
                 already_reduced.add(symbol)
@@ -415,6 +419,7 @@ def _generate_increase_actions(
             "symbol": symbol,
             "name": pos.get("name", ""),
             "amount_jpy": round(alloc, 0),
+            "current_price": pos.get("price"),
             "reason": f"ベース期待値 +{base_ret*100:.1f}% (比率{current_w*100:.1f}%→{(value_jpy+alloc)/new_total*100:.1f}%)",
             "priority": 6,
         })

@@ -1,5 +1,6 @@
 """Rebalance proposal output formatter (KIK-447, split from portfolio_formatter.py)."""
 
+from src.core.ticker_utils import get_lot_size, round_to_lot_size
 from src.output._format_helpers import fmt_pct_sign as _fmt_pct_sign
 from src.output._format_helpers import fmt_float as _fmt_float
 
@@ -9,6 +10,23 @@ _ACTION_LABELS = {
     "reduce": "減らす",
     "increase": "増やす",
 }
+
+def _estimate_shares_annotation(
+    symbol: str, value_jpy: float, current_price: float | None,
+) -> str:
+    """Generate a lot-size-aware share estimate annotation.
+
+    Returns empty string for lot_size=1 stocks or when price is unavailable.
+    """
+    lot = get_lot_size(symbol)
+    if lot <= 1 or not current_price or current_price <= 0:
+        return ""
+    estimated_shares = int(value_jpy / current_price)
+    rounded = round_to_lot_size(estimated_shares, symbol)
+    if rounded <= 0:
+        rounded = lot
+    return f"\u2252 {rounded}\u682a\uff08{lot}\u682a\u5358\u4f4d\uff09"
+
 
 _ACTION_EMOJI = {
     "sell": "\U0001f534",      # red circle
@@ -114,12 +132,22 @@ def format_rebalance_report(proposal: dict) -> str:
             )
             if value > 0:
                 lines.append(f"   確保資金: {value:,.0f}円")
+            lot_note = _estimate_shares_annotation(
+                symbol, value, action.get("current_price"),
+            )
+            if lot_note:
+                lines.append(f"   {lot_note}")
         elif act_type == "increase":
             amount = action.get("amount_jpy", 0)
             lines.append(
                 f"{i}. {emoji} **{label}**: {symbol}{name_str}"
                 f" +{amount:,.0f}円 → {reason}"
             )
+            lot_note = _estimate_shares_annotation(
+                symbol, amount, action.get("current_price"),
+            )
+            if lot_note:
+                lines.append(f"   {lot_note}")
 
         lines.append("")
 

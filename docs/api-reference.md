@@ -726,6 +726,8 @@ Ticker symbol utilities: currency/country inference from symbol suffixes.
 - `extract_all_symbols(text: str) -> list[str]` — Extract all unique ticker symbols from text.
 - `get_lot_size(symbol: str) -> int` — Get minimum tradable lot size for a symbol.
 - `lot_cost(symbol: str, price: float) -> float` — Calculate the cost of 1 lot (minimum tradable unit).
+- `round_to_lot_size(shares: int, symbol: str) -> int` — Round shares to the nearest valid lot size multiple.
+- `validate_lot_size(shares: int, symbol: str) -> None` — Validate that shares is a valid multiple of the lot size.
 - `cash_currency(symbol: str) -> str` — Extract currency from cash symbol (e.g., 'JPY.CASH' -> 'JPY').
 - `infer_currency(symbol: str, info: dict | None=None) -> str` — Infer the currency from the ticker symbol suffix.
 - `infer_region_code(symbol: str) -> str` — Infer lowercase region code from ticker suffix (KIK-438).

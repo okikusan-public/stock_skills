@@ -133,6 +133,35 @@ def lot_cost(symbol: str, price: float) -> float:
     return get_lot_size(symbol) * price
 
 
+def round_to_lot_size(shares: int, symbol: str) -> int:
+    """Round shares to the nearest valid lot size multiple.
+
+    For lot_size=1 (e.g. US stocks), returns shares unchanged.
+    Uses Python's built-in round() (banker's rounding at midpoints).
+    """
+    lot = get_lot_size(symbol)
+    if lot <= 1:
+        return shares
+    return round(shares / lot) * lot
+
+
+def validate_lot_size(shares: int, symbol: str) -> None:
+    """Validate that shares is a valid multiple of the lot size.
+
+    Raises ValueError with the nearest valid amount for lot_size > 1.
+    For lot_size=1, always passes.
+    """
+    lot = get_lot_size(symbol)
+    if lot <= 1:
+        return
+    if shares % lot != 0:
+        nearest = round_to_lot_size(shares, symbol)
+        raise ValueError(
+            f"{symbol}は{lot}株単位で売買する必要があります。"
+            f"{shares}株は不正です（最も近い有効株数: {nearest}株）"
+        )
+
+
 def cash_currency(symbol: str) -> str:
     """Extract currency from cash symbol (e.g., 'JPY.CASH' -> 'JPY')."""
     return symbol.upper().replace(".CASH", "")
