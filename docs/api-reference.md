@@ -68,6 +68,14 @@ Portfolio health check orchestrator (KIK-576).
 
 - `run_health_check(csv_path: str, client) -> dict` — Run health check on all portfolio holdings.
 
+### src.core.health.theme_balance (KIK-605: テーマバランス制御)
+
+Theme balance checks for portfolio health (KIK-605).
+
+- `check_theme_concentration(positions: list[dict], themes_map: dict[str, list[str]]) -> list[dict]` — Check if any theme is over-concentrated in PF.
+- `check_sector_relative_per(positions: list[dict], sector_median_per: dict[str, float]) -> list[dict]` — Flag positions whose PER is far above sector median.
+- `detect_theme_cooling(current_trends: list[dict], previous_trends: list[dict]) -> list[dict]` — Detect themes that are cooling down.
+
 ### src.core.health.trend
 
 Trend health analysis for portfolio health checks (KIK-576).

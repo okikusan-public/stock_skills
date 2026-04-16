@@ -81,3 +81,13 @@ technicals:
   score_bb_proximity: 25.0
   score_volume_surge: 10.0
   score_price_reversal: 10.0
+
+# ---------------------------------------------------------------------------
+# Theme balance (src/core/health/theme_balance.py) (KIK-605)
+# ---------------------------------------------------------------------------
+theme_balance:
+  max_theme_weight: 0.20       # 同一テーマのPFウェイト上限
+  max_theme_stocks: 3          # 同一テーマの銘柄数上限
+  per_warn_multiplier: 2.0     # セクター中央PERの何倍で警告
+  fng_caution_threshold: 80    # F&G スコアがこれ以上でテーマ追加購入に警告
+  theme_stale_days: 90         # テーマ鮮度の日数閾値

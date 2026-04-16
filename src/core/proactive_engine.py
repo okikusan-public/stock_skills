@@ -4,7 +4,8 @@ Rule-based triggers — no LLM required.
 Graceful degradation: returns empty list when Neo4j unavailable or any exception occurs.
 
 Trigger categories:
-  Time:        thesis note >90d old, last health check >14d ago, earnings within 7d
+  Time:        thesis note >90d old, last health check >14d ago, earnings within 7d,
+               theme staleness >90d (KIK-605)
   State:       recurring screening picks, concern notes, held stock w/ new report
   Contextual:  research sector matches held stocks
   Context:     execution result keyword matching (KIK-465)
@@ -18,6 +19,8 @@ from __future__ import annotations
 
 from datetime import date
 from typing import TYPE_CHECKING
+
+from src.core._thresholds import th
 
 if TYPE_CHECKING:
     from src.core.ports.graph import GraphReader
@@ -103,6 +106,7 @@ class ProactiveEngine:
         suggestions += self._check_state_triggers(symbol)
         suggestions += self._check_contextual_triggers(sector)
         suggestions += self._check_context_triggers(context)
+        suggestions += self._check_theme_staleness()
 
         # Sort by urgency, deduplicate by title
         _order = {"high": 0, "medium": 1, "low": 2}
@@ -302,6 +306,92 @@ class ProactiveEngine:
                     "urgency": "low",
                 })
         return out[:2]
+
+    # ------------------------------------------------------------------
+    # Theme staleness trigger (KIK-605)
+    # ------------------------------------------------------------------
+
+    def _check_theme_staleness(self) -> list[dict]:
+        """Suggest re-validating themes when PF holds themed stocks with stale themes."""
+        stale_days = int(th("theme_balance", "theme_stale_days", 90))
+        out: list[dict] = []
+        try:
+            # Get current holdings
+            if self._graph_reader is not None:
+                holdings = self._graph_reader.get_current_holdings()
+            else:
+                from src.data.graph_query import get_current_holdings
+                holdings = get_current_holdings()
+            if not holdings:
+                return out
+
+            # Get themes for held symbols
+            symbols = [h.get("symbol", "") for h in holdings if h.get("symbol")]
+            if not symbols:
+                return out
+
+            try:
+                from src.data.graph_query import get_themes_for_symbols_batch
+                themes_map = get_themes_for_symbols_batch(symbols)
+            except Exception:
+                return out
+
+            if not themes_map:
+                return out
+
+            # Collect unique themes held in PF
+            held_themes: set[str] = set()
+            for sym_themes in themes_map.values():
+                for t in sym_themes:
+                    held_themes.add(t)
+
+            if not held_themes:
+                return out
+
+            # Check theme node freshness — look for Theme nodes with updated_at
+            try:
+                from src.data.graph_query._common import _get_driver
+                driver = _get_driver()
+                if driver is None:
+                    return out
+                with driver.session() as session:
+                    result = session.run(
+                        "MATCH (t:Theme) WHERE t.name IN $names "
+                        "RETURN t.name AS name, t.updated_at AS updated_at",
+                        names=list(held_themes),
+                    )
+                    today = date.today()
+                    for record in result:
+                        name = record["name"]
+                        updated = record["updated_at"]
+                        if updated is None:
+                            # No updated_at → treat as stale
+                            out.append({
+                                "emoji": "\U0001f4c5",
+                                "title": f"テーマ「{name}」の再検証",
+                                "reason": f"テーマの鮮度情報なし — PF銘柄が属するテーマの再検証を推奨",
+                                "command_hint": f"screen-stocks --auto-theme",
+                                "urgency": "medium",
+                            })
+                        else:
+                            try:
+                                updated_date = date.fromisoformat(str(updated)[:10])
+                                delta = (today - updated_date).days
+                                if delta >= stale_days:
+                                    out.append({
+                                        "emoji": "\U0001f4c5",
+                                        "title": f"テーマ「{name}」の再検証",
+                                        "reason": f"テーマ更新から{delta}日経過 — トレンド変化の確認を推奨",
+                                        "command_hint": f"screen-stocks --auto-theme",
+                                        "urgency": "medium",
+                                    })
+                            except (ValueError, TypeError):
+                                pass
+            except Exception:
+                pass
+        except Exception:
+            pass
+        return out[:1]  # At most one theme staleness suggestion
 
 
 # ---------------------------------------------------------------------------

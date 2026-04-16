@@ -24,6 +24,9 @@ src/core/screening/growth_screener.py: "KIK-446"
 src/core/screening/alpha_screener.py: "KIK-357"
 src/core/screening/screener_registry.py: "KIK-514: Strategy/Factory + RegionConfig"
 
+# health/
+src/core/health/theme_balance.py: "KIK-605: テーマバランス制御"
+
 # portfolio/
 src/core/portfolio/adjustment_advisor.py: "KIK-496: 17ルール調整アドバイザー"
 src/core/portfolio/market_regime.py: "KIK-496: 市場レジーム検出"
