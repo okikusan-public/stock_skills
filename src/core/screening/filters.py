@@ -18,12 +18,16 @@ def apply_filters(stock_data: dict, criteria: dict) -> bool:
     """
     checks = [
         ("max_per", "per", "max"),
+        ("min_per", "per", "min"),
         ("max_pbr", "pbr", "max"),
         ("min_dividend_yield", "dividend_yield", "min"),
         ("min_roe", "roe", "min"),
         ("min_revenue_growth", "revenue_growth", "min"),
         ("min_earnings_growth", "earnings_growth", "min"),
         ("min_market_cap", "market_cap", "min"),
+        ("max_market_cap", "market_cap", "max"),
+        ("max_psr", "psr", "max"),
+        ("min_gross_margin", "gross_margin", "min"),
         ("min_total_shareholder_return", "total_shareholder_return", "min"),
     ]
 

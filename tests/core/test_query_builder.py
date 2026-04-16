@@ -252,9 +252,9 @@ class TestConstants:
         assert set(ASEAN_EXCHANGES) == {"SES", "SET", "KLS", "JKT", "PHS"}
 
     def test_criteria_field_map_keys(self):
-        """_CRITERIA_FIELD_MAP should have the expected keys including KIK-432/437 additions."""
+        """_CRITERIA_FIELD_MAP should have the expected keys including KIK-432/437/602 additions."""
         expected = {
-            "max_per", "max_pbr", "min_dividend_yield", "min_roe",
+            "max_per", "min_per", "max_pbr", "min_dividend_yield", "min_roe",
             "min_revenue_growth", "min_earnings_growth", "min_market_cap",
             # KIK-432: high-growth preset criteria
             "min_quarterly_revenue_growth", "max_psr", "min_gross_margin",

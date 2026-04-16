@@ -108,3 +108,13 @@ presets:
       min_dividend_yield: 0.02
       min_earnings_growth: 0.10
       min_market_cap: 100000000000
+
+  market-darling:
+    description: "市場期待銘柄（高PER許容・EPS急成長・大型）"
+    criteria:
+      min_per: 30
+      min_earnings_growth: 0.30
+      min_revenue_growth: 0.15
+      max_psr: 30.0
+      min_gross_margin: 0.20
+      min_market_cap: 50000000000

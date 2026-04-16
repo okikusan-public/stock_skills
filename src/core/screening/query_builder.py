@@ -43,6 +43,7 @@ def load_preset(preset_name: str) -> dict:
 # "min_*" criteria use "gt" (greater-than) because we want stocks ABOVE the min.
 _CRITERIA_FIELD_MAP: dict[str, tuple[str, str]] = {
     "max_per":              ("peratio.lasttwelvemonths",             "lt"),
+    "min_per":              ("peratio.lasttwelvemonths",             "gt"),
     "max_pbr":              ("pricebookratio.quarterly",             "lt"),
     "min_dividend_yield":   ("forward_dividend_yield",               "gt"),
     "min_roe":              ("returnonequity.lasttwelvemonths",      "gt"),
