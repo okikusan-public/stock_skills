@@ -20,3 +20,7 @@ tax:
   capital_gains_rate: 0.20315  # 所得税15.315% + 住民税5%
   needs_filing: true           # 一般口座→true
   realized_losses_ytd: 0       # 今年の確定損失額（損益通算用、手動更新）
+
+screening:
+  excluded_regions: [kr, tw, europe, uk]  # 証券会社で取扱なし
+  preferred_regions: [japan, us, sg, hk, id]  # 取扱あり

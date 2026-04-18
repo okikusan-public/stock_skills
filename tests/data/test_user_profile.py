@@ -424,6 +424,125 @@ class TestGetBrokerInfo:
 
 
 # ---------------------------------------------------------------------------
+# get_screening_regions
+# ---------------------------------------------------------------------------
+
+class TestGetScreeningRegions:
+    """get_screening_regions() returns preferred/excluded region lists."""
+
+    def test_get_screening_regions_defaults(self, monkeypatch, tmp_path):
+        """Default should return empty lists for both keys."""
+        monkeypatch.setattr(user_profile, "_PROFILE_PATH", tmp_path / "nope.yaml")
+        monkeypatch.setattr(user_profile, "_DEFAULT_PATH", tmp_path / "nope2.yaml")
+
+        result = user_profile.get_screening_regions()
+        assert result == {"preferred": [], "excluded": []}
+
+    def test_get_screening_regions_custom(self, monkeypatch, tmp_path):
+        """Should read screening config from YAML."""
+        yaml_content = textwrap.dedent("""\
+            broker:
+              name: 楽天証券
+              account_type: 一般口座
+            fees:
+              us_stock:
+                rate: 0.00495
+                min_usd: 0
+                max_usd: 22
+                sec_fee: 0.0000206
+              jp_stock:
+                rate: 0
+              asean_stock:
+                rate: 0.011
+              fx:
+                realtime_spread: 0
+                scheduled_spread: 0
+            tax:
+              capital_gains_rate: 0.20315
+              needs_filing: true
+              realized_losses_ytd: 0
+            screening:
+              excluded_regions: [kr, tw, europe, uk]
+              preferred_regions: [japan, us, sg, hk, id]
+        """)
+        yaml_file = tmp_path / "user_profile.yaml"
+        yaml_file.write_text(yaml_content)
+        monkeypatch.setattr(user_profile, "_PROFILE_PATH", yaml_file)
+
+        result = user_profile.get_screening_regions()
+        assert result["preferred"] == ["japan", "us", "sg", "hk", "id"]
+        assert result["excluded"] == ["kr", "tw", "europe", "uk"]
+
+    def test_get_screening_regions_preferred(self, monkeypatch, tmp_path):
+        """Should return preferred_regions correctly when only preferred is set."""
+        yaml_content = textwrap.dedent("""\
+            broker:
+              name: 楽天証券
+              account_type: 一般口座
+            fees:
+              us_stock:
+                rate: 0.00495
+                min_usd: 0
+                max_usd: 22
+                sec_fee: 0.0000206
+              jp_stock:
+                rate: 0
+              asean_stock:
+                rate: 0.011
+              fx:
+                realtime_spread: 0
+                scheduled_spread: 0
+            tax:
+              capital_gains_rate: 0.20315
+              needs_filing: true
+              realized_losses_ytd: 0
+            screening:
+              preferred_regions: [japan, us]
+        """)
+        yaml_file = tmp_path / "user_profile.yaml"
+        yaml_file.write_text(yaml_content)
+        monkeypatch.setattr(user_profile, "_PROFILE_PATH", yaml_file)
+
+        result = user_profile.get_screening_regions()
+        assert result["preferred"] == ["japan", "us"]
+        assert result["excluded"] == []
+
+    def test_get_screening_regions_excluded(self, monkeypatch, tmp_path):
+        """Should return excluded_regions correctly when only excluded is set."""
+        yaml_content = textwrap.dedent("""\
+            broker:
+              name: 楽天証券
+              account_type: 一般口座
+            fees:
+              us_stock:
+                rate: 0.00495
+                min_usd: 0
+                max_usd: 22
+                sec_fee: 0.0000206
+              jp_stock:
+                rate: 0
+              asean_stock:
+                rate: 0.011
+              fx:
+                realtime_spread: 0
+                scheduled_spread: 0
+            tax:
+              capital_gains_rate: 0.20315
+              needs_filing: true
+              realized_losses_ytd: 0
+            screening:
+              excluded_regions: [kr, tw]
+        """)
+        yaml_file = tmp_path / "user_profile.yaml"
+        yaml_file.write_text(yaml_content)
+        monkeypatch.setattr(user_profile, "_PROFILE_PATH", yaml_file)
+
+        result = user_profile.get_screening_regions()
+        assert result["preferred"] == []
+        assert result["excluded"] == ["kr", "tw"]
+
+
+# ---------------------------------------------------------------------------
 # Cache behavior
 # ---------------------------------------------------------------------------
 

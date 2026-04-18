@@ -114,6 +114,21 @@ def needs_tax_filing() -> bool:
     return profile.get("tax", {}).get("needs_filing", True)
 
 
+def get_screening_regions() -> dict:
+    """Get preferred and excluded regions for screening.
+
+    Returns dict with keys:
+    - preferred: list of region codes to include (empty = all)
+    - excluded: list of region codes to exclude (empty = none)
+    """
+    profile = get_profile()
+    screening = profile.get("screening", {})
+    return {
+        "preferred": screening.get("preferred_regions", []),
+        "excluded": screening.get("excluded_regions", []),
+    }
+
+
 def _get_defaults() -> dict:
     """Return sensible default profile when no config file exists."""
     return {
@@ -133,6 +148,10 @@ def _get_defaults() -> dict:
             "capital_gains_rate": 0.20315,
             "needs_filing": True,
             "realized_losses_ytd": 0,
+        },
+        "screening": {
+            "preferred_regions": [],
+            "excluded_regions": [],
         },
     }
 
