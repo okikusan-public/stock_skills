@@ -7,7 +7,7 @@ a single source of truth for suffix-based lookups.
 import re
 from typing import Optional
 
-from src.core.common import is_cash
+from src.data.common import is_cash
 
 
 # ---------------------------------------------------------------------------

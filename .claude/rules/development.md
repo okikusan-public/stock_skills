@@ -29,9 +29,9 @@
 - 配当利回りの正規化: `_normalize_ratio()` が値 > 1 の場合 100 で割って比率に変換
 - データモデル定義: `docs/data-models.md` を参照
 
-### コア層 (src/core/)
-- 最小限のユーティリティのみ: common.py, ticker_utils.py, portfolio/portfolio_io.py
-- 判断ロジックはエージェントが担う（src/core/ に追加しない）
+### 共通ユーティリティ (src/data/)
+- common.py, ticker_utils.py, portfolio_io.py は src/data/ に配置
+- 判断ロジックはエージェントが担う（src/data/ は純粋なデータ操作のみ）
 
 ## テスト
 
@@ -59,7 +59,7 @@
 - ツールファサード → tools/（データ操作のみ、判断しない）
 - エージェント定義 → .claude/agents/<name>/（agent.md + examples.yaml）
 - データ取得/保存 → src/data/{yahoo_client,graph_store,graph_query,history,context}/
-- 共通ユーティリティ → src/core/（common.py, ticker_utils.py のみ）
+- 共通ユーティリティ → src/data/（common.py, ticker_utils.py, portfolio_io.py）
 - テスト → tests/{core,data}/（src/ と1:1対応）
 
 ## ドキュメント構成

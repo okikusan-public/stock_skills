@@ -37,12 +37,6 @@ graph TD
         LLM["llm.py"]
     end
 
-    subgraph Core["src/core/ (minimal)"]
-        TU["ticker_utils"]
-        CM["common"]
-        PIO["portfolio_io"]
-    end
-
     subgraph Data["src/data/"]
         YC["yahoo_client/"]
         GC["grok_client/"]
@@ -54,9 +48,7 @@ graph TD
     User --> Orchestrator
     Orchestrator --> Agents
     Agents --> Tools
-    Tools --> Core
     Tools --> Data
-    Core --> Data
 ```
 
 ---

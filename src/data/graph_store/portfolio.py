@@ -109,7 +109,7 @@ def sync_portfolio(holdings: list[dict]) -> bool:
     if driver is None:
         return False
     try:
-        from src.core.common import is_cash
+        from src.data.common import is_cash
 
         with driver.session() as session:
             session.run("MERGE (p:Portfolio {name: 'default'})")

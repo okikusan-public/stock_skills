@@ -12,7 +12,7 @@ Returns None when no context available or Neo4j unavailable (graceful degradatio
 import re
 from typing import Optional
 
-from src.core.ticker_utils import extract_symbol
+from src.data.ticker_utils import extract_symbol
 from src.data import graph_store, graph_query
 from src.data import note_manager
 

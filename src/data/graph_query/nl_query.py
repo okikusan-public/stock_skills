@@ -7,7 +7,7 @@ Returns None when no template matches or Neo4j is unavailable.
 import re
 from typing import Optional
 
-from src.core.ticker_utils import SYMBOL_PATTERN, extract_symbol
+from src.data.ticker_utils import SYMBOL_PATTERN, extract_symbol
 from src.data import graph_query
 
 # Backward-compatible alias (tests import _extract_symbol from this module)

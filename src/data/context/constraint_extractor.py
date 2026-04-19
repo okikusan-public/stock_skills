@@ -170,7 +170,7 @@ def _build_lot_size_constraints(symbols: list[str]) -> list[dict]:
     so the system never proposes impossible trades (e.g., 50 shares of JP stock).
     """
     try:
-        from src.core.ticker_utils import get_lot_size, infer_currency
+        from src.data.ticker_utils import get_lot_size, infer_currency
     except ImportError:
         return []
 
@@ -198,7 +198,7 @@ def _build_lot_size_constraints(symbols: list[str]) -> list[dict]:
 def _extract_symbols(user_query: str) -> list[str]:
     """Extract ticker symbols from user query."""
     try:
-        from src.core.ticker_utils import extract_all_symbols
+        from src.data.ticker_utils import extract_all_symbols
         return extract_all_symbols(user_query)
     except ImportError:
         return []

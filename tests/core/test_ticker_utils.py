@@ -1,8 +1,8 @@
-"""Tests for src.core.ticker_utils (KIK-473, KIK-597)."""
+"""Tests for src.data.ticker_utils (KIK-473, KIK-597)."""
 
 import pytest
 
-from src.core.ticker_utils import (
+from src.data.ticker_utils import (
     extract_all_symbols,
     round_to_lot_size,
     validate_lot_size,

@@ -128,7 +128,7 @@ def save_note(
     detected_symbols: list[str] = []
     if note_type == "journal" and not symbol and content:
         try:
-            from src.core.ticker_utils import extract_all_symbols
+            from src.data.ticker_utils import extract_all_symbols
             detected_symbols = extract_all_symbols(content)[:3]
         except Exception:
             pass

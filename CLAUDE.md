@@ -58,11 +58,6 @@ Tools (tools/)
   notes.py         — 投資メモ読み書き（src/data/note_manager のファサード）
   watchlist.py     — ウォッチリスト読み書き（JSON直接I/O）
 
-Core (src/core/) — 最小限のユーティリティのみ
-  common.py        — 共通ユーティリティ（is_etf, safe_float 等）
-  ticker_utils.py  — ティッカー推論（通貨/地域マッピング）
-  portfolio/portfolio_io.py — PF CSV 読み書き
-
 Data (src/data/)
   yahoo_client/  — yfinance ラッパー（24h JSONキャッシュ）
   grok_client/   — Grok API (xAI) ラッパー
@@ -71,6 +66,9 @@ Data (src/data/)
   context/       — 自動コンテキスト注入
   history/       — 実行履歴ストア
   note_manager   — 投資メモ管理
+  common.py      — 共通ユーティリティ（is_etf, safe_float 等）
+  ticker_utils.py — ティッカー推論（通貨/地域マッピング）
+  portfolio_io.py — PF CSV 読み書き
 
 Config: config/exchanges.yaml (60+ regions), config/themes.yaml
 Rules:  .claude/rules/ (development, workflow, testing)

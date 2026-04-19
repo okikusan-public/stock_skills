@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from src.core.ticker_utils import (
+from src.data.ticker_utils import (
     SUFFIX_TO_CURRENCY as _SUFFIX_TO_CURRENCY,
     infer_currency as _infer_currency,
 )
@@ -19,10 +19,6 @@ DEFAULT_CSV_PATH = os.path.join(
     os.path.dirname(__file__),
     "..",
     "..",
-    "..",
-    ".claude",
-    "skills",
-    "stock-portfolio",
     "data",
     "portfolio.csv",
 )
