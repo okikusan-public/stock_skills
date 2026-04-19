@@ -54,13 +54,14 @@ Tools (tools/)
   graphrag.py      — Neo4j ナレッジグラフ（src/data/graph_store/ + graph_query/ のファサード）
   grok.py          — Grok API 検索（src/data/grok_client/ のファサード）
   llm.py           — マルチLLM呼び出し（Gemini/GPT/Grok）
+  portfolio_io.py  — PF CSV 読み書き（src/core/portfolio/portfolio_io のファサード）
+  notes.py         — 投資メモ読み書き（src/data/note_manager のファサード）
+  watchlist.py     — ウォッチリスト読み書き（JSON直接I/O）
 
-Core (src/core/)
-  screening/ — screener, indicators, filters, query_builder, alpha, technicals, momentum, contrarian
-  portfolio/ — portfolio_manager, simulation, concentration, rebalancer, backtest
-  risk/      — correlation, shock_sensitivity, scenario_analysis, recommender
-  research/  — researcher
-  health/    — community
+Core (src/core/) — 最小限のユーティリティのみ
+  common.py        — 共通ユーティリティ（is_etf, safe_float 等）
+  ticker_utils.py  — ティッカー推論（通貨/地域マッピング）
+  portfolio/portfolio_io.py — PF CSV 読み書き
 
 Data (src/data/)
   yahoo_client/  — yfinance ラッパー（24h JSONキャッシュ）

@@ -36,7 +36,7 @@
 
 ## テスト
 
-- `python3 -m pytest tests/ -q` で全テスト実行（約2548テスト、~12秒）
+- `python3 -m pytest tests/ -q` で全テスト実行（約979テスト、~4秒）
 - `tests/conftest.py` に共通フィクスチャ: `stock_info_data`, `stock_detail_data`, `price_history_df`, `mock_yahoo_client`
 - `tests/conftest.py` に autouse `_block_external_io` フィクスチャ: Neo4j/TEI/Grok を全テストで自動モック
 - `tests/fixtures/` に JSON/CSV テストデータ（Toyota 7203.T ベース）

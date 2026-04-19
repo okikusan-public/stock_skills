@@ -37,10 +37,10 @@ graph TD
         LLM["llm.py"]
     end
 
-    subgraph Core["src/core/"]
-        SC["screening/"]
-        PF["portfolio/"]
-        RK["risk/"]
+    subgraph Core["src/core/ (minimal)"]
+        TU["ticker_utils"]
+        CM["common"]
+        PIO["portfolio_io"]
     end
 
     subgraph Data["src/data/"]
