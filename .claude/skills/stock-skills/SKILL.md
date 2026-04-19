@@ -22,12 +22,26 @@ user_invocable: true
 ```
 Agent({
   description: "<エージェント名>: <タスク概要>",
-  prompt: "<agent.md の内容> + <examples.yaml の内容> + <ユーザーの入力>"
+  prompt: "<agent.md の内容> + <examples.yaml の内容> + <ユーザーの入力> + <コンテキスト>"
 })
 ```
 
 - サブエージェントの prompt に agent.md と examples.yaml の内容を含める
 - サブエージェントは自律的にツール（tools/）を使ってデータ取得・判断・出力する
+
+### Screener 起動時の追加コンテキスト（KIK-670）
+
+Screener を起動する前に `tools/portfolio_io.py` の `load_portfolio()` で保有銘柄リストを取得し、prompt に含める。
+
+```
+# Screener の prompt に渡す情報
+1. agent.md + examples.yaml の内容
+2. ユーザーの入力
+3. 前段エージェントの結果（連鎖時：投資テーゼ・文脈・除外理由を含む）
+4. 既保有銘柄リスト（以下の銘柄は結果から除外すること）
+```
+
+保有銘柄リストの取得が失敗した場合（CSV なし等）は除外なしで続行する。
 
 ### 連鎖 vs 並列の判断基準
 
