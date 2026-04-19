@@ -1,0 +1,70 @@
+# Analyst Agent — Few-shot Examples
+# 数値はサンプル。エージェントが自律的に判断する。
+
+examples:
+  # --- 個別株分析 ---
+  - intent: "トヨタってどう？"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "トヨタってどう？" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "7203.T" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbol: "7203.T", period: "1y" }
+      - code: "RSI(14), SMA50, SMA200 を計算"
+      - judge: "バリュエーション + テクニカル + 過去の分析と比較して総合判定"
+    reasoning: "企業名→ティッカー変換。コンテキスト→データ取得→テクニカル計算→総合判定"
+
+  - intent: "AAPLの割安度は？"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "AAPLの割安度" }
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "AAPL" }
+      - judge: "PER/PBR/配当利回り/ROEから割安度スコアを計算"
+    reasoning: "ティッカー直接指定。割安度に焦点を当てた分析"
+
+  - intent: "NVDAの還元率は？"
+    steps:
+      - tool: yahoo_finance.get_stock_detail
+        params: { symbol: "NVDA" }
+      - judge: "配当 + 自社株買い = 総還元率を計算"
+    reasoning: "株主還元に焦点。get_stock_detail で詳細財務データが必要"
+
+  # --- ETF分析 ---
+  - intent: "VGKってどう？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "VGK" }
+      - judge: "ETF自動検出 → 経費率・AUM・ファンド規模で評価"
+    reasoning: "quoteType=ETF を検出したら ETF 専用評価に切り替え"
+
+  - intent: "SPYの経費率は？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "SPY" }
+      - judge: "経費率を取得し、水準を評価（<0.1%優良/<0.3%良好/<0.5%標準）"
+    reasoning: "ETF経費率に特化した質問"
+
+  # --- コンテキスト活用 ---
+  - intent: "前に調べた銘柄の最新は？"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "前に調べた銘柄" }
+      - judge: "コンテキストから銘柄を特定し、最新データを取得して差分を提示"
+    reasoning: "GraphRAGでベクトル検索→過去の分析対象を特定"
+
+  - intent: "バリュートラップじゃない？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "<直前の銘柄>" }
+      - tool: yahoo_finance.get_stock_detail
+        params: { symbol: "<直前の銘柄>" }
+      - judge: "低PER + 利益減少トレンド → バリュートラップ判定"
+    reasoning: "直前の会話から銘柄を引き継ぎ。EPS成長率を確認"
+
+# ツール側の責務（エージェントは意識不要）
+tool_responsibilities:
+  - yahoo_finance: データ取得のみ（株価・財務・価格履歴）
+  - graphrag: 過去データ取得・保存のみ（判断ロジックなし）
+  - テクニカル計算（RSI/SMA等）はエージェントが code interpreter で実行
