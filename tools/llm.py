@@ -8,6 +8,7 @@ APIキー未設定時は None を返す（呼び出し元が Claude にフォー
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -74,26 +75,35 @@ def call_llm(
     if not api_key:
         return None
 
+    t0 = time.time()
     try:
         if provider == "gemini":
-            return _call_gemini(api_key, model, prompt, system_prompt, timeout)
+            result = _call_gemini(api_key, model, prompt, system_prompt, timeout)
         elif provider == "gpt":
-            return _call_openai_compatible(
+            result = _call_openai_compatible(
                 api_key, _ENDPOINTS["gpt"], model, prompt, system_prompt, timeout,
             )
         elif provider == "grok":
-            return _call_openai_compatible(
+            result = _call_openai_compatible(
                 api_key, _ENDPOINTS["grok"], model, prompt, system_prompt, timeout,
             )
+        else:
+            return None
     except (requests.RequestException, KeyError, json.JSONDecodeError) as exc:
-        import sys
+        elapsed = time.time() - t0
         print(
-            f"[llm] WARN: {provider}/{model} failed: {type(exc).__name__}: {exc}",
+            f"[llm] FAIL {provider}/{model} ({elapsed:.1f}s): {type(exc).__name__}: {exc}",
             file=sys.stderr,
         )
         return None
 
-    return None
+    elapsed = time.time() - t0
+    length = len(result) if result else 0
+    print(
+        f"[llm] OK {provider}/{model} ({elapsed:.1f}s, {length} chars)",
+        file=sys.stderr,
+    )
+    return result
 
 
 def is_provider_available(provider: str) -> bool:

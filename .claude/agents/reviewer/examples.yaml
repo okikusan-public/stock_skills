@@ -23,16 +23,34 @@ examples:
     conclude: "各レビュアーの結果を統合して PASS/WARN/FAIL 判定"
     reasoning: "スクリーニング → データ品質とロジック整合性を並列チェック"
 
-  # === 投資判断のレビュー（マルチLLM） ===
+  # === 投資判断のレビュー（マルチLLM — 必ず Bash で Python 実行） ===
   - intent: "入替提案のレビュー"
     steps:
       - tool: graphrag.get_context
         params: { user_input: "入替提案レビュー" }
-      - tool: llm.call_llm
-        params: { provider: gpt, model: gpt-5.4, prompt: "<Strategistの出力> をリスク観点でレビューせよ", system_prompt: "投資判断のリスクレビュアー" }
-      - tool: llm.call_llm
-        params: { provider: gemini, model: gemini-3.1-pro-preview, prompt: "<Strategistの出力> の論理整合性をレビューせよ", system_prompt: "投資判断のロジックレビュアー" }
-      - code: "Claude（自身）でデータ正確性をレビュー"
+      - bash: |
+          python3 -c "
+          import sys; sys.path.insert(0, '.')
+          from tools.llm import call_llm
+          result = call_llm('gpt', 'gpt-5.4',
+              '<Strategistの出力全文をここに入れる>',
+              '投資判断のリスクレビュアー。リスク・見落とし・反論を指摘せよ')
+          print('=== GPT Risk Review ===')
+          print(result)
+          "
+        verify: "stderr に [llm] OK gpt/gpt-5.4 が出力されること"
+      - bash: |
+          python3 -c "
+          import sys; sys.path.insert(0, '.')
+          from tools.llm import call_llm
+          result = call_llm('gemini', 'gemini-3.1-pro-preview',
+              '<Strategistの出力全文をここに入れる>',
+              '投資判断のロジックレビュアー。矛盾・論理整合性・lessonとの整合を確認せよ')
+          print('=== Gemini Logic Review ===')
+          print(result)
+          "
+        verify: "stderr に [llm] OK gemini/gemini-3.1-pro-preview が出力されること"
+      - code: "Claude（自身）でデータ正確性をレビュー（call_llm不要）"
     reviewers:
       - role: "ロジックレビュアー"
         checks:

@@ -42,7 +42,22 @@ SKILL.md（routing.yaml）経由で渡された他エージェントの出力を
 
 ### 3. 並列レビュー実行
 
-`tools/llm.py` の `call_llm(provider, model, prompt, system_prompt)` で各レビュアーを起動:
+**重要: call_llm() は必ず Bash で Python を実行して呼ぶこと。自分でレスポンスを生成してはならない。**
+
+各レビュアーを `tools/llm.py` の `call_llm()` で起動する。呼び出しは以下のように Bash ツールで Python を実行する:
+
+```python
+python3 -c "
+import sys; sys.path.insert(0, '.')
+from tools.llm import call_llm
+result = call_llm('gpt', 'gpt-5.4', '<プロンプト>', '<システムプロンプト>')
+print(result)
+"
+```
+
+- stderr に `[llm] OK gpt/gpt-5.4 (X.Xs, N chars)` が出力されれば実際にAPIを叩いた証拠
+- `[llm] OK` が出ない場合はAPIが呼ばれていない → 再実行すること
+- **自分で GPT/Gemini の回答をシミュレートすることは禁止**。必ず call_llm() の戻り値を使う
 
 #### リスクレビュアー
 - 売却提案に資金使途が含まれているか
