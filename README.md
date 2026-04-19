@@ -5,13 +5,19 @@
 
 投資アシスタントシステム。Agentic AI Pattern で設計。自然言語で話しかけるだけで、銘柄探索・分析・ポートフォリオ管理・リスク評価が自動実行される。
 
+## システム要件
+
+- **[Claude Code](https://claude.ai/code)** — 本システムのランタイム。SKILL.md をオーケストレーターとして読み込み、エージェントを自律的に起動・制御する。Claude Code なしでは動作しない
+- **Python 3.10+** — ツール（tools/）の実行環境
+- **Anthropic サブスクリプション** — Claude Code の利用に必要
+
 ## セットアップ
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Python 3.10+ が必要。依存: yfinance, pyyaml, numpy, pandas, requests, python-dotenv
+依存: yfinance, pyyaml, numpy, pandas, requests, python-dotenv
 
 ### 環境変数
 
