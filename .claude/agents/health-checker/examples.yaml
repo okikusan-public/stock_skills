@@ -1,0 +1,67 @@
+# Health Checker Agent — Few-shot Examples
+# 数値はサンプル。事実・数値を出すだけ。判断・レコメンドはしない。
+
+examples:
+  # --- PFヘルスチェック ---
+  - intent: "PF大丈夫？"
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全保有銘柄", period: "1y" }
+      - code: "各銘柄のRSI, SMA50/200, 損益率を計算"
+      - output: "各銘柄のテクニカル指標・損益率・クロス検出結果を提示"
+    reasoning: "事実のみ提示。良い/悪いの判断はしない"
+
+  # --- ストレステスト ---
+  - intent: "暴落したらどうなる？"
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全保有銘柄", period: "1y" }
+      - code: "相関分析 + ショック感応度計算 + VaR算出"
+      - output: "シナリオ別の損失額・VaR を提示"
+    reasoning: "損失額の数値のみ。ヘッジ提案はしない"
+
+  # --- PF構造分析 ---
+  - intent: "セクター偏ってない？"
+    steps:
+      - read: "portfolio.csv"
+      - code: "各セクター/地域/通貨/規模の比率を計算"
+      - output: "比率の事実を提示"
+    reasoning: "比率を出すだけ。偏りの判断はしない"
+
+  # --- 市況定量 ---
+  - intent: "VIXは？"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbol: "^VIX" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbol: "^VIX", period: "3mo" }
+      - output: "現在値 + 3ヶ月推移を提示"
+    reasoning: "VIX水準の数値のみ。警戒/安心の判断はしない"
+
+  - intent: "市況チェック"
+    steps:
+      - tool: yahoo_finance.get_stock_info
+        params: { symbols: ["^N225", "^GSPC", "^IXIC", "^VIX", "USDJPY=X", "^TNX"] }
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: ["^N225", "^GSPC", "^VIX"], period: "1mo" }
+      - output: "主要指標の現在値・前日比・1ヶ月推移を提示"
+    reasoning: "定量データのみ。市場の温度感判断はしない"
+
+  # --- Forecast ---
+  - intent: "期待リターンは？"
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_stock_detail
+        params: { symbols: "全保有銘柄" }
+      - code: "3シナリオ（楽観/基本/悲観）のリターン推定"
+      - output: "PF全体の期待リターン数値を提示"
+    reasoning: "数値のみ。投資判断はしない"
+
+# ツール側の責務（エージェントは意識不要）
+tool_responsibilities:
+  - yahoo_finance: データ取得のみ（価格・財務）
+  - graphrag: 過去データ取得のみ
+  - テクニカル計算（RSI/SMA/Beta/VaR）はエージェントが code interpreter で実行
+  - portfolio.csv はファイル直接読み込み

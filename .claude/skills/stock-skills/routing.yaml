@@ -6,9 +6,11 @@ agents:
     role: 銘柄探し・スクリーニング実行
     triggers: [探す, スクリーニング, いい株, おすすめ, 割安, 高配当, テーマ, トレンド, 成長株]
   analyst:
-    role: 銘柄分析・PF診断・ヘルスチェック・ストレステスト・ウォッチリスト・投資メモ
-    # agent.md で内部振り分け: stock-report / stock-portfolio / stress-test / investment-note / watchlist
-    triggers: [レポート, 分析, PF, ポートフォリオ, 損益, 買った, 売った, ヘルスチェック, ストレステスト, ウォッチ, メモ, ノート, 予測]
+    role: 銘柄分析・バリュエーション評価（個別株・ETF）
+    triggers: [レポート, 分析, 割安度, 還元率, バリュートラップ]
+  health-checker:
+    role: PFの事実・数値を出す（判断・レコメンドはしない）
+    triggers: [PF, ポートフォリオ, 損益, ヘルスチェック, ストレステスト, VIX, 金利, 期待リターン, 構造, 偏り, 市況チェック]
   researcher:
     role: ニュース・Xセンチメント・業界/市場動向・ビジネスモデル調査
     triggers: [ニュース, リサーチ, 深掘り, 業界, マーケット, 市況, センチメント, ビジネスモデル, 動向]
@@ -34,10 +36,13 @@ examples:
     agent: analyst
 
   - intent: "PF大丈夫？"
-    agent: analyst
+    agent: health-checker
 
   - intent: "ストレステストして"
-    agent: analyst
+    agent: health-checker
+
+  - intent: "VIXは？"
+    agent: health-checker
 
   - intent: "ウォッチリストに入れて"
     agent: analyst
@@ -63,14 +68,14 @@ examples:
     agents: [researcher, screener]
 
   - intent: "市況チェック"
-    agents: [analyst, researcher]
+    agents: [health-checker, researcher]
 
   - intent: "PFを改善したい"
-    agents: [analyst, strategist]
+    agents: [health-checker, strategist]
     review: true
 
   - intent: "リスク確認して代わりを探して"
-    agents: [analyst, screener]
+    agents: [health-checker, screener]
     review: true
 
   - intent: "半導体を調べて有望な銘柄を探して"
