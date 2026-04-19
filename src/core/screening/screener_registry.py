@@ -255,14 +255,24 @@ def build_default_registry() -> ScreenerRegistry:
         GrowthScreener, ContrarianScreener, MomentumScreener,
         TrendingScreener,
     )
-    from src.output.formatter import (
-        format_query_markdown, format_pullback_markdown,
-        format_alpha_markdown, format_growth_markdown,
-        format_contrarian_markdown, format_momentum_markdown,
-        format_trending_markdown,
-    )
+    # Formatter imports are optional — agents format their own output (KIK-651)
+    try:
+        from src.output.formatter import (
+            format_query_markdown, format_pullback_markdown,
+            format_alpha_markdown, format_growth_markdown,
+            format_contrarian_markdown, format_momentum_markdown,
+            format_trending_markdown,
+        )
+    except ImportError:
+        _noop_fmt = None
+        format_query_markdown = _noop_fmt
+        format_pullback_markdown = _noop_fmt
+        format_alpha_markdown = _noop_fmt
+        format_growth_markdown = _noop_fmt
+        format_contrarian_markdown = _noop_fmt
+        format_momentum_markdown = _noop_fmt
+        format_trending_markdown = _noop_fmt
 
-    # Try to import optional shareholder-return formatter
     try:
         from src.output.formatter import format_shareholder_return_markdown as _sr_fmt
     except ImportError:

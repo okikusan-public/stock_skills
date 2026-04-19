@@ -1,0 +1,122 @@
+# Reviewer Agent — Few-shot Examples
+# レビュー基準もエージェントが状況に応じて自律的に判断する。
+# guardrails の5制約は参考であり、それ以外の問題も自律的に検出する。
+
+examples:
+  # --- スクリーニング結果のレビュー ---
+  - intent: "スクリーニング結果のレビュー"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "スクリーニング結果レビュー" }
+    reviewers:
+      - role: "データレビュアー"
+        checks:
+          - "結果が0件なら代替条件を提案"
+          - "バリュートラップ（低PER+利益減少）が混入していないか"
+          - "異常値（配当>15%、PBR<0.1等）が残っていないか"
+      - role: "ロジックレビュアー"
+        checks:
+          - "同一セクター偏重になっていないか"
+          - "ユーザーの投資方針・過去のlessonと合っているか"
+          - "既保有銘柄と重複していないか"
+    conclude: "各レビュアーの結果を統合して PASS/WARN/FAIL 判定"
+    reasoning: "スクリーニング → データ品質とロジック整合性を並列チェック"
+
+  # --- 投資判断のレビュー ---
+  - intent: "入替提案のレビュー"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "入替提案レビュー" }
+    reviewers:
+      - role: "ロジックレビュアー"
+        checks:
+          - "売却シグナル(bearish)なのに保有推奨等の矛盾がないか"
+          - "過去の lesson と矛盾した提案をしていないか"
+          - "過去のテーゼと今回の判断が整合しているか"
+          - "以前同じ銘柄で失敗していないか"
+      - role: "リスクレビュアー"
+        checks:
+          - "売却提案に資金使途が含まれているか"
+          - "「何もしない」選択肢と比較されているか"
+          - "通貨配分制約（USD60%以下等）を満たしているか"
+          - "テーマ順張りリスク（F&G80超でトレンドテーマ追加）"
+          - "見落とされているリスク（決算タイミング、地政学等）"
+      - role: "データレビュアー"
+        checks:
+          - "税コスト（譲渡益課税約20%）が計算に含まれているか"
+          - "what-if の資金収支の整合性"
+          - "単元株コスト（日本株100株、SGX100株）の確認"
+          - "推定値ではなく計算値が使われているか"
+    conclude: "各レビュアーの結果を統合して PASS/WARN/FAIL 判定"
+    reasoning: "投資判断 → 3観点で並列レビュー。lesson との整合性が最重要"
+
+  # --- 購入判断のレビュー ---
+  - intent: "購入判断のレビュー"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "購入判断レビュー" }
+    reviewers:
+      - role: "ロジックレビュアー"
+        checks:
+          - "分析シグナルと推奨が一致しているか"
+          - "lesson の trigger に該当する状況ではないか"
+      - role: "リスクレビュアー"
+        checks:
+          - "PF加重平均RSI が70超で買い増しを提案していないか"
+          - "セクター/通貨の集中が悪化しないか"
+          - "規模バランス（小型株25%超）は維持されるか"
+      - role: "データレビュアー"
+        checks:
+          - "購入コストの計算が正しいか"
+          - "Before/After の比率変化が正確か"
+    conclude: "各レビュアーの結果を統合して PASS/WARN/FAIL 判定"
+    reasoning: "購入 → 過熱チェックと集中リスクが重要"
+
+  # --- PF診断のレビュー ---
+  - intent: "PF診断のレビュー"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "PF診断レビュー" }
+    reviewers:
+      - role: "リスクレビュアー"
+        checks:
+          - "通貨/セクター/地域集中リスクが正しく検出されているか"
+          - "含み益が1銘柄にPF総利益の50%以上集中していないか"
+          - "小型株比率が25%超で警告されているか"
+      - role: "ロジックレビュアー"
+        checks:
+          - "以前同じ銘柄で失敗していないか"
+          - "改善案が lesson と矛盾していないか"
+    conclude: "各レビュアーの結果を統合して PASS/WARN/FAIL 判定"
+    reasoning: "PF診断 → リスク見落としとlesson整合が中心"
+
+  # --- 反論チェック (Devil's Advocate) ---
+  - intent: "反論チェック"
+    reviewers:
+      - role: "リスクレビュアー"
+        checks:
+          - "提案の逆の立場から論点を提示"
+          - "最悪のシナリオで何が起こるか"
+          - "「本当にそうか？」の検証"
+          - "見落とされている代替案はないか"
+    conclude: "反論が致命的か判断し PASS/WARN/FAIL 判定"
+    reasoning: "Devil's Advocate → リスクレビュアー単独で実行"
+
+  # --- フォールバック（全LLMがClaude） ---
+  - intent: "投資判断レビュー（APIキー未設定）"
+    steps:
+      - check: "llm.get_available_providers() == []"
+      - tool: graphrag.get_context
+        params: { user_input: "レビュー" }
+    reviewers:
+      - role: "リスクレビュアー（Claude代替）"
+      - role: "ロジックレビュアー（Claude代替）"
+      - role: "データレビュアー（Claude代替）"
+    conclude: "全て Claude で3観点を順にレビューし統合判断"
+    reasoning: "APIキー未設定 → Claude Code 自体で全レビュアーを実行"
+
+# ツール側の責務（エージェントは意識不要）
+tool_responsibilities:
+  - llm: LLM呼び出しのみ（テキスト生成）。判断ロジックなし
+  - graphrag: 過去データ取得のみ（lesson・テーゼ・失敗履歴・前回レビュー）
+  - レビュー判定（PASS/WARN/FAIL）はエージェントが統合判断する

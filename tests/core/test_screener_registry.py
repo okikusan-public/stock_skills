@@ -411,10 +411,11 @@ class TestBuildDefaultRegistry:
         # QueryScreener-based presets support legacy (default)
         assert "value" not in unsupported
 
-    def test_shareholder_return_has_formatter(self):
+    def test_shareholder_return_registered(self):
         registry = build_default_registry()
         spec = registry.get("shareholder-return")
-        assert spec.formatter is not None
+        assert spec is not None
+        assert spec.preset == "shareholder-return"
 
     def test_momentum_screen_kwargs_fn(self):
         registry = build_default_registry()

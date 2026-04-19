@@ -84,6 +84,47 @@ examples:
   - intent: "トヨタを調べてメモして"
     agent: analyst
 
+  # --- 記録系（エージェント不要、オーケストレーターが直接実行） ---
+  - intent: "メモして"
+    action: direct
+    operation: note_save
+
+  - intent: "学びを記録"
+    action: direct
+    operation: note_save
+
+  - intent: "テーゼを記録"
+    action: direct
+    operation: note_save
+
+  - intent: "ウォッチリストに入れて"
+    action: direct
+    operation: watchlist_add
+
+  - intent: "ウォッチリスト見せて"
+    action: direct
+    operation: watchlist_list
+
+  - intent: "ウォッチリストから外して"
+    action: direct
+    operation: watchlist_remove
+
+  - intent: "トヨタ100株買った"
+    action: direct
+    operation: portfolio_buy
+
+  - intent: "AAPL5株売った"
+    action: direct
+    operation: portfolio_sell
+
+  - intent: "メモ一覧"
+    action: direct
+    operation: note_list
+
+  - intent: "メモ削除"
+    action: direct
+    operation: note_delete
+
 context_rules:
   - 直前の銘柄を省略されたら補完する
   - 直前のスクリーニング結果の「N位の銘柄」は自動解決する

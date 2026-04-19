@@ -1,0 +1,113 @@
+# Researcher Agent — Few-shot Examples
+# 数値はサンプル。エージェントがユーザーの意図に応じて自律的に判断する。
+# 全パターンで最初に GraphRAG で過去のリサーチ履歴を確認する。
+
+examples:
+  # --- 銘柄リサーチ (stock) ---
+  - intent: "トヨタの最新ニュース"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "トヨタの最新ニュース" }
+      - tool: grok.search_stock_deep
+        params: { symbol: "7203.T", company_name: "トヨタ自動車" }
+      - judge: "ニュース要約 + カタリスト + センチメント + 過去リサーチとの差分"
+    reasoning: "企業名→ティッカー変換。コンテキスト→Grok検索→差分分析"
+
+  - intent: "NVDAを深掘りして"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "NVDAを深掘り" }
+      - tool: grok.search_stock_deep
+        params: { symbol: "NVDA", company_name: "NVIDIA" }
+      - tool: grok.search_x_sentiment
+        params: { symbol: "NVDA", company_name: "NVIDIA" }
+      - judge: "ニュース + Xセンチメント を統合して深掘りレポート"
+    reasoning: "深掘り要求 → stock_deep + sentiment の両方を実行"
+
+  - intent: "AAPLのセンチメントは？"
+    steps:
+      - tool: grok.search_x_sentiment
+        params: { symbol: "AAPL", company_name: "Apple" }
+      - judge: "ポジ/ネガ意見 + スコア(-1.0〜1.0)を提示"
+    reasoning: "センチメント特化。stock_deep は不要"
+
+  # --- 業界分析 (industry) ---
+  - intent: "半導体業界の動向"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "半導体業界の動向" }
+      - tool: grok.search_industry
+        params: { industry_or_theme: "半導体 semiconductor 業界動向" }
+      - judge: "業界トレンド + 主要プレイヤー + 成長ドライバー + リスク"
+    reasoning: "業界名を検出。日英キーワードを組み合わせて検索"
+
+  - intent: "EV業界を調べて"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "EV業界" }
+      - tool: grok.search_industry
+        params: { industry_or_theme: "EV 電気自動車 業界動向 2026" }
+      - judge: "トレンド + プレイヤー + 政策動向"
+    reasoning: "テーマ→業界分析。年号を付けて最新情報を優先"
+
+  # --- マーケット概況 (market) ---
+  - intent: "今の相場は？"
+    steps:
+      - tool: graphrag.get_context
+        params: { user_input: "今の相場" }
+      - tool: grok.search_market
+        params: { market_or_index: "日本株 米国株 市況 2026" }
+      - judge: "市況サマリー + セクターローテーション + リスク要因"
+    reasoning: "市場全体が対象。幅広いキーワードで検索"
+
+  - intent: "米国市場のセンチメント"
+    steps:
+      - tool: grok.search_market
+        params: { market_or_index: "US stock market sentiment S&P500 NASDAQ" }
+      - judge: "米国市場のセンチメント + 注目イベント"
+    reasoning: "地域を絞った市況照会"
+
+  # --- ビジネスモデル分析 (business) ---
+  - intent: "トヨタのビジネスモデル"
+    steps:
+      - tool: grok.search_business
+        params: { symbol: "7203.T", company_name: "トヨタ自動車" }
+      - judge: "事業セグメント + 収益構造 + 競争優位性"
+    reasoning: "ビジネスモデル・事業構造に焦点"
+
+  - intent: "MSFTは何で稼いでる？"
+    steps:
+      - tool: grok.search_business
+        params: { symbol: "MSFT", company_name: "Microsoft" }
+      - judge: "セグメント別売上 + 成長ドライバー + モート分析"
+    reasoning: "収益構造への質問 → business 検索"
+
+  # --- トレンドテーマ検出 (trending) ---
+  - intent: "今熱いテーマは？"
+    steps:
+      - tool: grok.get_trending_themes
+        params: { region: "japan" }
+      - judge: "注目テーマ一覧 + 各テーマの根拠・ドライバー"
+    reasoning: "テーマ全般の質問。地域デフォルトは japan"
+
+  - intent: "米国のトレンドテーマ"
+    steps:
+      - tool: grok.get_trending_themes
+        params: { region: "us" }
+      - judge: "米国市場の注目テーマ + ドライバー"
+    reasoning: "地域指定あり"
+
+  # --- Grok未設定時のフォールバック ---
+  - intent: "NVDAのニュース（Grok未設定）"
+    steps:
+      - check: "grok.is_available() == False"
+      - tool: WebSearch
+        params: { query: "NVIDIA NVDA latest news 2026" }
+      - judge: "WebSearch結果を要約。Xセンチメントは取得不可と明示"
+    reasoning: "Grok未設定 → WebSearchで代替。センチメントは非対応"
+
+# ツール側の責務（エージェントは意識不要）
+tool_responsibilities:
+  - grok: API呼び出しのみ（ニュース/センチメント/業界/市場/ビジネス検索）
+  - graphrag: 過去データ取得・保存のみ（判断ロジックなし）
+  - WebSearch: Grok未設定時のフォールバック（Xセンチメント非対応）
