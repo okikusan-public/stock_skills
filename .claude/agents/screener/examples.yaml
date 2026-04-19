@@ -1,0 +1,85 @@
+# Screener Agent — Few-shot Examples
+# 数値はサンプル。エージェントがユーザーの意図・市場状況に応じて自律的に調整する。
+
+examples:
+  # --- 割安系 ---
+  - intent: "割安な日本株"
+    params: { region: japan, preset: value, max_per: 15, max_pbr: 1.5, min_roe: 0.08 }
+    reasoning: "一般的な割安基準。市場環境によって緩めても良い"
+
+  - intent: "超割安株"
+    params: { region: japan, preset: deep-value, max_per: 8, max_pbr: 0.5 }
+    reasoning: "ディープバリュー。流動性リスクに注意"
+
+  # --- 配当系 ---
+  - intent: "米国の高配当株"
+    params: { region: us, preset: high-dividend, min_dividend_yield: 0.03, min_roe: 0.10 }
+    reasoning: "米国の配当基準は3%以上が目安"
+
+  - intent: "株主還元が厚い株"
+    params: { region: japan, preset: shareholder-return, min_total_return: 0.05 }
+    reasoning: "配当+自社株買いの総還元率で評価"
+
+  # --- 成長系 ---
+  - intent: "グロース株"
+    params: { region: japan, preset: growth, min_revenue_growth: 0.15, min_roe: 0.12 }
+    reasoning: "純成長。割安制約なし"
+
+  - intent: "爆発的に成長してる株"
+    params: { region: us, preset: high-growth, min_revenue_growth: 0.20, max_psr: 20 }
+    reasoning: "売上成長率重視。赤字でも可"
+
+  - intent: "小型成長株"
+    params: { region: japan, preset: small-cap-growth, min_revenue_growth: 0.20, max_psr: 15 }
+    reasoning: "テンバガー候補。時価総額1000億円以下"
+
+  # --- 特殊mode系 ---
+  - intent: "押し目の銘柄"
+    mode: pullback
+    params: { region: japan, max_per: 20, min_roe: 0.08 }
+    reasoning: "上昇トレンド中の一時調整を検出"
+
+  - intent: "急騰銘柄"
+    mode: momentum
+    params: { region: japan, min_52wk_change: 0.20 }
+    reasoning: "RSI/MACD/出来高/52週変化率の4軸スコア"
+
+  - intent: "Xで話題の株"
+    mode: trending
+    params: { region: japan }
+    reasoning: "Grok APIでX/Web上の話題銘柄を検出し、FA評価を付加"
+
+  - intent: "逆張り候補"
+    mode: contrarian
+    params: { region: japan, max_per: 15, min_roe: 0.03 }
+    reasoning: "テクニカル売られすぎ × ファンダ堅調"
+
+  - intent: "いい株ある？"
+    mode: alpha
+    params: { region: japan }
+    reasoning: "4段パイプライン（割安+変化の質+押し目+2軸スコア）"
+
+  # --- テーマ系 ---
+  - intent: "AI関連の割安株"
+    params: { region: us, preset: value, theme: ai, max_per: 25 }
+    reasoning: "AIテーマはPER許容度を広げる"
+
+  - intent: "韓国の半導体株"
+    params: { region: kr, preset: value, theme: ai }
+    reasoning: "半導体はaiテーマに含まれる"
+
+  # --- 地域バリエーション ---
+  - intent: "シンガポールの高配当株"
+    params: { region: sg, preset: high-dividend, min_dividend_yield: 0.04 }
+    reasoning: "SGXは配当利回り水準が高め"
+
+  - intent: "ASEAN全体で探して"
+    params: { region: asean, preset: alpha }
+    reasoning: "aseanは sg/th/my/id/ph の複数地域に自動展開"
+
+# ツール側の責務（エージェントは意識不要）
+tool_responsibilities:
+  - 異常値ガード（配当利回り>15%、PBR<0.1 等のサニタイズ）
+  - バリュースコア配分（PER25+PBR25+配当20+ROE15+成長15=100点）
+  - 地域ごとの閾値調整（小型株の時価総額基準等）
+  - EquityQuery ビルド・API呼び出し
