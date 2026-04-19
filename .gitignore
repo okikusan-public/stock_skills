@@ -2,6 +2,10 @@ data/cache/
 data/history/
 data/watchlists/
 data/screening_results/
+data/reports/
+data/research/
+data/reviews/
+data/session_logs/
 data/notes/
 __pycache__/
 *.pyc
@@ -9,6 +13,7 @@ __pycache__/
 .env
 .claude/skills/stock-portfolio/data/portfolio.csv
 .claude/worktrees/
+.claude/settings.json
 .claude/settings.local.json
 data/models/
 articles/
