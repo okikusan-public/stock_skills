@@ -11,9 +11,7 @@ retry_rules:
     action: "別のツールで代替取得を試みる（yahoo_finance → WebSearch 等）"
     max_retry: 1
 
-  - condition: "Reviewer が FAIL を返した"
-    action: "FAIL 理由を踏まえて該当エージェントを再起動"
-    max_retry: 2
+  # Reviewer FAIL のリトライは retry_on_fail セクションで制御（下記参照）
 
   - condition: "Strategist のレコメンドに矛盾がある"
     action: "Health Checker で事実を再確認してから Strategist を再起動"
@@ -41,6 +39,15 @@ auto_review:
   action: append_reviewer
   skip_condition: reviewer_already_executed  # 二重実行を防止
 
+# ---------------------------------------------------------------------------
+# Reviewer FAIL 時のリトライ方針 (KIK-671)
+# FAIL は「何を直すか」の判断にユーザーの意図が必要。自律リトライしない。
+# ---------------------------------------------------------------------------
+retry_on_fail:
+  max_retries: 2
+  before_retry: ask_user  # FAIL理由と修正方針をユーザーに提示し承認を得る
+  on_pass_or_warn: auto   # PASS/WARN はユーザー確認不要でそのまま出力
+
 escalation:
   - condition: "再試行上限に達した"
     action: "現時点の結果をそのまま提示し、制限事項を明示する"
@@ -52,4 +59,5 @@ human_in_the_loop:
   # ユーザー確認が必要な操作（それ以外は全て自律実行）
   - "売買の最終実行（buy/sell の --yes 確認）"
   - "投資判断の最終承認（Strategist のレコメンド承認）"
+  - "Reviewer FAIL 時のリトライ承認（FAIL理由と修正方針を提示）"
   - "差し戻し上限到達時の続行判断"
