@@ -35,6 +35,7 @@ auto_review:
   trigger:
     # 以下のいずれかに該当 → Reviewer を自動挿入
     - agent_includes: strategist
+    - agent_includes: screener    # スクリーニング結果も投資判断の入口
     - routing_flag: "review: true"
     - output_contains: [売却, 購入, 入替, リバランス, 売るべき, 買うべき, 乗り換え, スワップ]
   action: append_reviewer
