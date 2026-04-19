@@ -10,3 +10,4 @@ __pycache__/
 data/models/
 articles/
 config/
+.DS_Store
