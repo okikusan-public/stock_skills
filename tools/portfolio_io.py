@@ -17,6 +17,7 @@ from src.data.portfolio_io import (  # noqa: E402
     save_portfolio,
     add_position,
     sell_position,
+    update_next_earnings,
     get_performance_review,
     DEFAULT_CSV_PATH,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "save_portfolio",
     "add_position",
     "sell_position",
+    "update_next_earnings",
     "get_performance_review",
     "DEFAULT_CSV_PATH",
 ]

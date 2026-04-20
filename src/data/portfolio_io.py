@@ -31,6 +31,7 @@ CSV_COLUMNS = [
     "cost_currency",
     "purchase_date",
     "memo",
+    "next_earnings",  # KIK-683: 直近決算日（YYYY-MM-DD）。ETFは空欄
 ]
 
 
@@ -64,6 +65,7 @@ def load_portfolio(csv_path: str = DEFAULT_CSV_PATH) -> list[dict]:
                 "cost_currency": row.get("cost_currency", "JPY").strip(),
                 "purchase_date": row.get("purchase_date", "").strip(),
                 "memo": row.get("memo", "").strip(),
+                "next_earnings": row.get("next_earnings", "").strip(),
             }
             if position["symbol"] and position["shares"] > 0:
                 portfolio.append(position)
@@ -93,6 +95,7 @@ def save_portfolio(
                     "cost_currency": pos.get("cost_currency", "JPY"),
                     "purchase_date": pos.get("purchase_date", ""),
                     "memo": pos.get("memo", ""),
+                    "next_earnings": pos.get("next_earnings", ""),
                 }
             )
 
@@ -160,6 +163,7 @@ def add_position(
             "cost_currency": cost_currency,
             "purchase_date": purchase_date,
             "memo": memo,
+            "next_earnings": "",
         }
         portfolio.append(new_pos)
         result = dict(new_pos)
@@ -252,6 +256,39 @@ def sell_position(
         result["hold_days"] = None
 
     return result
+
+
+def update_next_earnings(
+    csv_path: str,
+    symbol: str,
+    next_earnings: str,
+) -> bool:
+    """特定銘柄の next_earnings を更新する (KIK-683)。
+
+    Parameters
+    ----------
+    csv_path : str
+        ポートフォリオCSVパス
+    symbol : str
+        ティッカーシンボル
+    next_earnings : str
+        決算日 (YYYY-MM-DD)。空文字で消去
+
+    Returns
+    -------
+    bool
+        更新成功なら True、銘柄が見つからなければ False
+    """
+    portfolio = load_portfolio(csv_path)
+    found = False
+    for pos in portfolio:
+        if pos["symbol"].upper() == symbol.upper():
+            pos["next_earnings"] = next_earnings
+            found = True
+            break
+    if found:
+        save_portfolio(portfolio, csv_path)
+    return found
 
 
 def get_performance_review(
