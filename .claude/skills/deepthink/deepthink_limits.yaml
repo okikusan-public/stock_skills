@@ -7,22 +7,25 @@ limits:
   max_llm_calls: 20          # 外部LLM (GPT/Gemini/Grok) の最大呼び出し回数
   max_wall_time_minutes: 15  # 壁時計時間の上限
 
-# 深度プリセット
+# 深度プリセット (KIK-690: max_output_chars 追加)
 depth_presets:
   shallow:
     max_iterations: 1
     max_agent_spawns: 3
     max_llm_calls: 5
+    max_output_chars: 1500   # 各エージェント出力の推奨上限
     description: "1回の追加調査。軽量な補完"
   medium:
     max_iterations: 3
     max_agent_spawns: 6
     max_llm_calls: 12
+    max_output_chars: 2500
     description: "2-3回の評価→改善ループ。標準的な深掘り"
   deep:
     max_iterations: 5
     max_agent_spawns: 10
     max_llm_calls: 20
+    max_output_chars: 4000
     description: "収束するまでループ。徹底的な分析"
 
 actions:

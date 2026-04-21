@@ -18,22 +18,38 @@ Evaluator-Optimizer パターンで自律的に深掘り分析する。通常の
 
 ## 実行フロー
 
-### Step 0: 開始通知
+### Step 0: 開始通知 + 承認待ち
 
-ユーザーに以下を通知して承認を得る:
+ユーザーに以下を通知する:
 - 「DeepThinkingモードで分析します」
 - 「評価→改善のループが収束するまで続きます」
 - 「各ステップで中間結果を報告します」
 - 深度: shallow / medium / deep（指定がなければ medium）
 
 深度選択ガイド:
-- **shallow**: 1回の追加調査。軽微な情報不足の補完（max 3 agents, 5 LLM calls）
-- **medium**: 2-3回の評価→改善ループ。標準的な深掘り（max 6 agents, 12 LLM calls）
-- **deep**: 最大5回のループ。徹底的な分析（max 10 agents, 20 LLM calls）
+- **shallow**: 1回の追加調査。軽微な情報不足の補完（max 3 agents, 5 LLM calls, 推奨出力 ~1500字）
+- **medium**: 2-3回の評価→改善ループ。標準的な深掘り（max 6 agents, 12 LLM calls, 推奨出力 ~2500字）
+- **deep**: 最大5回のループ。徹底的な分析（max 10 agents, 20 LLM calls, 推奨出力 ~4000字）
+
+**⚠️ ユーザーの明示的な応答（「OK」「続けて」等）を待ってから Step 1 に進む。勝手に開始しない。**
 
 ### Step 1: 初回分析
 
-stock-skills のエージェント（Screener / Analyst / Health Checker / Researcher / Strategist）を通常通り起動。使用可能なエージェントは [stock-skills routing.yaml](../stock-skills/routing.yaml) を参照。
+**まず lesson をロードする（必須）:**
+
+```python
+python3 -c "
+import sys; sys.path.insert(0, '.')
+from tools.notes import load_notes
+lessons = load_notes(note_type='lesson')
+for n in lessons:
+    print(f'[{n.get(\"date\",\"\")}] {n.get(\"content\",\"\")[:200]}')
+"
+```
+
+lesson のロード結果を以降の全ステップで参照する。lesson が 0 件でも実行は続行する。
+
+次に stock-skills のエージェント（Screener / Analyst / Health Checker / Researcher / Strategist）を起動。使用可能なエージェントは [stock-skills routing.yaml](../stock-skills/routing.yaml) を参照。
 
 ### Step 2: 評価（Evaluator）
 
@@ -45,7 +61,7 @@ stock-skills のエージェント（Screener / Analyst / Health Checker / Resea
 | シナリオ | 複数のシナリオが検討されているか（楽観/悲観/中立） |
 | PF整合 | ユーザーのPF構成・ターゲットと照合されているか |
 | 反論 | Devil's Advocate の視点があるか |
-| lesson | 過去の lesson と矛盾していないか |
+| lesson | 過去の lesson と矛盾していないか（Step 1 でロード済みの lesson を参照） |
 
 **評価結果**: 不足リストを作成。
 
@@ -65,26 +81,35 @@ stock-skills のエージェント（Screener / Analyst / Health Checker / Resea
 
 ```
 不足: "RSI未確認" → Analyst 追加起動（code interpreter で RSI 計算）
-不足: "地政学シナリオなし" → Researcher + Gemini(web_search) で並列調査
+不足: "地政学シナリオなし" → Researcher + Gemini(web_search=True) で並列調査
 不足: "PFターゲット未照合" → Health Checker でPF構造確認
 ```
 
 **マルチLLMの活用**（`config/llm_capabilities.yaml` を参照）:
-- 事実収集: Gemini(web_search=True) + Grok(tools/grok.py) を並列
-- シナリオ推論: GPT(reasoning='high') + Gemini-Pro を並列
-- 統合: Claude（自身）
+
+| 用途 | 優先LLM | 理由 |
+|:---|:---|:---|
+| **事実収集** | Gemini(web_search=True) | Google検索統合。検索トークン無課金 |
+| **Xセンチメント** | Grok(tools/grok.py) | X/Web リアルタイム検索 |
+| **シナリオ推論・反論** | GPT(reasoning='high') | 批判的思考・深い推論 |
+| **長文分析** | Gemini-Pro | 1Mコンテキスト・構造的思考 |
+| **統合判断** | Claude（自身） | オーケストレーション・一貫性維持 |
+
+**事実収集は Gemini Grounding を優先する。** GPT は推論・反論に特化させる。
 
 ### Step 4: チェックポイント
 
-改善結果をユーザーに中間報告する:
+改善結果をユーザーに中間報告する。**以下のフォーマットに厳密に従うこと。省略・変更しない。**
 
 ```
-📊 Step 2/5 完了（LLM calls: 5/12）
+📊 DeepThink Step N/M 完了（Agents: X/Y, LLM calls: A/B）
 
 中間結果:
-- NVO: RSI 85.6（過熱圏）
-- イラン停戦シナリオ: DVN -15%、CEG -8%
-- 停戦長期化シナリオ: DVN +5%、CEG +12%
+- [発見1]
+- [発見2]
+- [発見3]
+
+不足: [残りの不足リスト or "なし（収束）"]
 
 [続行] [方向修正] [ここで終了]
 ```
@@ -106,22 +131,23 @@ stock-skills のエージェント（Screener / Analyst / Health Checker / Resea
 `deepthink_limits.yaml` に従い暴走を防止する:
 
 - 上限到達時: ループ停止 → 現時点の結果を提示 → 続行にはユーザー承認が必要
-- 進捗は各ステップで表示: 「Step 3/5, LLM calls 8/12, Agents 4/6」
+- 進捗は各ステップで表示: 「Agents 4/6, LLM calls 8/12」
 
 ## 進捗表示フォーマット
 
-各ステップの開始・完了時に以下を表示:
+**このフォーマットに厳密に従うこと。省略・変更しない。**
 
+ステップ開始時:
 ```
-🔍 DeepThink Step 2: シナリオ分析
-   Gemini(grounding) でイラン停戦の影響を調査中...
-   GPT(reasoning=high) で原油価格シナリオを分析中...
+🔍 DeepThink Step N: [ステップ名]
+   [実行中のLLM/ツール名] で [何をしているか]...
 ```
 
+ステップ完了時:
 ```
-✅ DeepThink Step 2 完了 (45s)
-   発見: 停戦シナリオで DVN -15%、CEG -8% の影響
-   次のステップ: PFターゲットとの照合
+✅ DeepThink Step N 完了
+   発見: [主要な発見を1-2行]
+   次のステップ: [次にやること]
 ```
 
 ## References
