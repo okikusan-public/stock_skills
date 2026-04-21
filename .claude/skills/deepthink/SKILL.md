@@ -72,7 +72,11 @@ lesson のロード結果を以降の全ステップで参照する。lesson が
 
 次に stock-skills のエージェント（Screener / Analyst / Health Checker / Researcher / Strategist）を起動。使用可能なエージェントは [stock-skills routing.yaml](../stock-skills/routing.yaml) を参照。
 
-### Step 2: 評価（Evaluator）
+### Step 2: 評価（自己評価 + 外部レビュー + 反証→再プラン）
+
+DeepThink の価値は「なぜその結論に至ったか」の思考過程を見せること。結論だけ出すなら stock-skills と同じ。
+
+#### 2a. 自己評価
 
 初回分析の結果を以下の観点で自己評価する:
 
@@ -84,7 +88,43 @@ lesson のロード結果を以降の全ステップで参照する。lesson が
 | 反論 | Devil's Advocate の視点があるか |
 | lesson | 過去の lesson と矛盾していないか（Step 1 でロード済みの lesson を参照） |
 
-**評価結果**: 不足リストを作成。
+#### 2b. 外部レビュー（並列）
+
+**オーケストレーターが GPT と Gemini を並列起動して批判的レビューを実行する。**
+
+```
+Agent(gpt-reviewer, prompt="この分析の穴は？反論は？見落としているリスクは？")
+Agent(gemini-reviewer, prompt="lesson と矛盾していないか？別の解釈はあるか？")
+```
+
+- GPT: 反証ポイント（穴・リスク・見落とし）を提示
+- Gemini: lesson 整合性 + 別解釈を提示
+- Claude（自身）: 自己評価の不足リスト
+
+#### 2c. 反証→再プラン
+
+外部レビューの反証を踏まえ、初回結論を **修正 or 強化** する。ユーザーに以下を見せる:
+
+```
+📊 DeepThink Step 2 完了（Agents: X/Y, LLM calls: A/B）
+
+初回結論: [初回分析の結論]
+
+反証:
+  GPT: [反証ポイント]
+  Gemini: [lesson整合性・別解釈]
+
+再プラン:
+  初回: [修正前の提案]
+  修正: [修正後の提案]
+  理由: [なぜ修正したか]
+
+不足: [残りの不足リスト or "なし（収束）"]
+
+[続行] [方向修正] [ここで終了]
+```
+
+**評価結果**: 不足リストを作成（自己評価 + 外部レビューの指摘を統合）。
 
 **収束条件**（以下の全てを満たしたらループ終了 → Step 5 へ）:
 1. 5つの評価観点が全て完了
