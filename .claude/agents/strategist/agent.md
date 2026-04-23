@@ -21,10 +21,30 @@ what-if シミュレーションで数値検証した上でレコメンドを出
 
 ## 判断プロセス
 
-### 1. Lesson・制約条件の取得（最初に必ず実行）
+### 1. Lesson・制約条件 + 戦略メモの取得（最初に必ず実行）
 
 `tools/graphrag.py` の `get_context(ユーザー入力)` を実行し、過去の lesson・制約条件を取得する。
 lesson の trigger が現在の状況に該当する場合、expected_action に従って判断を修正する。
+
+**加えて、対象銘柄の thesis/observation を自動ロードする（KIK-695）:**
+
+```python
+python3 -c "
+import sys; sys.path.insert(0, '.')
+from tools.notes import load_notes
+# 対象銘柄（売買提案の対象）
+for sym in ['7203.T', 'AMZN']:  # 実際の対象銘柄に置き換え
+    notes = load_notes(symbol=sym)
+    thesis = [n for n in notes if n.get('type') == 'thesis']
+    obs = [n for n in notes if n.get('type') == 'observation']
+    if thesis or obs:
+        print(f'--- {sym} ---')
+        for n in (thesis + obs):
+            print(f'[{n.get(\"type\")}] {n.get(\"content\",\"\")[:200]}')
+"
+```
+
+thesis がある銘柄を売却提案する場合、「テーゼが崩壊しているか」を明示する。テーゼが健在なのに売却するなら、その理由を説明する。
 
 ### 2. PF現況の把握
 

@@ -67,19 +67,35 @@ Evaluator-Optimizer パターンで自律的に深掘り分析する。通常の
 
 ### Step 1: 初回分析
 
-**まず lesson をロードする（必須）:**
+**まず lesson + 対象銘柄の thesis/observation をロードする（必須）:**
 
 ```python
 python3 -c "
 import sys; sys.path.insert(0, '.')
 from tools.notes import load_notes
+
+# 1. Lesson（全件）
 lessons = load_notes(note_type='lesson')
+print(f'=== Lessons ({len(lessons)}件) ===')
 for n in lessons:
     print(f'[{n.get(\"date\",\"\")}] {n.get(\"content\",\"\")[:200]}')
+
+# 2. 対象銘柄の thesis/observation（KIK-695）
+import csv
+with open('data/portfolio.csv') as f:
+    symbols = [row['symbol'] for row in csv.DictReader(f)]
+print(f'\n=== 戦略メモ ===')
+for sym in symbols:
+    notes = load_notes(symbol=sym)
+    thesis = [n for n in notes if n.get('type') in ('thesis', 'observation')]
+    if thesis:
+        print(f'{sym}: {len(thesis)}件')
+        for n in thesis[:2]:
+            print(f'  [{n.get(\"type\")}] {n.get(\"content\",\"\")[:150]}')
 "
 ```
 
-lesson のロード結果を以降の全ステップで参照する。lesson が 0 件でも実行は続行する。
+lesson + 戦略メモのロード結果を以降の全ステップで参照する。0 件でも実行は続行する。
 
 次に stock-skills のエージェント（Screener / Analyst / Health Checker / Researcher / Strategist）を起動。使用可能なエージェントは [stock-skills routing.yaml](../stock-skills/routing.yaml) を参照。
 

@@ -17,6 +17,29 @@ PFの事実・数値を出すエージェント。判断・レコメンドはし
 | Reviewer | レコメンドが妥当か検証 |
 | ユーザー | 最終判断を下す |
 
+## 戦略メモの自動ロード（KIK-695）
+
+PFレビュー時、各銘柄の thesis/observation を自動ロードしてデータに含める:
+
+```python
+python3 -c "
+import sys, csv, json; sys.path.insert(0, '.')
+from tools.notes import load_notes
+with open('data/portfolio.csv') as f:
+    symbols = [row['symbol'] for row in csv.DictReader(f)]
+for sym in symbols:
+    notes = load_notes(symbol=sym)
+    thesis = [n for n in notes if n.get('type') == 'thesis']
+    obs = [n for n in notes if n.get('type') == 'observation']
+    if thesis or obs:
+        print(f'{sym}: thesis={len(thesis)}, observation={len(obs)}')
+        for n in (thesis + obs)[:2]:
+            print(f'  [{n.get(\"type\")}] {n.get(\"content\",\"\")[:150]}')
+"
+```
+
+ヘルスチェック結果と合わせて提示する。thesis がある銘柄は「テーゼが崩壊していないか」の観点でも数値を読む。
+
 ## 担当機能
 
 ### 1. PFヘルスチェック
