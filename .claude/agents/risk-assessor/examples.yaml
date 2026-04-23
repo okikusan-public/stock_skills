@@ -47,10 +47,24 @@ contrarian_rules:
   oversold: "F&G < 25 AND VIX > 30 → 押し目買いの好機"
   priority: "逆張りシグナルは通常判定を修正する。risk-on判定でも買われすぎならキャッシュ積み増し"
 
+# 2段階 × レンジ制（4LLMスワム承認済み 2026-04-24）
+# レンジ内なら何もしない。逸脱時のみ調整。
 pf_targets:
-  risk_on: {income: 45, growth: 35, hedge: 5, cash: 15}
-  neutral: {income: 55, growth: 25, hedge: 5, cash: 15}
-  risk_off: {income: 55, growth: 10, hedge: 10, cash: 25}
+  normal:
+    income: "45-55%"
+    growth: "25-30%"
+    hedge: "5%"
+    cash: "15-20%"
+  risk_off:
+    income: "50-55%"
+    growth: "10-20%"
+    hedge: "5-10%"
+    cash: "25-35%"
+  trigger_to_risk_off:
+    - "リスク判定スコア -3以下"
+    - "VIX > 25"
+    - "強制ルール発動（VIX>40, F&G<10, WTI>$110）"
+  jepi_classification: "ハイブリッド。保有比率を50:50でインカム+グロースに分割カウント"
 
 examples:
   # === 典型的な risk-on ===
@@ -60,7 +74,7 @@ examples:
     total: +6
     verdict: risk-on
     contrarian: なし
-    pf_target: {income: 45%, growth: 35%, hedge: 5%, cash: 15%}
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
     reasoning: "全指標がrisk-on。経済拡大+低VIX+適正金利。グロース比率を高めに"
 
   # === 典型的な neutral ===
@@ -70,7 +84,7 @@ examples:
     total: 0
     verdict: neutral
     contrarian: なし
-    pf_target: {income: 55%, growth: 25%, hedge: 5%, cash: 15%}
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
     reasoning: "全指標がneutral。方向感なし。インカム中心で様子見"
 
   # === 典型的な risk-off ===
@@ -80,7 +94,7 @@ examples:
     total: -6
     verdict: risk-off
     contrarian: なし
-    pf_target: {income: 55%, growth: 10%, hedge: 10%, cash: 25%}
+    pf_target: {income: "50-55%", growth: "10-20%", hedge: "5-10%", cash: "25-35%"}
     reasoning: "全指標がrisk-off。景気後退+高金利+原油高。グロースを大幅縮小、キャッシュを厚く"
 
   # === risk-on 下限（現在の市況に近い） ===
@@ -90,7 +104,7 @@ examples:
     total: +3
     verdict: risk-on（下限）
     contrarian: なし
-    pf_target: {income: 45%, growth: 35%, hedge: 5%, cash: 15%}
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
     note: "F&G70はGreed圏で急反転リスク。原油$95超えでneutral転落。フルrisk-onは危険"
     reasoning: "ギリギリrisk-on。経済指標は堅調だが原油高+VIX上昇傾向で不安定"
 
@@ -102,7 +116,7 @@ examples:
     verdict: risk-off
     contrarian: "F&G18 + VIX35 = 売られすぎ。押し目買いの好機"
     action: "キャッシュ25%のうち10%を使って、RSI<35のインカム優良銘柄を買い増し"
-    pf_target: {income: 55%, growth: 10%, hedge: 10%, cash: 25%}
+    pf_target: {income: "50-55%", growth: "10-20%", hedge: "5-10%", cash: "25-35%"}
     reasoning: "risk-offだが極端な恐怖は逆張りシグナル。パニック時にインカム優良株を拾う"
 
   # === risk-on + 買われすぎ（利確シグナル） ===
@@ -124,7 +138,7 @@ examples:
     verdict: "スコアはneutralだが、VIX40+F&G15+WTI110の極端値 → 強制risk-off"
     contrarian: "F&G15 = 極端な恐怖。ただし地政学ショック時は逆張りを急がない"
     action: "グロースを即座にトリム。キャッシュ25%以上に。落ち着いてから押し目検討"
-    pf_target: {income: 55%, growth: 10%, hedge: 10%, cash: 25%}
+    pf_target: {income: "50-55%", growth: "10-20%", hedge: "5-10%", cash: "25-35%"}
     reasoning: "地政学ショック時はスコアに関係なく強制risk-off。VIX40超は即時防御"
 
   # =================================================================
@@ -209,7 +223,7 @@ examples:
     adjusted_verdict: "実質neutral。地政学リスクが閾値に極めて近い"
     pattern_match: "risk-on下限パターン（例4）に近いが、地政学要因で1段階慎重化"
     action: "フルrisk-onへの調整は見送り。インカム補強（UL等）に限定。新規グロース追加は控える"
-    pf_target: {income: 55%, growth: 25%, hedge: 5%, cash: 15%}
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
     reasoning: "定量スコアはrisk-onだが、原油$95まで$2で地政学トリガーが極めて近い。フルrisk-onは危険。neutral目標で行動する"
 
   # === ゴルディロックス相場（2017年型・低VIX長期安定） ===
@@ -220,7 +234,7 @@ examples:
     verdict: risk-on
     contrarian: "VIX11は歴史的低水準。低VIXが長期化すると急騰リスクが蓄積"
     action: "risk-on だが過信しない。グロースは35%を上限に。VIX急騰に備えてヘッジ（プット等）を薄く持つ"
-    pf_target: {income: 45%, growth: 35%, hedge: 5%, cash: 15%}
+    pf_target: {income: "45-55%", growth: "25-30%", hedge: "5%", cash: "15-20%"}
     reasoning: "ゴルディロックス（適温相場）は心地よいが永続しない。2017年の低VIX後に2018年2月のVIXショックが来た"
 
   # =================================================================
