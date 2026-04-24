@@ -80,19 +80,3 @@ tools:
       score_portfolio:
         description: "PF全銘柄の一括スコアリング + 4象限分類（保有/買い増し/要監視/売却検討）"
         when: "PF全体の品質評価、要監視銘柄の特定時"
-
-  disclosure:
-    source: tools/disclosure.py
-    functions:
-      read_disclosure:
-        description: "PDF/DOCX/XLSX/PPTXをMarkdownに変換（1st pass: テキスト抽出）"
-        when: "決算短信、IR資料、有価証券報告書、10-K/10-Qを読む時"
-      detect_important_pages:
-        description: "Markdown化した内容から重要ページ候補を検出"
-        when: "スクショ解析のターゲットページを絞る時"
-      screenshot_pages:
-        description: "指定ページをPNG画像化（2nd pass: Vision解析用）"
-        when: "図表・グラフ・KPIダッシュボードを読む時"
-      download_disclosure:
-        description: "URLからIR資料をダウンロードしローカル保存"
-        when: "WebSearchで見つけたIR資料PDFを取得する時"
