@@ -365,13 +365,34 @@ def test_deepthink_swarm() -> dict:
             "エグゼクティブサマリー": "エグゼクティブサマリー" in skill_content,
             "統合結論": "統合結論" in skill_content or "議論の統合" in skill_content,
             "採用/却下": "採用" in skill_content,
+            "ツール参照": "tools.yaml" in skill_content,
+            "screen_stocks必須": "screen_stocks" in skill_content,
         }
         for label, found in checks.items():
             details.append(f"[{'x' if found else 'o'}] SKILL.md {label}: {'あり' if found else 'なし'}")
             if not found:
                 passed = False
 
-        # 基準6: llm_capabilities.yaml の存在と整合性
+        # 基準6: config/tools.yaml の存在と整合性
+        tools_path = PROJECT_ROOT / "config" / "tools.yaml"
+        if tools_path.exists():
+            with open(tools_path) as f:
+                tools_def = yaml.safe_load(f)
+            tools_keys = list(tools_def.get("tools", {}).keys())
+            required = ["yahoo_finance", "grok", "graphrag", "llm", "notes", "portfolio_io"]
+            has_all_tools = all(t in tools_keys for t in required)
+            details.append(f"[{'x' if has_all_tools else 'o'}] tools.yaml: {tools_keys}")
+            # screen_stocks が定義されているか
+            yf = tools_def.get("tools", {}).get("yahoo_finance", {}).get("functions", {})
+            has_screen = "screen_stocks" in yf
+            details.append(f"[{'x' if has_screen else 'o'}] tools.yaml screen_stocks: {'定義あり' if has_screen else 'なし'}")
+            if not (has_all_tools and has_screen):
+                passed = False
+        else:
+            details.append("[o] tools.yaml: ファイルなし")
+            passed = False
+
+        # 基準7: llm_capabilities.yaml の存在と整合性
         cap_path = PROJECT_ROOT / "config" / "llm_capabilities.yaml"
         if cap_path.exists():
             with open(cap_path) as f:

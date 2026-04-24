@@ -74,6 +74,12 @@
 - `tools/graphrag.py` の `get_context()` 経由でエージェントが取得
 - Neo4j 未接続時は graceful degradation
 
+## ツール定義
+
+- `config/tools.yaml` — 全ツールの関数名・役割・いつ使うかを一元管理
+- ツール（tools/）に関数を追加・変更した場合は `config/tools.yaml` も更新すること
+- エージェント（agent.md）やスキル（SKILL.md）はツール一覧をベタ書きせず、`config/tools.yaml` を参照する
+
 ## gitignore 対象
 
 - `data/cache/` — 銘柄ごと JSON キャッシュ（TTL 24時間）
