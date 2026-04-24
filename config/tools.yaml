@@ -33,6 +33,9 @@ tools:
       get_context:
         description: "過去の分析・lesson・thesis・観察メモの取得（Neo4j GraphRAG）"
         when: "初回分析時（必須）。銘柄の過去文脈を踏まえた判断に使う"
+      sync_all:
+        description: "data/ → GraphRAG の一括同期（notes + portfolio）"
+        when: "「syncして」「データを同期して」と言われた時"
 
   llm:
     source: tools/llm.py
