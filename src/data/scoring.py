@@ -47,21 +47,14 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 10.0) -> float:
 
 
 def _normalize_de(value) -> float | None:
-    """Normalize D/E to percentage form.
-
-    yfinance returns D/E as percentage (e.g., 105.0 = 105%) per docs/data-models.md.
-    Some sources may return as ratio (e.g., 1.05). We detect and convert.
+    """Return D/E as percentage. yfinance always returns percentage form
+    (e.g., 7.255 = 7.255%, 105.0 = 105%) per docs/data-models.md.
+    No heuristic conversion — KIK-709 removed the < 10 detection that
+    misclassified low-leverage stocks like NVDA (7.2%) and AUTO.JK (3.5%).
     """
     if value is None:
         return None
-    de = safe_float(value)
-    if de == 0:
-        return 0.0
-    # Heuristic: ratio form is typically < 10 (D/E 1000% is rare but possible)
-    # data-models.md defines percentage form as standard
-    if 0 < de < 10.0:
-        return de * 100.0
-    return de
+    return safe_float(value)
 
 
 # ---------------------------------------------------------------------------
@@ -311,13 +304,20 @@ def score_durability(info: dict, detail: dict | None = None) -> dict:
                 else:
                     stability = 0.0
 
+    # KIK-709: Industry-aware margin divisor
     sector = info.get("sector") or ""
-    if "Tech" in sector or "Communication" in sector:
-        b_raw = op_margin / 6
-    elif "Energy" in sector or "Financial" in sector:
-        b_raw = op_margin / 4
-    else:
-        b_raw = op_margin / 2
+    industry = info.get("industry") or ""
+    industry_divisors = cfg.get("industry_divisors", {})
+    divisor = industry_divisors.get(industry)
+    if divisor is None:
+        # Sector-level fallback
+        if "Tech" in sector or "Communication" in sector:
+            divisor = 6  # high-margin software/platform
+        elif "Energy" in sector or "Financial" in sector:
+            divisor = 4
+        else:
+            divisor = 2
+    b_raw = op_margin / divisor
 
     b_score = _clamp(b_raw * stability)
 
@@ -356,9 +356,18 @@ def score_durability(info: dict, detail: dict | None = None) -> dict:
 
     score = _clamp(raw)
 
+    # KIK-709: Quarterly warning — TTM margin vs annual average divergence
+    quarterly_warning = None
+    ttm_margin = safe_float(info.get("operating_margin")) * 100
+    if op_margin > 0 and ttm_margin > 0:
+        divergence = (ttm_margin - op_margin) / op_margin
+        if divergence < -0.20:  # TTM is 20%+ below annual average
+            quarterly_warning = f"TTM margin {ttm_margin:.1f}% vs avg {op_margin:.1f}% ({divergence*100:+.0f}%)"
+
     return {"score": round(score, 1), "A": round(a_score, 1),
             "B": round(b_score, 1), "C": round(c_score, 1),
-            "D": round(d_score, 1), "de_penalty": de_penalty_applied}
+            "D": round(d_score, 1), "de_penalty": de_penalty_applied,
+            "quarterly_warning": quarterly_warning}
 
 
 # ---------------------------------------------------------------------------

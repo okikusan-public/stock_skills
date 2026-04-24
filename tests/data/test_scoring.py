@@ -230,6 +230,57 @@ class TestScoreDurability:
         result = score_durability(info)
         assert 0.0 <= result["score"] <= 10.0
 
+    # KIK-709: D/E normalization bug fix tests
+    def test_low_de_no_penalty(self):
+        """D/E 7.2% (NVDA-like) should NOT trigger any penalty."""
+        info = _make_info(debt_to_equity=7.2, operating_margin=0.65, current_ratio=3.9)
+        detail = _make_detail(interest_expense=-300000000)
+        result = score_durability(info, detail)
+        assert result["de_penalty"] is None
+        assert result["score"] > 3.0  # not capped at 3 (was the bug)
+
+    def test_low_de_3_5_no_penalty(self):
+        """D/E 3.5% (AUTO.JK-like) should NOT trigger any penalty."""
+        info = _make_info(debt_to_equity=3.5, operating_margin=0.06, current_ratio=2.2,
+                          sector="Consumer Cyclical")
+        detail = _make_detail(interest_expense=-50000000)
+        result = score_durability(info, detail)
+        assert result["de_penalty"] is None
+        assert result["score"] > 3.0
+
+    # KIK-709: Quarterly warning tests
+    def test_quarterly_warning_triggered(self):
+        """TTM margin 20%+ below annual average → warning."""
+        info = _make_info(operating_margin=0.05)  # TTM 5%
+        detail = _make_detail(
+            operating_income_history=[500, 450, 400],
+            revenue_history=[5000, 5000, 5000],  # annual avg ~9%
+        )
+        result = score_durability(info, detail)
+        assert result["quarterly_warning"] is not None
+
+    def test_quarterly_warning_not_triggered(self):
+        """TTM margin close to annual average → no warning."""
+        info = _make_info(operating_margin=0.10)  # TTM 10%
+        detail = _make_detail(
+            operating_income_history=[500, 450, 400],
+            revenue_history=[5000, 5000, 5000],  # annual avg ~9%
+        )
+        result = score_durability(info, detail)
+        assert result["quarterly_warning"] is None
+
+    # KIK-709: Industry divisor test
+    def test_industry_divisor_hardware(self):
+        """Computer Hardware should use divisor=3, not Tech's 6."""
+        info_hw = _make_info(sector="Technology", industry="Computer Hardware",
+                             operating_margin=0.10)
+        info_sw = _make_info(sector="Technology", industry="Software—Infrastructure",
+                             operating_margin=0.10)
+        result_hw = score_durability(info_hw)
+        result_sw = score_durability(info_sw)
+        # HW with divisor=3 should score higher than SW with divisor=6
+        assert result_hw["B"] > result_sw["B"]
+
 
 # ---------------------------------------------------------------------------
 # Quadrant Classification (4象限)

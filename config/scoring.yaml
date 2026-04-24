@@ -86,6 +86,18 @@ growth_runway:
   fallback: 4
 
 # ---------------------------------------------------------------------------
+# 持続性B: Industry別 operating margin divisor (KIK-709)
+# Tech内でもHW製造業は低マージンのため、divisor=3に設定
+# ---------------------------------------------------------------------------
+industry_divisors:
+  Computer Hardware: 3
+  Electronic Components: 3
+  Scientific & Technical Instruments: 3
+  Specialty Industrial Machinery: 3
+  Auto Manufacturers: 2
+  Auto Parts: 2
+
+# ---------------------------------------------------------------------------
 # 非対称Beta安定性乗数
 # ---------------------------------------------------------------------------
 stability_beta:
