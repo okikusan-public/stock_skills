@@ -109,7 +109,11 @@ def sync_all() -> dict:
             for nf in note_files:
                 try:
                     with open(nf, "r", encoding="utf-8") as f:
-                        note = json.load(f)
+                        data = json.load(f)
+                    # note_manager saves as list [{...}], handle both formats
+                    note = data[0] if isinstance(data, list) else data
+                    if not note:
+                        continue
                     _merge_note(
                         note_id=note.get("id", nf.stem),
                         note_date=note.get("date", ""),
