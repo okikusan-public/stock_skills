@@ -1,0 +1,95 @@
+# 3軸品質スコアリング設定 (KIK-708)
+# v3.1 — 4LLM×3ラウンド + 5エージェントレビュー + 3LLM最終承認で確定
+
+# ---------------------------------------------------------------------------
+# 各軸のコンポーネント重み
+# ---------------------------------------------------------------------------
+weights:
+  return:
+    yield: 0.45         # Shareholder Yield (div + buyback)
+    coverage: 0.35      # 利益カバレッジ (EPS÷DPS)
+    consistency: 0.20   # 還元の一貫性 (payout健全性)
+
+  growth:
+    organic: 0.30       # 正規化有機成長 max(EG, RG)
+    roic: 0.25          # ROIC (ROA近似)
+    cashflow: 0.15      # 調整CF転換
+    runway: 0.20        # 成長滑走路 (セクター別)
+    capital: 0.10       # 資本配分力
+
+  durability:
+    financial: 0.30     # 財務堅牢性 (利払倍率)
+    earnings: 0.30      # 収益耐久性 (OpMargin × stability)
+    model: 0.20         # 事業モデル耐性 (利益率維持年数)
+    liquidity: 0.20     # 流動性 (current_ratio)
+
+  total:
+    durability: 0.45    # 「まず生き残る」が最重要
+    growth: 0.35        # 複利効果の源泉
+    return: 0.20        # 結果指標
+
+# ---------------------------------------------------------------------------
+# 閾値・ペナルティ
+# ---------------------------------------------------------------------------
+thresholds:
+  # D/Eペナルティ（段階的に厳格化）
+  de_penalty:
+    level1: 100         # >100% → 財務堅牢性(A) cap 5
+    level2: 200         # >200% → 財務堅牢性(A) cap 3
+    hard_cap: 250       # >250% → 持続性全体 ≤ 3
+
+  # 持続性→還元性の連動Cap
+  cap_rules:
+    - durability_below: 3
+      return_max: 4
+    - durability_below: 5
+      return_max: 6
+
+  # 無配株の閾値
+  zero_div_yield: 1.0  # yield < 1% → 無配株扱い（B,C不適用）
+
+  # 成長性の上限
+  organic_growth_cap: 30    # 有機成長率の上限 (%)
+  roic_cap: 30              # ROICの上限 (%)
+  coverage_cap: 3.0         # EPS/DPS カバレッジの上限 (倍)
+
+# ---------------------------------------------------------------------------
+# 4象限分類（上から優先判定、排他的・網羅的）
+# ---------------------------------------------------------------------------
+quadrants:
+  sell:
+    durability_below: 3     # or cap activated
+  watch:
+    durability_below: 5
+    total_below: 5
+  add:
+    total_min: 7
+    all_axes_min: 4
+  # hold = default (上記いずれにも非該当)
+
+# ---------------------------------------------------------------------------
+# 成長滑走路のセクター別デフォルト値 (0-10)
+# ---------------------------------------------------------------------------
+growth_runway:
+  sector_defaults:
+    Technology: 8
+    Healthcare: 6
+    Communication Services: 5
+    Consumer Cyclical: 4
+    Consumer Defensive: 3
+    Financial Services: 3
+    Industrials: 4
+    Energy: 2
+    Utilities: 3
+    Real Estate: 3
+    Basic Materials: 3
+  fallback: 4
+
+# ---------------------------------------------------------------------------
+# 非対称Beta安定性乗数
+# ---------------------------------------------------------------------------
+stability_beta:
+  low_beta_coeff: 0.05    # beta<1: max(floor, 1-(1-β)×coeff)
+  low_beta_floor: 0.90
+  high_beta_coeff: 0.20   # beta≥1: max(floor, 1-(β-1)×coeff)
+  high_beta_floor: 0.75

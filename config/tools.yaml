@@ -67,3 +67,13 @@ tools:
       load_watchlist:
         description: "ウォッチリスト読込"
         when: "ウォッチ中銘柄の参照時"
+
+  scoring:
+    source: tools/scoring.py
+    functions:
+      score_quality:
+        description: "個別銘柄の3軸品質スコア（還元性・成長性・持続性）+ 4象限分類"
+        when: "銘柄の質を定量評価する時、入替候補の比較時"
+      score_portfolio:
+        description: "PF全銘柄の一括スコアリング + 4象限分類（保有/買い増し/要監視/売却検討）"
+        when: "PF全体の品質評価、要監視銘柄の特定時"

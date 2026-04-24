@@ -287,6 +287,7 @@ def get_stock_detail(symbol: str) -> Optional[dict]:
         fcf: Optional[float] = None
         dividend_paid: Optional[float] = None
         stock_repurchase: Optional[float] = None
+        depreciation: Optional[float] = None  # KIK-708
         try:
             cf = ticker.cashflow
             operating_cashflow = _try_get_field(cf, [
@@ -297,6 +298,12 @@ def get_stock_detail(symbol: str) -> Optional[dict]:
             fcf = _try_get_field(cf, [
                 "Free Cash Flow",
                 "FreeCashFlow",
+            ])
+            # KIK-708: Depreciation for adjusted cash conversion
+            depreciation = _try_get_field(cf, [
+                "Depreciation And Amortization",
+                "Depreciation",
+                "DepreciationAndAmortization",
             ])
             # KIK-375: Shareholder return data
             dividend_paid = _try_get_field(cf, [
@@ -364,6 +371,8 @@ def get_stock_detail(symbol: str) -> Optional[dict]:
         net_income_stmt: Optional[float] = None
         revenue_history: list[float] = []
         net_income_history: list[float] = []
+        operating_income_history: list[float] = []  # KIK-708
+        interest_expense: Optional[float] = None    # KIK-708
         try:
             inc = ticker.income_stmt
             if inc is not None and not inc.empty:
@@ -385,6 +394,20 @@ def get_stock_detail(symbol: str) -> Optional[dict]:
                     "Net Income",
                     "NetIncome",
                     "Net Income Common Stockholders",
+                ])
+
+                # KIK-708: Operating income history (3 periods) for scoring
+                operating_income_history = _try_get_history(inc, [
+                    "Operating Income",
+                    "EBIT",
+                    "OperatingIncome",
+                ])
+
+                # KIK-708: Interest expense for interest coverage ratio
+                interest_expense = _try_get_field(inc, [
+                    "Interest Expense",
+                    "InterestExpense",
+                    "Interest Expense Non Operating",
                 ])
 
                 # Diluted EPS – latest two years for growth calculation
@@ -476,6 +499,10 @@ def get_stock_detail(symbol: str) -> Optional[dict]:
             "dividend_paid_history": dividend_paid_history,
             "stock_repurchase_history": stock_repurchase_history,
             "cashflow_fiscal_years": cashflow_fiscal_years,
+            # Scoring fields (KIK-708)
+            "operating_income_history": operating_income_history,
+            "interest_expense": interest_expense,
+            "depreciation": depreciation,
             # ETF fields (KIK-469)
             "quoteType": quote_type,
             "expense_ratio": expense_ratio,
