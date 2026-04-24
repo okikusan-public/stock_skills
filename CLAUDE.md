@@ -61,6 +61,7 @@ Tools (tools/)
   portfolio_io.py  — PF CSV 読み書き（src/data/portfolio_io のファサード）
   notes.py         — 投資メモ読み書き（src/data/note_manager のファサード）
   watchlist.py     — ウォッチリスト読み書き（JSON直接I/O）
+  scoring.py       — 3軸品質スコアリング（src/data/scoring.py のファサード）
 
 Data (src/data/)
   yahoo_client/  — yfinance ラッパー（24h JSONキャッシュ）
@@ -73,8 +74,10 @@ Data (src/data/)
   common.py      — 共通ユーティリティ（is_etf, safe_float 等）
   ticker_utils.py — ティッカー推論（通貨/地域マッピング）
   portfolio_io.py — PF CSV 読み書き
+  scoring.py     — 3軸品質スコアリング（還元性・成長性・持続性）
 
 Config: .claude/agents/screener/examples.yaml (regions, themes, presets, few-shot)
+Config: config/scoring.yaml (スコアリング重み・閾値・セクター別設定)
 Rules:  .claude/rules/ (development, workflow, testing)
 Docs:   docs/ (architecture, neo4j-schema, data-models)
 Tests:  tests/ (unit), tests/e2e/ (E2E agent scenarios)
