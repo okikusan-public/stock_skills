@@ -15,8 +15,8 @@ agents:
     role: ニュース・Xセンチメント・業界/市場動向・ビジネスモデル調査
     triggers: [ニュース, リサーチ, 深掘り, 業界, マーケット, 市況, センチメント, ビジネスモデル, 動向]
   strategist:
-    role: 投資判断・入替提案・ワークフロー設計
-    triggers: [入替, リバランス, 改善, 調整, プラン, 戦略, どうすべき, 乗り換え, スワップ]
+    role: 投資判断・入替提案・ワークフロー設計・売却判断
+    triggers: [入替, リバランス, 改善, 調整, プラン, 戦略, どうすべき, 乗り換え, スワップ, 売却, 損切り, 利確, 手放す, 撤退, 売るべき, 売り時]
   risk-assessor:
     role: 市場リスク状態判定（risk-on/neutral/risk-off）+ PFバランス目標提示
     triggers: [リスク判定, リスクオン, リスクオフ, 押し目, 買われすぎ, 売られすぎ, 市況判定]
@@ -85,6 +85,20 @@ examples:
 
   - intent: "PFを改善したい"
     agents: [health-checker, strategist]
+    review: true
+
+  # --- 売却判断（risk-assessor → health-checker → strategist の3連鎖） ---
+  - intent: "この株売るべき？"
+    agents: [risk-assessor, health-checker, strategist]
+    review: true
+    note: "risk-assessorで市場リスク判定→health-checkerで数値事実→strategistでcheck_exit_rule照合+What-If比較"
+
+  - intent: "損切りすべき？"
+    agents: [risk-assessor, health-checker, strategist]
+    review: true
+
+  - intent: "利確すべき？"
+    agents: [risk-assessor, health-checker, strategist]
     review: true
 
   - intent: "リスク確認して代わりを探して"
@@ -169,7 +183,7 @@ examples:
 context_rules:
   - 直前の銘柄を省略されたら補完する
   - 直前のスクリーニング結果の「N位の銘柄」は自動解決する
-  - 直前のhealth結果のEXIT銘柄は自動引き継ぐ
+  - 直前のhealth結果の注意銘柄（RSI異常値・大幅損失等）は自動引き継ぐ
 
 ambiguity:
   strategy: ask  # 複数エージェントが同スコアなら短く選択肢を提示

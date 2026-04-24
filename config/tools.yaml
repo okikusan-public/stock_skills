@@ -56,6 +56,9 @@ tools:
       save_note:
         description: "投資メモ・教訓の保存"
         when: "分析結果から教訓を記録する時"
+      check_exit_rule:
+        description: "exit-ruleノートの損切り/利確閾値と現在損益率を照合"
+        when: "売却判断時（必須）。事前設定した撤退ルールとの照合に使う"
 
   portfolio_io:
     source: tools/portfolio_io.py

@@ -95,6 +95,9 @@ examples:
     steps:
       - tool: graphrag.get_context
         params: { user_input: "売却判断" }
+      - tool: notes.check_exit_rule
+        params: { symbol: "<対象銘柄>", pnl_pct: "<現在の損益率%>" }
+        note: "exit-rule ノートの stop_loss/take_profit 閾値と照合。抵触時はルールに従う"
       - read: "portfolio.csv"
       - code: |
           売却代金 = 現在値 × 株数
@@ -102,17 +105,20 @@ examples:
           手取り = 売却代金 - 税金
           Before/After: セクター/通貨/地域比率
       - recommend: "売却/ホールド/一部売却の3パターンを比較"
-    reasoning: "売却 → 税コスト含めて3パターン比較。何もしない選択肢と比較"
+    reasoning: "売却 → まず exit-rule を確認。ルール抵触ならルール優先。なければ税コスト含めて3パターン比較"
 
   - intent: "損切りすべき？"
     input: "Health Checker: 含み損 -15%, RSI 35"
     steps:
       - tool: graphrag.get_context
         params: { user_input: "損切り判断" }
+      - tool: notes.check_exit_rule
+        params: { symbol: "<対象銘柄>", pnl_pct: -15.0 }
+        note: "stop_loss 閾値に抵触しているか確認。抵触 → ルール通り損切りを推奨"
       - read: "portfolio.csv"
       - code: "損切り時の実現損失額を計算。損益通算の可能性を確認"
       - recommend: "損切り / ナンピン / ホールドの3パターンを期待値で比較"
-    reasoning: "損切り → 感情でなくデータで判断。損益通算メリットも考慮"
+    reasoning: "損切り → exit-rule の stop_loss 確認が最優先。感情でなくルールとデータで判断"
 
   # === Lesson 違反時の自動警告 ===
   - intent: "RSI75の銘柄を買いたい（Lesson: 高値掴みした→RSI70超で買わない）"
