@@ -121,6 +121,22 @@ presets:
   market-darling:    "市場期待銘柄（高PER許容・EPS急成長）"
 
 # ---------------------------------------------------------------------------
+# 3軸品質スコア閾値（KIK-710）
+# score_quality() の出力を解釈する基準。エージェントが自律判断に使う。
+# ---------------------------------------------------------------------------
+quality_thresholds:
+  levels:
+    excellent: 8    # ≥8: 優秀（「高い」「優良」はこの水準）
+    good: 6         # ≥6: 良好（「良い」「しっかりした」はこの水準）
+    average: 4      # ≥4: 普通
+    poor: 4         # <4: 低い（要注意）
+  total:
+    premium: 7      # ≥7: プレミアム品質
+    solid: 6        # ≥6: 堅実
+    moderate: 5     # ≥5: 中程度
+    weak: 5         # <5: 弱い
+
+# ---------------------------------------------------------------------------
 # Few-shot Examples
 # ---------------------------------------------------------------------------
 examples:
@@ -289,3 +305,50 @@ tool_responsibilities:
   - 異常値ガード（配当利回り>15%、PBR<0.1 等のサニタイズ）
   - 地域ごとの閾値調整（小型株の時価総額基準等）
   - EquityQuery ビルド・API呼び出し
+
+# ---------------------------------------------------------------------------
+# 3軸品質スコア活用 Few-shot (KIK-710)
+# quality_filter: score_quality()結果に対するフィルタ条件
+# ---------------------------------------------------------------------------
+quality_examples:
+  - intent: "質の高い高配当株"
+    params: { region: japan, preset: high-dividend, min_dividend_yield: 0.03, min_roe: 0.10 }
+    scoring: "配当(35)+PER(20)+PBR(15)+ROE(15)+成長(15)=100点"
+    quality_filter: { min_return: 6, min_durability: 6 }
+    reasoning: "高配当presetで絞った後、score_quality()で還元性≥6+持続性≥6をフィルタ。見かけ高配当を排除"
+
+  - intent: "持続性の高い成長株"
+    params: { region: japan, preset: growth, min_revenue_growth: 0.10, min_roe: 0.12 }
+    scoring: "成長(30)+ROE(25)+PER(20)+PBR(15)+配当(10)=100点"
+    quality_filter: { min_durability: 7, min_growth: 6 }
+    reasoning: "成長presetで絞った後、score_quality()で持続性≥7+成長性≥6。脆い高成長を排除"
+
+  - intent: "バランス型の優良株"
+    params: { region: japan, preset: quality, min_roe: 0.12 }
+    scoring: "ROE(35)+PER/PBR(35)+配当(20)+安定性(10)=100点"
+    quality_filter: { min_total: 6, min_all_axes: 4 }
+    reasoning: "qualityプリセット＋3軸全て≥4かつTotal≥6。三拍子揃った銘柄"
+
+  - intent: "堅い高配当を探して"
+    params: { region: japan, preset: high-dividend, min_dividend_yield: 0.035 }
+    scoring: "配当(35)+PER(20)+PBR(15)+ROE(15)+成長(15)=100点"
+    quality_filter: { min_durability: 7 }
+    reasoning: "持続性≥7で鉄壁。配当が持続可能か（payout健全性・財務堅牢性）を重視"
+
+  - intent: "還元が厚くて成長もある株"
+    params: { region: japan, preset: shareholder-return, min_total_return: 0.04 }
+    scoring: "総還元率(30)+PER(20)+PBR(15)+ROE(20)+成長(15)=100点"
+    quality_filter: { min_return: 6, min_growth: 5 }
+    reasoning: "還元性≥6+成長性≥5。還元原資が枯渇しない持続的な還元企業を選別"
+
+  - intent: "米国の優良成長株"
+    params: { region: us, preset: growth, min_revenue_growth: 0.12, min_roe: 0.15 }
+    scoring: "成長(30)+ROE(25)+PER(20)+PBR(15)+配当(10)=100点"
+    quality_filter: { min_total: 7 }
+    reasoning: "Total≥7のプレミアム品質のみ。米国はROE基準を高めに設定"
+
+  - intent: "長期で安心して持てる配当株"
+    params: { region: japan, preset: long-term, min_roe: 0.10, min_dividend_yield: 0.02 }
+    scoring: "ROE(25)+PER(20)+PBR(15)+配当(25)+成長(15)=100点"
+    quality_filter: { min_durability: 7, min_return: 5, min_growth: 4 }
+    reasoning: "持続性≥7が必須。長期ホールドには財務堅牢性と事業モデル耐性が最重要"
