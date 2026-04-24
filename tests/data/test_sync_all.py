@@ -1,0 +1,47 @@
+"""Tests for sync_all() one-shot sync function (KIK-712)."""
+
+from unittest.mock import patch, MagicMock
+
+import pytest
+
+
+class TestSyncAll:
+    """Test tools/graphrag.py sync_all()."""
+
+    def test_neo4j_unavailable_returns_skipped(self):
+        """When Neo4j is not available, sync_all returns skipped."""
+        from tools.graphrag import sync_all
+        with patch("src.data.graph_store._common.is_available", return_value=False):
+            result = sync_all()
+        assert result["skipped"]
+        assert not result["synced"]
+
+    def test_sync_all_returns_dict_structure(self):
+        """sync_all always returns a dict with synced/failed/skipped keys."""
+        from tools.graphrag import sync_all
+        with patch("src.data.graph_store._common.is_available", return_value=False):
+            result = sync_all()
+        assert "synced" in result
+        assert "failed" in result
+        assert "skipped" in result
+        assert isinstance(result["synced"], list)
+        assert isinstance(result["failed"], list)
+        assert isinstance(result["skipped"], list)
+
+    def test_portfolio_sync_called(self):
+        """When Neo4j available, portfolio sync is attempted."""
+        from tools.graphrag import sync_all
+        with patch("src.data.graph_store._common.is_available", return_value=True), \
+             patch("src.data.portfolio_io.load_portfolio", return_value=[{"symbol": "MSFT"}]), \
+             patch("src.data.graph_store.portfolio.sync_portfolio") as mock_sync:
+            result = sync_all()
+        mock_sync.assert_called_once()
+        assert any("portfolio" in s for s in result["synced"])
+
+    def test_portfolio_error_continues(self):
+        """Portfolio sync failure doesn't stop note sync."""
+        from tools.graphrag import sync_all
+        with patch("src.data.graph_store._common.is_available", return_value=True), \
+             patch("src.data.portfolio_io.load_portfolio", side_effect=Exception("CSV broken")):
+            result = sync_all()
+        assert any("portfolio" in s for s in result["failed"])

@@ -60,6 +60,87 @@ try:
 except ImportError:
     HAS_CONTEXT = False
 
+# --- 一括同期 (KIK-712) ---
+
+
+def sync_all() -> dict:
+    """data/ → GraphRAG の一括同期.
+
+    SKILL.md の「syncして」に対応する便利関数。
+    Neo4j 未接続時は早期リターン。個別ファイルのエラーは続行。
+
+    Returns
+    -------
+    dict
+        {"synced": [...], "failed": [...], "skipped": [...]}
+    """
+    import json
+    import glob
+    from datetime import datetime
+
+    result = {"synced": [], "failed": [], "skipped": []}
+
+    # Neo4j 接続チェック
+    try:
+        from src.data.graph_store._common import is_available
+        if not is_available():
+            return {"synced": [], "failed": [], "skipped": ["Neo4j未接続"]}
+    except ImportError:
+        return {"synced": [], "failed": [], "skipped": ["graph_store未インストール"]}
+
+    # 1. Portfolio sync
+    try:
+        from src.data.portfolio_io import load_portfolio, DEFAULT_CSV_PATH
+        from src.data.graph_store.portfolio import sync_portfolio
+        holdings = load_portfolio(DEFAULT_CSV_PATH)
+        if holdings:
+            sync_portfolio(holdings)
+            result["synced"].append(f"portfolio({len(holdings)}銘柄)")
+    except Exception as e:
+        result["failed"].append(f"portfolio: {e}")
+
+    # 2. Notes sync (data/notes/*.json)
+    try:
+        from src.data.graph_store.note import merge_note as _merge_note
+        notes_dir = Path(_project_root) / "data" / "notes"
+        if notes_dir.exists():
+            note_files = sorted(notes_dir.glob("*.json"))
+            synced_count = 0
+            for nf in note_files:
+                try:
+                    with open(nf, "r", encoding="utf-8") as f:
+                        note = json.load(f)
+                    _merge_note(
+                        note_id=note.get("id", nf.stem),
+                        note_date=note.get("date", ""),
+                        note_type=note.get("type", "observation"),
+                        content=note.get("content", ""),
+                        symbol=note.get("symbol"),
+                        source=note.get("source", "claude"),
+                        category=note.get("category", ""),
+                    )
+                    synced_count += 1
+                except Exception:
+                    result["failed"].append(f"note: {nf.name}")
+            if synced_count:
+                result["synced"].append(f"notes({synced_count}件)")
+    except Exception as e:
+        result["failed"].append(f"notes: {e}")
+
+    # 3. Update sync_status.yaml
+    try:
+        status_path = Path(_project_root) / "data" / "sync_status.yaml"
+        import yaml
+        status = {"last_sync": datetime.now().isoformat()}
+        with open(status_path, "w", encoding="utf-8") as f:
+            yaml.dump(status, f)
+        result["synced"].append("sync_status更新")
+    except Exception:
+        pass  # non-critical
+
+    return result
+
+
 __all__ = [
     # 取得系
     "get_prior_report",
@@ -89,6 +170,8 @@ __all__ = [
     "get_open_action_items",
     # コンテキスト
     "get_context",
+    # 同期
+    "sync_all",
     # フラグ
     "HAS_GRAPH_QUERY",
     "HAS_GRAPH_STORE",
