@@ -132,15 +132,51 @@ class TestDetectAlerts:
         exit_alerts = [a for a in alerts if a["type"] == "exit_rule"]
         assert len(exit_alerts) == 0  # filtered by state-change
 
+    def test_hard_stop_excludes_exit_rule(self):
+        """At -21%, only hard_stop fires, not exit_rule (elif)."""
+        positions = [_pos("DEC", 100)]
+        infos = {"DEC": _info("DEC", 78)}  # -22%
+        alerts = detect_alerts(positions, infos, {"DEC": [80]*20})
+        types = [a["type"] for a in alerts if a["symbol"] == "DEC"]
+        assert "hard_stop" in types
+        assert "exit_rule" not in types
+
+    def test_multiple_alerts_same_stock(self):
+        """A stock can have exit_rule + rsi_low simultaneously."""
+        closes = [100 - i * 3 for i in range(20)]  # descending → RSI low
+        positions = [_pos("CANON", 100)]
+        infos = {"CANON": _info("CANON", 84)}  # -16%
+        alerts = detect_alerts(positions, infos, {"CANON": closes})
+        types = [a["type"] for a in alerts if a["symbol"] == "CANON"]
+        assert "exit_rule" in types
+        assert "rsi_low" in types
+
+    def test_malformed_earnings_date(self):
+        """Malformed next_earnings should not crash."""
+        positions = [_pos("TEST", 100, next_earnings="not-a-date")]
+        infos = {"TEST": _info("TEST", 105)}
+        alerts = detect_alerts(positions, infos, {})
+        earn = [a for a in alerts if a["type"] == "earnings_soon"]
+        assert len(earn) == 0  # graceful skip
+
+    def test_format_truncates_critical(self):
+        """More than 3 CRITICAL alerts: only first 3 shown."""
+        alerts = [
+            {"symbol": f"S{i}", "type": "exit_rule", "severity": "CRITICAL",
+             "message": f"test{i}", "value": -16}
+            for i in range(5)
+        ]
+        result = format_morning_summary(alerts)
+        assert result.count("🔴") == 3
+
     def test_severity_ordering(self):
         """CRITICAL alerts come before INFO."""
-        positions = [_pos("A", 100), _pos("B", 200)]
-        infos = {"A": _info("A", 84), "B": _info("B", 250)}
-        # A triggers exit_rule (CRITICAL), B might trigger RSI
-        closes_b = [200 + i * 3 for i in range(20)]
-        alerts = detect_alerts(positions, infos, {"A": [85]*20, "B": closes_b}, vix_price=27)
-        if len(alerts) >= 2:
-            assert alerts[0]["severity"] == "CRITICAL"
+        positions = [_pos("A", 100)]
+        infos = {"A": _info("A", 84)}
+        alerts = detect_alerts(positions, infos, {"A": [85]*20}, vix_price=27)
+        # A: exit_rule (CRITICAL) + VIX (INFO)
+        assert len(alerts) >= 2
+        assert alerts[0]["severity"] == "CRITICAL"
 
 
 # ---------------------------------------------------------------------------

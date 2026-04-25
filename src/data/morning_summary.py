@@ -6,8 +6,7 @@ Pure data functions — no judgment, no recommendations.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
-from typing import Optional
+from datetime import date, datetime
 
 import numpy as np
 
@@ -75,7 +74,6 @@ def detect_alerts(
         List of alert dicts with keys: symbol, type, severity, message, value.
     """
     alerts = []
-    today = date.today().isoformat()
     thr = ALERT_THRESHOLDS
     prev_symbols_types = set()
     if prev_alerts:

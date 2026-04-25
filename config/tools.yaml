@@ -83,3 +83,13 @@ tools:
       score_portfolio:
         description: "PF全銘柄の一括スコアリング + 4象限分類（保有/買い増し/要監視/売却検討）"
         when: "PF全体の品質評価、要監視銘柄の特定時"
+
+  morning_summary:
+    source: tools/morning_summary.py
+    functions:
+      detect_alerts:
+        description: "PF全銘柄の数値ベース異常検知（exit-rule/RSI/決算接近/VIX）"
+        when: "朝サマリー時、PFの異常有無を確認する時"
+      format_morning_summary:
+        description: "異常検知結果を1分で読めるサマリーにフォーマット"
+        when: "detect_alertsの結果を人間向けに整形する時"
