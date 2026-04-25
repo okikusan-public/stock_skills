@@ -2,6 +2,28 @@
 # 数値はサンプル。事実・数値を出すだけ。判断・レコメンドはしない。
 
 examples:
+  # === 朝サマリー (KIK-717) ===
+  - intent: "おはよう"
+    mode: morning-summary
+    steps:
+      - read: "portfolio.csv"
+      - tool: yahoo_finance.get_stock_info
+        params: { symbols: "全保有銘柄 + ^VIX" }
+      - tool: yahoo_finance.get_price_history
+        params: { symbols: "全保有銘柄", period: "1mo" }
+        note: "RSI計算用"
+      - tool: morning_summary.detect_alerts
+        note: "exit-rule/RSI/決算接近/VIXの数値ベース異常検知"
+      - tool: morning_summary.format_morning_summary
+      - output: |
+          異常なし → ☀️ 異常なし（1行）
+          異常あり → ⚠️ N件 + 詳細 + 深掘り導線（最大10行）
+    reasoning: "数値ベースの異常検知のみ。判断・レコメンドはしない"
+
+  - intent: "朝サマリー"
+    mode: morning-summary
+    note: "「おはよう」と同じ。routing.yamlのtriggers参照"
+
   # === PFヘルスチェック ===
   - intent: "PF大丈夫？"
     steps:
