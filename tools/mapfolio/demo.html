@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Mapfolio</title>
+
+<link rel="stylesheet" href="lib/leaflet.css">
+<script src="lib/leaflet.js"></script>
+<script src="lib/marked.min.js"></script>
+<script src="lib/html2canvas.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<style id="dynamic-font-style"></style>
+
+<style>
+:root {
+  --bg:       #ede6da;
+  --panel:    #f5efe5;
+  --sidebar:  #e8dfd1;
+  --accent:   #d63c2f;
+  --orange:   #e8920a;
+  --text:     #2a1f18;
+  --muted:    #8a7a6e;
+  --border:   #d4c9bb;
+  --tab-h:    56px;
+  --header-h: 52px;
+  --safe-b:   env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%; width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+#header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--header-h);
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 14px; gap: 10px;
+  z-index: 300;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.h-logo {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+.h-title { font-size: 18px; font-weight: 700; flex: 1; }
+.h-btn {
+  width: 38px; height: 38px; border-radius: 9px;
+  border: 1.5px solid var(--border); background: var(--panel);
+  font-size: 17px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.h-btn.red { background: var(--accent); border-color: var(--accent); }
+
+/* ── Tab panels ── */
+.panel {
+  position: fixed;
+  top: var(--header-h);
+  left: 0; right: 0;
+  bottom: calc(var(--tab-h) + var(--safe-b));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: none;
+  background: var(--bg);
+}
+.panel.active { display: block; }
+
+/* Map panel — full height */
+#panel-map { overflow: hidden; }
+#map {
+  width: 100%; height: 100%;
+}
+
+/* Floating search over map */
+#map-search {
+  position: absolute;
+  top: calc(var(--header-h) + 10px);
+  left: 12px; right: 12px;
+  z-index: 200;
+  display: flex; gap: 8px;
+}
+#map-search input {
+  flex: 1; padding: 11px 14px; border-radius: 10px;
+  border: none; background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,.18);
+  font-size: 15px; color: var(--text); outline: none;
+}
+#map-search button {
+  width: 44px; height: 44px; border-radius: 10px;
+  background: var(--accent); border: none; color: #fff;
+  font-size: 18px; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Floating pin mode FAB */
+#pin-fab {
+  position: absolute;
+  bottom: calc(var(--tab-h) + var(--safe-b) + 16px);
+  right: 16px; z-index: 200;
+  width: 52px; height: 52px; border-radius: 16px;
+  background: var(--orange); border: none; color: #fff;
+  font-size: 22px; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(232,146,10,.45);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .15s;
+}
+#pin-fab.active { background: #2a8a2a; box-shadow: 0 4px 14px rgba(42,138,42,.45); }
+#pin-fab:active { transform: scale(.92); }
+
+/* ── Common panel content ── */
+.p-section {
+  padding: 16px 16px 0;
+}
+.p-section:last-child { padding-bottom: 20px; }
+.p-label {
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; margin-bottom: 8px;
+}
+
+/* Search / input rows */
+.input-row { display: flex; gap: 8px; }
+.input-row input {
+  flex: 1; padding: 11px 13px; border-radius: 10px;
+  border: 1.5px solid var(--border); background: var(--panel);
+  font-size: 15px; color: var(--text); outline: none;
+}
+.input-row input:focus { border-color: var(--accent); }
+.input-row button {
+  width: 44px; height: 44px; border-radius: 10px;
+  border: none; color: #fff; font-size: 18px; cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.input-row button.red   { background: var(--accent); }
+.input-row button.orange{ background: var(--orange); }
+
+/* Textarea */
+.md-area, .pin-area {
+  width: 100%; border-radius: 10px;
+  border: 1.5px solid var(--border); background: var(--panel);
+  font-size: 14px; line-height: 1.65;
+  padding: 12px; color: var(--text); outline: none;
+  font-family: 'Menlo', 'Consolas', monospace;
+  resize: none;
+}
+.md-area { min-height: 180px; }
+.pin-area { min-height: 80px; max-height: 180px; font-size: 12px; }
+.md-area:focus, .pin-area:focus { border-color: var(--accent); }
+
+/* Rendered preview */
+#md-preview {
+  background: var(--panel); border-radius: 10px;
+  padding: 14px; font-size: 15px; line-height: 1.7;
+  color: var(--text); margin-top: 0;
+}
+#md-preview h1 { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+#md-preview h2 { font-size: 16px; font-weight: 700; margin: 10px 0 5px; }
+#md-preview h3 { font-size: 14px; font-weight: 600; margin: 8px 0 4px; }
+#md-preview p  { margin-bottom: 6px; }
+#md-preview ul { padding-left: 18px; }
+#md-preview li { margin-bottom: 3px; }
+#md-preview li::marker { color: var(--accent); }
+#md-preview blockquote {
+  border-left: 3px solid var(--accent); padding-left: 10px;
+  margin: 8px 0; color: var(--muted); font-style: italic;
+}
+#md-preview strong { color: var(--accent); }
+.addr-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: #fff3e0; color: #b36800;
+  border: 1px solid #f0b849; border-radius: 5px;
+  padding: 1px 7px; font-size: .9em; font-weight: 600;
+}
+
+/* Layout picker */
+.layout-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.layout-card {
+  padding: 10px; border-radius: 10px;
+  border: 2px solid var(--border); background: var(--panel);
+  cursor: pointer; text-align: center; transition: all .15s;
+}
+.layout-card.active { border-color: var(--accent); background: #fdf0ee; }
+.layout-card .lc-icon {
+  width: 100%; aspect-ratio: 1.4; border-radius: 6px;
+  background: var(--bg); margin-bottom: 6px;
+  display: flex; overflow: hidden;
+}
+.layout-card .lc-map  { background: rgba(100,160,120,.5); }
+.layout-card .lc-text { background: rgba(180,140,100,.35); }
+.lc-right  { flex-direction: row; }
+.lc-right .lc-map  { width: 60%; }
+.lc-right .lc-text { flex: 1; }
+.lc-left   { flex-direction: row; }
+.lc-left .lc-text  { width: 40%; }
+.lc-left .lc-map   { flex: 1; }
+.lc-below  { flex-direction: column; }
+.lc-below .lc-map  { height: 55%; }
+.lc-below .lc-text { flex: 1; }
+.lc-above  { flex-direction: column; }
+.lc-above .lc-text { height: 45%; }
+.lc-above .lc-map  { flex: 1; }
+.layout-card .lc-name { font-size: 11px; font-weight: 600; color: var(--text); }
+
+/* Font size grid */
+.fs-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.fs-item { display: flex; flex-direction: column; gap: 4px; }
+.fs-item label { font-size: 11px; color: var(--muted); }
+.fs-item input[type=number] {
+  width: 100%; padding: 9px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--panel);
+  font-size: 15px; font-weight: 600; color: var(--text); outline: none;
+}
+.fs-item input[type=number]:focus { border-color: var(--accent); }
+
+/* Radius slider */
+.slider-wrap { display: flex; align-items: center; gap: 10px; }
+.slider-wrap input[type=range] { flex: 1; accent-color: var(--accent); height: 4px; }
+.slider-val { font-size: 13px; font-weight: 700; color: var(--accent); min-width: 48px; }
+
+/* A4 mini preview */
+#mini-preview {
+  width: 100%; aspect-ratio: 297/210;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.12);
+  overflow: hidden;
+  display: flex;
+}
+#mini-preview.layout-right  { flex-direction: row; }
+#mini-preview.layout-left   { flex-direction: row-reverse; }
+#mini-preview.layout-below  { flex-direction: column; }
+#mini-preview.layout-above  { flex-direction: column-reverse; }
+.mp-map  { background: #e8f0e8; flex-shrink: 0; overflow: hidden; }
+#mini-preview.layout-right .mp-map,
+#mini-preview.layout-left  .mp-map  { width: 58%; height: 100%; }
+#mini-preview.layout-below .mp-map,
+#mini-preview.layout-above .mp-map  { width: 100%; height: 56%; }
+.mp-map img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mp-text {
+  flex: 1; padding: 8px 10px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.mp-meta { font-size: 6px; color: var(--muted); margin-bottom: 4px; letter-spacing: .08em; }
+.mp-title { font-size: 10px; font-weight: 800; margin-bottom: 4px; line-height: 1.2; }
+.mp-body  { font-size: 6px; line-height: 1.6; color: #3d3028; flex: 1; overflow: hidden; }
+.mp-footer { font-size: 5px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 3px; margin-top: 4px; display: flex; justify-content: space-between; }
+
+/* Export buttons */
+.export-row { display: flex; gap: 10px; }
+.export-btn-lg {
+  flex: 1; padding: 15px; border-radius: 12px;
+  border: none; font-size: 16px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center;
+  justify-content: center; gap: 8px; transition: opacity .15s;
+}
+.export-btn-lg:active { opacity: .8; }
+.exp-png { background: var(--panel); border: 2px solid var(--border); color: var(--text); }
+.exp-pdf { background: var(--accent); color: #fff; }
+
+/* Pin mode toggle (in pins panel) */
+.toggle-btn {
+  width: 100%; padding: 12px; border-radius: 10px;
+  border: 1.5px solid var(--border); background: var(--panel);
+  font-size: 14px; font-weight: 600; color: var(--muted);
+  cursor: pointer; transition: all .15s;
+}
+.toggle-btn.active { background: var(--orange); color: #fff; border-color: var(--orange); }
+
+/* Divider */
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+/* ── Bottom tab bar ── */
+#tabbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: calc(var(--tab-h) + var(--safe-b));
+  padding-bottom: var(--safe-b);
+  background: var(--sidebar);
+  border-top: 1px solid var(--border);
+  display: flex; z-index: 300;
+}
+.tab {
+  flex: 1; border: none; background: transparent;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px; cursor: pointer;
+  color: var(--muted); font-size: 11px; font-weight: 600;
+  transition: color .15s;
+}
+.tab .tab-icon { font-size: 22px; line-height: 1; }
+.tab.active { color: var(--accent); }
+.tab:active { opacity: .7; }
+
+/* ── Toast ── */
+#toast {
+  position: fixed; bottom: calc(var(--tab-h) + var(--safe-b) + 16px);
+  left: 50%; transform: translateX(-50%) translateY(30px);
+  background: #2a1f18; color: #fff; padding: 10px 22px;
+  border-radius: 30px; font-size: 14px; font-weight: 600;
+  opacity: 0; transition: all .3s; z-index: 9999; pointer-events: none;
+  white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+/* ── Loading ── */
+#loading {
+  display: none; position: fixed; inset: 0;
+  background: rgba(237,230,218,.8); z-index: 9998;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 14px;
+  font-size: 15px; font-weight: 600; color: var(--text);
+}
+#loading.show { display: flex; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <div class="h-logo">📍</div>
+  <span class="h-title">Mapfolio</span>
+  <button class="h-btn" onclick="saveToLocal()" title="保存">💾</button>
+  <button class="h-btn red" onclick="exportPDF()" title="PDF出力">📄</button>
+</div>
+
+<!-- ══ MAP PANEL ══ -->
+<div id="panel-map" class="panel active">
+  <div id="map-search">
+    <input type="text" id="search-input" placeholder="場所を検索…"
+           onkeydown="if(event.key==='Enter')doSearch()">
+    <button class="red" onclick="doSearch()">🔍</button>
+  </div>
+  <div id="map"></div>
+</div>
+
+<!-- Pin FAB (always visible when map is active) -->
+<button id="pin-fab" onclick="togglePinMode()" title="タップしてピン追加モード">📌</button>
+
+<!-- ══ EDIT PANEL ══ -->
+<div id="panel-edit" class="panel">
+  <div class="p-section">
+    <div class="p-label">✏ Markdown</div>
+    <textarea class="md-area" id="md-editor" oninput="updatePreview()"
+      placeholder="# タイトル&#10;&#10;説明文...&#10;&#10;## ポイント&#10;- 箇条書き&#10;&#10;@住所@でピン自動追加"></textarea>
+  </div>
+  <div class="divider"></div>
+  <div class="p-section">
+    <div class="p-label">👁 プレビュー</div>
+    <div id="md-preview"></div>
+  </div>
+  <div style="height:16px"></div>
+</div>
+
+<!-- ══ PINS PANEL ══ -->
+<div id="panel-pins" class="panel">
+  <div class="p-section">
+    <div class="p-label">📌 住所・場所名で追加</div>
+    <div class="input-row">
+      <input type="text" id="pin-input" placeholder="場所名・住所で検索"
+             onkeydown="if(event.key==='Enter')addPinBySearch()">
+      <button class="orange" onclick="addPinBySearch()">📌</button>
+    </div>
+  </div>
+  <div class="p-section" style="margin-top:12px">
+    <button class="toggle-btn" id="pin-mode-btn" onclick="togglePinMode()">
+      🖱 地図タップでピン追加
+    </button>
+  </div>
+  <div class="p-section" style="margin-top:14px">
+    <div class="p-label">ピン一覧（編集可能）</div>
+    <textarea class="pin-area" id="pin-textarea"
+      placeholder="（ピンがありません）"
+      onblur="parsePinListText()"
+      spellcheck="false"></textarea>
+    <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5">
+      書式: 名称:緯度,経度 &nbsp;|&nbsp; 編集後フォーカスを外すと反映
+    </div>
+  </div>
+  <div style="height:16px"></div>
+</div>
+
+<!-- ══ OUTPUT PANEL ══ -->
+<div id="panel-out" class="panel">
+  <div class="p-section">
+    <div class="p-label">A4 レイアウト</div>
+    <div class="layout-grid" id="layout-grid">
+      <div class="layout-card active" data-layout="right" onclick="setLayout('right',this)">
+        <div class="lc-icon lc-right"><div class="lc-map"></div><div class="lc-text"></div></div>
+        <div class="lc-name">文章を右に</div>
+      </div>
+      <div class="layout-card" data-layout="left" onclick="setLayout('left',this)">
+        <div class="lc-icon lc-left"><div class="lc-text"></div><div class="lc-map"></div></div>
+        <div class="lc-name">文章を左に</div>
+      </div>
+      <div class="layout-card" data-layout="above" onclick="setLayout('above',this)">
+        <div class="lc-icon lc-above"><div class="lc-text"></div><div class="lc-map"></div></div>
+        <div class="lc-name">文章を上に</div>
+      </div>
+      <div class="layout-card" data-layout="below" onclick="setLayout('below',this)">
+        <div class="lc-icon lc-below"><div class="lc-map"></div><div class="lc-text"></div></div>
+        <div class="lc-name">文章を下に</div>
+      </div>
+    </div>
+  </div>
+  <div class="p-section" style="margin-top:14px">
+    <div class="p-label">地図の表示範囲</div>
+    <div class="slider-wrap">
+      <input type="range" id="radius-slider" min="100" max="5000" step="50" value="650"
+             oninput="updateRadius(this.value)">
+      <span class="slider-val" id="radius-val">650m</span>
+    </div>
+  </div>
+  <div class="p-section" style="margin-top:14px">
+    <div class="p-label">🔡 フォントサイズ (pt)</div>
+    <div class="fs-grid">
+      <div class="fs-item">
+        <label>見出し1</label>
+        <input type="number" id="fs-h1" min="16" max="72" value="36"
+               oninput="setFontSize('h1',this.value)">
+      </div>
+      <div class="fs-item">
+        <label>見出し2</label>
+        <input type="number" id="fs-h2" min="10" max="48" value="18"
+               oninput="setFontSize('h2',this.value)">
+      </div>
+      <div class="fs-item">
+        <label>見出し3</label>
+        <input type="number" id="fs-h3" min="8" max="36" value="14"
+               oninput="setFontSize('h3',this.value)">
+      </div>
+      <div class="fs-item">
+        <label>本文</label>
+        <input type="number" id="fs-body" min="6" max="24" value="12"
+               oninput="setFontSize('body',this.value)">
+      </div>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="p-section">
+    <div class="p-label">A4 完成イメージ</div>
+    <div id="mini-preview" class="layout-right">
+      <div class="mp-map">
+        <img id="mini-map-img" src="" alt="" style="display:none">
+      </div>
+      <div class="mp-text">
+        <div class="mp-meta" id="mp-meta">MAPFOLIO / A4</div>
+        <div class="mp-title" id="mp-title">タイトル</div>
+        <div class="mp-body"  id="mp-body"></div>
+        <div class="mp-footer">
+          <span id="mp-loc">—</span>
+          <span>Mapfolio</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="p-section" style="margin-top:16px">
+    <div class="export-row">
+      <button class="export-btn-lg exp-png" onclick="exportPNG()">📷 PNG</button>
+      <button class="export-btn-lg exp-pdf" onclick="exportPDF()">📄 PDF</button>
+    </div>
+  </div>
+  <div style="height:20px"></div>
+</div>
+
+<!-- Loading / Toast -->
+<div id="loading"><div class="spinner"></div><span id="loading-msg">処理中…</span></div>
+<div id="toast"></div>
+
+<script>
+// ─── State ───────────────────────────────────────────
+const state = {
+  lat: 35.6812, lng: 139.7671, zoom: 14, radius: 650,
+  layout: 'right',
+  locationName: '東京駅',
+  fontSizes: { h1:36, h2:18, h3:14, body:12 },
+  projectId: null, projectName: '新規プロジェクト',
+};
+
+// ─── Map init ─────────────────────────────────────────
+const map = L.map('map', {
+  center: [state.lat, state.lng], zoom: state.zoom,
+  zoomControl: false, // use touch gestures
+});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+}).addTo(map);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+function makeCenterIcon() {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:20px;height:20px;background:#d63c2f;
+      border-radius:50% 50% 50% 0;transform:rotate(-45deg) translate(-5px,-5px);
+      border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>`,
+    iconSize:[20,20], iconAnchor:[10,20],
+  });
+}
+const mainMarker  = L.marker([state.lat, state.lng], { icon:makeCenterIcon(), draggable:true }).addTo(map);
+const radiusCircle = L.circle([state.lat, state.lng], {
+  radius:state.radius, color:'#d63c2f', weight:2, fillColor:'#d63c2f', fillOpacity:.07,
+}).addTo(map);
+
+mainMarker.on('dragend', e => {
+  const p = e.target.getLatLng();
+  state.lat = p.lat; state.lng = p.lng;
+  radiusCircle.setLatLng([state.lat, state.lng]);
+  updateMiniMeta(); scheduleSnapshot();
+});
+map.on('moveend zoomend', () => { state.zoom = map.getZoom(); updateMiniMeta(); scheduleSnapshot(); });
+map.on('click', e => {
+  if (pinMode) { addPin(e.latlng.lat, e.latlng.lng, null); return; }
+  state.lat = e.latlng.lat; state.lng = e.latlng.lng;
+  mainMarker.setLatLng([state.lat, state.lng]);
+  radiusCircle.setLatLng([state.lat, state.lng]);
+  updateMiniMeta(); scheduleSnapshot();
+});
+
+// ─── Tabs ─────────────────────────────────────────────
+const TABS = ['map','edit','pins','out'];
+function showTab(name) {
+  TABS.forEach(t => {
+    document.getElementById('panel-'+t).classList.toggle('active', t===name);
+    document.querySelector(`.tab[data-tab="${t}"]`).classList.toggle('active', t===name);
+  });
+  document.getElementById('pin-fab').style.display = name==='map' ? 'flex' : 'none';
+  if (name==='out') scheduleSnapshot();
+  if (name==='map') setTimeout(()=>map.invalidateSize(), 100);
+}
+
+// ─── Search ──────────────────────────────────────────
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  showLoading('検索中…');
+  try {
+    const res  = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=ja`);
+    const data = await res.json();
+    if (!data.length) { toast('見つかりませんでした'); return; }
+    state.lat = parseFloat(data[0].lat);
+    state.lng = parseFloat(data[0].lon);
+    state.locationName = data[0].display_name.split(',')[0];
+    map.setView([state.lat, state.lng], state.zoom);
+    mainMarker.setLatLng([state.lat, state.lng]);
+    radiusCircle.setLatLng([state.lat, state.lng]);
+    updateMiniMeta(); scheduleSnapshot();
+    toast(`📍 ${state.locationName}`);
+  } catch(e) { toast('検索エラー'); }
+  finally { hideLoading(); }
+}
+
+// ─── Pins ────────────────────────────────────────────
+const pins = [];
+let pinMode = false, nextPinId = 1;
+const autoPinAddrs = new Set();
+
+function makePinIcon(n) {
+  return L.divIcon({
+    className:'',
+    html:`<div style="width:22px;height:22px;background:#e8920a;border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg) translate(-5px,-5px);border:2px solid #fff;
+      box-shadow:0 2px 6px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;">
+      <span style="transform:rotate(45deg);font-size:9px;font-weight:700;color:#fff">${n}</span>
+    </div>`,
+    iconSize:[22,22], iconAnchor:[11,22],
+  });
+}
+
+function togglePinMode() {
+  pinMode = !pinMode;
+  const fab = document.getElementById('pin-fab');
+  const btn = document.getElementById('pin-mode-btn');
+  fab.classList.toggle('active', pinMode);
+  fab.textContent = pinMode ? '✅' : '📌';
+  if (btn) { btn.classList.toggle('active', pinMode); btn.textContent = pinMode ? '✅ タップ追加中（再タップで解除）' : '🖱 地図タップでピン追加'; }
+  if (pinMode) toast('地図をタップしてピンを追加');
+}
+
+function addPin(lat, lng, label, silent=false) {
+  const id = nextPinId++;
+  const lbl = label || `ピン ${pins.length+1}`;
+  const m = L.marker([lat,lng], { icon:makePinIcon(pins.length+1), draggable:true })
+    .addTo(map)
+    .bindPopup(`<b>${lbl}</b><br><small>${lat.toFixed(5)},${lng.toFixed(5)}</small>`);
+  if (!silent) m.openPopup();
+  m.on('dragend', ev => {
+    const pos = ev.target.getLatLng();
+    const pin = pins.find(x=>x.id===id);
+    if (!pin) return;
+    pin.lat=pos.lat; pin.lng=pos.lng;
+    m.setPopupContent(`<b>${pin.label}</b><br><small>${pos.lat.toFixed(5)},${pos.lng.toFixed(5)}</small>`);
+    renderPinList(); scheduleSnapshot();
+  });
+  pins.push({id, lat, lng, label:lbl, marker:m});
+  renumberPins(); scheduleSnapshot();
+  if (!silent) toast(`📌 ${lbl}`);
+}
+
+function removePin(id) {
+  const i = pins.findIndex(p=>p.id===id);
+  if (i<0) return;
+  map.removeLayer(pins[i].marker);
+  pins.splice(i,1);
+  renumberPins(); scheduleSnapshot();
+}
+
+function renumberPins() {
+  pins.forEach((p,i) => p.marker.setIcon(makePinIcon(i+1)));
+  renderPinList();
+}
+
+function renderPinList() {
+  const ta = document.getElementById('pin-textarea');
+  if (document.activeElement===ta) return;
+  ta.value = pins.map(p=>`${p.label}:${p.lat.toFixed(6)},${p.lng.toFixed(6)}`).join('\n');
+}
+
+function parsePinListText() {
+  const lines = document.getElementById('pin-textarea').value
+    .split('\n').map(l=>l.trim()).filter(Boolean);
+  const parsed = lines.map(line => {
+    const ci = line.lastIndexOf(':');
+    if (ci<0) return null;
+    const label = line.slice(0,ci).trim();
+    const coords = line.slice(ci+1).trim().split(',');
+    const lat=parseFloat(coords[0]), lng=parseFloat(coords[1]);
+    return (label&&!isNaN(lat)&&!isNaN(lng)) ? {label,lat,lng} : null;
+  }).filter(Boolean);
+
+  while (pins.length > parsed.length) { const r=pins.pop(); map.removeLayer(r.marker); }
+  parsed.forEach((p,i) => {
+    if (i<pins.length) {
+      pins[i].label=p.label; pins[i].lat=p.lat; pins[i].lng=p.lng;
+      pins[i].marker.setLatLng([p.lat,p.lng]);
+      pins[i].marker.setPopupContent(`<b>${p.label}</b><br><small>${p.lat.toFixed(5)},${p.lng.toFixed(5)}</small>`);
+    } else {
+      const id=nextPinId++;
+      const m=L.marker([p.lat,p.lng],{icon:makePinIcon(i+1),draggable:true}).addTo(map)
+        .bindPopup(`<b>${p.label}</b><br><small>${p.lat.toFixed(5)},${p.lng.toFixed(5)}</small>`);
+      const cid=id;
+      m.on('dragend',ev=>{const pos=ev.target.getLatLng();const pin=pins.find(x=>x.id===cid);if(!pin)return;pin.lat=pos.lat;pin.lng=pos.lng;renderPinList();scheduleSnapshot();});
+      pins.push({id,lat:p.lat,lng:p.lng,label:p.label,marker:m});
+    }
+  });
+  renumberPins(); scheduleSnapshot(); toast('📌 ピンを更新しました');
+}
+
+async function addPinBySearch() {
+  const q = document.getElementById('pin-input').value.trim();
+  if (!q) return;
+  showLoading('検索中…');
+  try {
+    const res  = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=ja`);
+    const data = await res.json();
+    if (!data.length) { toast('見つかりませんでした'); return; }
+    addPin(parseFloat(data[0].lat), parseFloat(data[0].lon), data[0].display_name.split(',')[0]);
+    map.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], Math.max(state.zoom,15));
+    document.getElementById('pin-input').value='';
+  } catch(e) { toast('検索エラー'); }
+  finally { hideLoading(); }
+}
+
+// ─── @address@ auto pin ───────────────────────────────
+let addrTimer=null;
+function scheduleAddrDetect() {
+  clearTimeout(addrTimer);
+  addrTimer=setTimeout(detectAddrPins,2000);
+}
+async function detectAddrPins() {
+  const md = document.getElementById('md-editor').value;
+  const sections = splitByH1(md);
+  for (const {h1,body} of sections) {
+    const re=/@([^@\n]+)@/g; let m;
+    while ((m=re.exec(body))!==null) {
+      const addr=m[1].trim();
+      if (autoPinAddrs.has(addr)) continue;
+      autoPinAddrs.add(addr);
+      try {
+        const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&accept-language=ja`);
+        const data=await res.json();
+        if (data.length) { addPin(parseFloat(data[0].lat),parseFloat(data[0].lon),h1||addr); toast(`📍 自動ピン: ${h1||addr}`); }
+      } catch{}
+    }
+  }
+}
+function splitByH1(md) {
+  const sections=[]; let h1=null, lines=[];
+  for (const line of md.split('\n')) {
+    const m=line.match(/^#\s+(.+)/);
+    if (m) { if (h1!==null||lines.length) sections.push({h1,body:lines.join('\n')}); h1=m[1].trim(); lines=[]; }
+    else lines.push(line);
+  }
+  if (h1!==null||lines.length) sections.push({h1,body:lines.join('\n')});
+  return sections;
+}
+
+// ─── Markdown preview ─────────────────────────────────
+function mdToHtml(md) {
+  return marked.parse(md.replace(/@([^@\n]+)@/g,'<span class="addr-badge">📍 $1</span>'));
+}
+function updatePreview() {
+  const raw=document.getElementById('md-editor').value;
+  document.getElementById('md-preview').innerHTML = mdToHtml(raw);
+  const m=raw.match(/^#\s+(.+)/m);
+  document.getElementById('mp-title').textContent = m?m[1]:'';
+  const body=m?raw.slice(raw.indexOf(m[0])+m[0].length).trim():raw;
+  document.getElementById('mp-body').innerHTML = mdToHtml(body);
+  scheduleAddrDetect();
+}
+
+// ─── Layout / Radius / Font ───────────────────────────
+function setLayout(layout, el) {
+  state.layout=layout;
+  document.querySelectorAll('.layout-card').forEach(c=>c.classList.toggle('active',c.dataset.layout===layout));
+  document.getElementById('mini-preview').className='layout-'+layout;
+  const mapArea=document.querySelector('.mp-map');
+  const isCol=layout==='right'||layout==='left';
+  mapArea.style.width=isCol?'58%':'100%';
+  mapArea.style.height=isCol?'100%':'56%';
+}
+function updateRadius(v) {
+  state.radius=parseInt(v);
+  document.getElementById('radius-val').textContent=v+'m';
+  radiusCircle.setRadius(state.radius);
+  updateMiniMeta();
+}
+function setFontSize(k,v) {
+  state.fontSizes[k]=Math.max(6,parseInt(v)||12);
+  applyFontSizes();
+}
+function applyFontSizes() {
+  const fs=state.fontSizes;
+  document.getElementById('dynamic-font-style').textContent=`
+    #md-preview h1{font-size:${Math.round(fs.h1*.6)}px!important}
+    #md-preview h2{font-size:${Math.round(fs.h2*.85)}px!important}
+    #md-preview h3{font-size:${Math.round(fs.h3*.85)}px!important}
+    #md-preview p,#md-preview li{font-size:${Math.round(fs.body*.9)}px!important}
+    .mp-title{font-size:${Math.round(fs.h1*.28)}px!important}
+    .mp-body h2{font-size:${Math.round(fs.h2*.35)}px!important}
+    .mp-body p,.mp-body li{font-size:${Math.round(fs.body*.45)}px!important}
+  `;
+}
+function updateMiniMeta() {
+  document.getElementById('mp-meta').textContent=`MAPFOLIO/A4  ${state.lat.toFixed(4)}N ${state.lng.toFixed(4)}E  R${state.radius}m`;
+  document.getElementById('mp-loc').textContent=state.locationName||'—';
+}
+
+// ─── Map snapshot ─────────────────────────────────────
+let snapTimer=null;
+function scheduleSnapshot() { clearTimeout(snapTimer); snapTimer=setTimeout(takeSnapshot,900); }
+async function takeSnapshot() {
+  try {
+    const canvas=await html2canvas(document.getElementById('map'),{useCORS:true,logging:false,scale:1});
+    const img=document.getElementById('mini-map-img');
+    img.src=canvas.toDataURL('image/jpeg',.8); img.style.display='block';
+  } catch{}
+}
+
+// ─── Export ───────────────────────────────────────────
+function inlineFontSizes(html) {
+  const fs=state.fontSizes;
+  return html
+    .replace(/<h1>/gi,`<h1 style="font-size:${fs.h1}px;font-weight:800;line-height:1.2;margin-bottom:14px">`)
+    .replace(/<h2>/gi,`<h2 style="font-size:${fs.h2}px;font-weight:700;margin:12px 0 5px">`)
+    .replace(/<h3>/gi,`<h3 style="font-size:${fs.h3}px;font-weight:600;margin:10px 0 4px">`)
+    .replace(/<p>/gi,`<p style="font-size:${fs.body}px;line-height:1.85;margin-bottom:7px">`)
+    .replace(/<li>/gi,`<li style="font-size:${fs.body}px;line-height:1.75;margin-bottom:3px">`)
+    .replace(/<blockquote>/gi,`<blockquote style="border-left:3px solid #d63c2f;padding-left:10px;margin:8px 0;color:#8a7a6e;font-style:italic">`);
+}
+async function buildA4El() {
+  const raw=document.getElementById('md-editor').value;
+  const m=raw.match(/^#\s+(.+)/m);
+  const title=m?m[1]:'';
+  const body=m?raw.slice(raw.indexOf(m[0])+m[0].length).trim():raw;
+  const bodyHtml=inlineFontSizes(mdToHtml(body));
+  const A4W=1123,A4H=794;
+  const isCol=state.layout==='right'||state.layout==='left';
+  const mW=isCol?Math.round(A4W*.58):A4W, mH=isCol?A4H:Math.round(A4H*.56);
+  let imgSrc='';
+  try {
+    const raw2=await html2canvas(document.getElementById('map'),{useCORS:true,logging:false,scale:2});
+    const tc=document.createElement('canvas'); tc.width=mW*2; tc.height=mH*2;
+    const ctx=tc.getContext('2d');
+    const sw=raw2.width,sh=raw2.height,dr=mW/mH,sr=sw/sh;
+    let sx=0,sy=0,cw=sw,ch=sh;
+    if(sr>dr){cw=sh*dr;sx=(sw-cw)/2;}else{ch=sw/dr;sy=(sh-ch)/2;}
+    ctx.drawImage(raw2,sx,sy,cw,ch,0,0,tc.width,tc.height);
+    imgSrc=tc.toDataURL('image/jpeg',.92);
+  } catch{}
+  const fd={right:'row',left:'row-reverse',below:'column',above:'column-reverse'}[state.layout];
+  const fs=state.fontSizes;
+  const el=document.createElement('div');
+  el.style.cssText=`width:${A4W}px;height:${A4H}px;display:flex;flex-direction:${fd};background:#fff;font-family:'Hiragino Sans','Noto Sans JP',sans-serif;position:fixed;top:-9999px;left:-9999px;z-index:0;`;
+  el.innerHTML=`
+    <div style="width:${mW}px;height:${mH}px;flex-shrink:0;overflow:hidden;background:#e8f0e8">
+      ${imgSrc?`<img src="${imgSrc}" style="width:${mW}px;height:${mH}px;display:block">`:'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8aaa8a;font-size:24px">🗺</div>'}
+    </div>
+    <div style="flex:1;padding:38px 42px 28px;display:flex;flex-direction:column;overflow:hidden">
+      <div style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#8a7a6e;margin-bottom:14px">MAPFOLIO/A4 ${state.lat.toFixed(4)}°N · ${state.lng.toFixed(4)}°E · R${state.radius}m</div>
+      <div style="font-size:${fs.h1}px;font-weight:800;line-height:1.2;margin-bottom:18px;color:#2a1f18">${title}</div>
+      <div style="flex:1;overflow:hidden;color:#3d3028">${bodyHtml}</div>
+      <div style="font-size:8px;color:#8a7a6e;margin-top:14px;border-top:1px solid #d4c9bb;padding-top:10px;display:flex;justify-content:space-between"><span>${state.locationName||'—'}</span><span>© OpenStreetMap · Mapfolio</span></div>
+    </div>`;
+  document.body.appendChild(el);
+  return el;
+}
+async function exportPNG() {
+  showLoading('PNG生成中…');
+  try {
+    const el=await buildA4El(); await delay(200);
+    const c=await html2canvas(el,{useCORS:true,scale:2,width:1123,height:794,logging:false});
+    document.body.removeChild(el);
+    const a=document.createElement('a'); a.download=`mapfolio_${Date.now()}.png`; a.href=c.toDataURL('image/png'); a.click();
+    toast('✅ PNG保存しました');
+  } catch(e){toast('エラー: '+e.message);}
+  finally{hideLoading();}
+}
+async function exportPDF() {
+  showLoading('PDF生成中…');
+  try {
+    const el=await buildA4El(); await delay(200);
+    const c=await html2canvas(el,{useCORS:true,scale:2,width:1123,height:794,logging:false});
+    document.body.removeChild(el);
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    pdf.addImage(c.toDataURL('image/jpeg',.95),'JPEG',0,0,297,210);
+    pdf.save(`mapfolio_${Date.now()}.pdf`);
+    toast('✅ PDF保存しました');
+  } catch(e){toast('エラー: '+e.message);}
+  finally{hideLoading();}
+}
+
+// ─── localStorage ─────────────────────────────────────
+const LS_IDX='mapfolio_index',LS_CUR='mapfolio_current',LS_PFX='mapfolio_proj_';
+function lsIdx(){try{return JSON.parse(localStorage.getItem(LS_IDX)||'[]');}catch{return[];}}
+function serializeState(){
+  return{version:1,name:state.projectName,savedAt:new Date().toISOString(),
+    center:{lat:state.lat,lng:state.lng,zoom:state.zoom},
+    radius:state.radius,layout:state.layout,locationName:state.locationName,
+    fontSizes:{...state.fontSizes},
+    markdown:document.getElementById('md-editor').value,
+    pins:pins.map(p=>({label:p.label,lat:p.lat,lng:p.lng}))};
+}
+function saveToLocal(silent=false){
+  const data=serializeState();
+  let id=state.projectId;
+  if(!id){id='proj_'+Date.now();state.projectId=id;}
+  const entry={id,name:data.name,savedAt:data.savedAt};
+  const idx=lsIdx(); const pos=idx.findIndex(e=>e.id===id);
+  if(pos>=0)idx[pos]=entry;else idx.unshift(entry);
+  localStorage.setItem(LS_IDX,JSON.stringify(idx));
+  localStorage.setItem(LS_CUR,id);
+  try{localStorage.setItem(LS_PFX+id,JSON.stringify(data));}
+  catch{toast('⚠️ 保存容量超過');return;}
+  if(!silent)toast('💾 保存しました');
+}
+
+// ─── Utilities ────────────────────────────────────────
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2500);
+}
+function showLoading(msg){document.getElementById('loading-msg').textContent=msg;document.getElementById('loading').classList.add('show');}
+function hideLoading(){document.getElementById('loading').classList.remove('show');}
+
+// ─── Auto-save every 30s ──────────────────────────────
+setInterval(()=>{ if(state.projectId) saveToLocal(true); },30000);
+
+// ─── Init ─────────────────────────────────────────────
+(function init(){
+  const DEFAULT=`# 東京駅 丸の内駅舎
+
+赤レンガの駅舎が美しい、東京の玄関口。復原されたドーム天井と行幸通りの趣ある佇まいが、歴史と都市の現在を同時に見せてくれます。
+
+@東京都千代田区丸の内1丁目@
+
+## 紹介ポイント
+- 午前中は駅舎正面に光が入り写真が撮りやすい
+- 丸の内仲通りや皇居外苑まで歩いて回れる
+
+> 地図は少し引き気味にすると全体が見えやすい`;
+
+  // Restore last session
+  const lastId=localStorage.getItem(LS_CUR);
+  const idx=lsIdx();
+  if(lastId && idx.find(e=>e.id===lastId)){
+    try{
+      const data=JSON.parse(localStorage.getItem(LS_PFX+lastId));
+      state.projectId=lastId;
+      state.projectName=data.name||'新規プロジェクト';
+      state.lat=data.center?.lat??35.6812; state.lng=data.center?.lng??139.7671; state.zoom=data.center?.zoom??14;
+      state.radius=data.radius??650; state.layout=data.layout??'right';
+      state.locationName=data.locationName||''; state.fontSizes={h1:36,h2:18,h3:14,body:12,...(data.fontSizes||{})};
+      map.setView([state.lat,state.lng],state.zoom);
+      mainMarker.setLatLng([state.lat,state.lng]);
+      radiusCircle.setLatLng([state.lat,state.lng]); radiusCircle.setRadius(state.radius);
+      document.getElementById('md-editor').value=data.markdown||'';
+      (data.pins||[]).forEach(p=>addPin(p.lat,p.lng,p.label,true));
+      document.getElementById('radius-slider').value=state.radius;
+      document.getElementById('radius-val').textContent=state.radius+'m';
+      document.querySelectorAll('.layout-card').forEach(c=>c.classList.toggle('active',c.dataset.layout===state.layout));
+      document.getElementById('mini-preview').className='layout-'+state.layout;
+      ['h1','h2','h3','body'].forEach(k=>{const el=document.getElementById('fs-'+k);if(el)el.value=state.fontSizes[k];});
+    } catch{}
+  } else {
+    document.getElementById('md-editor').value=DEFAULT;
+  }
+  updatePreview(); updateMiniMeta(); applyFontSizes();
+  map.whenReady(()=>setTimeout(takeSnapshot,1500));
+})();
+</script>
+</body>
+</html>
