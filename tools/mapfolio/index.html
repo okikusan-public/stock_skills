@@ -15,19 +15,22 @@
 <!-- jsPDF -->
 <script src="lib/jspdf.umd.min.js"></script>
 
+<!-- Dynamic font sizes (updated by JS) -->
+<style id="dynamic-font-style"></style>
+
 <style>
 /* ─── Design tokens ─── */
 :root {
-  --bg:        #ede6da;
-  --panel:     #f5efe5;
-  --sidebar:   #e8dfd1;
-  --accent:    #d63c2f;
-  --accent2:   #c43528;
-  --text:      #2a1f18;
-  --muted:     #8a7a6e;
-  --border:    #d4c9bb;
-  --radius:    10px;
-  --shadow:    0 2px 12px rgba(0,0,0,.12);
+  --bg:      #ede6da;
+  --panel:   #f5efe5;
+  --sidebar: #e8dfd1;
+  --accent:  #d63c2f;
+  --orange:  #e8920a;
+  --text:    #2a1f18;
+  --muted:   #8a7a6e;
+  --border:  #d4c9bb;
+  --radius:  10px;
+  --shadow:  0 2px 12px rgba(0,0,0,.12);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,632 +44,331 @@ body {
   flex-direction: column;
 }
 
-/* ─── Top bar ─── */
+/* ─── Topbar ─── */
 #topbar {
-  display: flex;
-  align-items: center;
-  padding: 0 18px;
-  height: 52px;
+  display: flex; align-items: center;
+  padding: 0 18px; height: 52px;
   background: var(--sidebar);
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  gap: 12px;
+  flex-shrink: 0; gap: 12px;
 }
-#topbar .logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon {
+  width: 34px; height: 34px; background: var(--accent);
+  border-radius: 8px; display: flex; align-items: center;
+  justify-content: center; color: #fff; font-size: 18px;
 }
-#topbar .logo-icon {
-  width: 34px; height: 34px;
-  background: var(--accent);
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 18px;
-}
-#topbar .brand-sub {
-  font-size: 9px;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--muted);
-  line-height: 1;
-}
-#topbar .brand-name {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: .02em;
-  line-height: 1;
-}
-#topbar .spacer { flex: 1; }
+.brand-sub  { font-size: 9px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); line-height:1; }
+.brand-name { font-size: 20px; font-weight:700; letter-spacing:.02em; line-height:1; }
+.spacer { flex: 1; }
 .btn-export {
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 16px;
-  border-radius: var(--radius);
-  border: none;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity .15s;
+  display:flex; align-items:center; gap:6px;
+  padding:7px 16px; border-radius:var(--radius);
+  border:none; font-size:13px; font-weight:600;
+  cursor:pointer; transition:opacity .15s;
 }
-.btn-export:hover { opacity: .85; }
-.btn-png {
-  background: var(--panel);
-  border: 1.5px solid var(--border);
-  color: var(--text);
-}
-.btn-pdf {
-  background: var(--accent);
-  color: #fff;
-}
+.btn-export:hover { opacity:.85; }
+.btn-png { background:var(--panel); border:1.5px solid var(--border); color:var(--text); }
+.btn-pdf { background:var(--accent); color:#fff; }
 
-/* ─── Main layout ─── */
-#main {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
+/* ─── Main ─── */
+#main { display:flex; flex:1; overflow:hidden; }
 
-/* ─── Left Sidebar ─── */
+/* ─── Sidebar ─── */
 #sidebar {
-  width: 230px;
-  background: var(--sidebar);
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-  flex-shrink: 0;
-  padding: 16px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  width:240px; background:var(--sidebar);
+  border-right:1px solid var(--border);
+  overflow-y:auto; flex-shrink:0;
+  padding:14px 13px;
+  display:flex; flex-direction:column; gap:16px;
 }
-.sidebar-section-label {
-  font-size: 10px;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.sec-label {
+  font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--muted); font-weight:700; margin-bottom:7px;
+  display:flex; align-items:center; gap:5px;
 }
-.search-box {
-  display: flex;
-  gap: 6px;
-}
+
+/* Search */
+.search-box { display:flex; gap:6px; }
 .search-box input {
-  flex: 1;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: var(--panel);
-  font-size: 13px;
-  color: var(--text);
-  outline: none;
+  flex:1; padding:8px 10px; border-radius:8px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:13px; color:var(--text); outline:none;
 }
-.search-box input:focus { border-color: var(--accent); }
+.search-box input:focus { border-color:var(--accent); }
 .search-box button {
-  width: 34px; height: 34px;
-  border-radius: 8px;
-  background: var(--accent);
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 15px;
+  width:34px; height:34px; border-radius:8px;
+  background:var(--accent); border:none; color:#fff;
+  cursor:pointer; display:flex; align-items:center;
+  justify-content:center; font-size:15px;
 }
+
+/* Pin section */
+.pin-search-row { display:flex; gap:6px; margin-bottom:6px; }
+.pin-search-row input {
+  flex:1; padding:7px 9px; border-radius:8px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:12px; color:var(--text); outline:none;
+}
+.pin-search-row input:focus { border-color:var(--orange); }
+.pin-search-row button {
+  width:32px; height:32px; border-radius:8px;
+  background:var(--orange); border:none; color:#fff;
+  font-size:14px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.pin-mode-btn {
+  width:100%; padding:6px 10px; border-radius:8px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:11px; font-weight:600; color:var(--muted);
+  cursor:pointer; transition:all .15s; margin-bottom:7px;
+}
+.pin-mode-btn.active { background:var(--orange); color:#fff; border-color:var(--orange); }
+
+/* Editable pin textarea */
+#pin-textarea {
+  width:100%; min-height:70px; max-height:160px;
+  padding:8px 9px; border-radius:8px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-family:'Menlo','Consolas',monospace; font-size:11px;
+  line-height:1.7; color:var(--text); resize:vertical; outline:none;
+}
+#pin-textarea:focus { border-color:var(--orange); }
+.pin-textarea-hint {
+  font-size:10px; color:var(--muted); margin-top:4px; line-height:1.5;
+}
+body.pin-adding #map { cursor:crosshair !important; }
 
 /* Layout buttons */
 .layout-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  border: 1.5px solid transparent;
-  background: var(--panel);
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--text);
-  margin-bottom: 6px;
-  transition: all .15s;
-  text-align: left;
-  width: 100%;
+  display:flex; align-items:center; gap:10px;
+  padding:8px 11px; border-radius:8px;
+  border:1.5px solid transparent; background:var(--panel);
+  cursor:pointer; font-size:12px; color:var(--text);
+  margin-bottom:5px; transition:all .15s; text-align:left; width:100%;
 }
-.layout-btn:last-child { margin-bottom: 0; }
-.layout-btn.active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-.layout-btn:not(.active):hover {
-  border-color: var(--accent);
-  background: #f0e8dc;
-}
+.layout-btn:last-child { margin-bottom:0; }
+.layout-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.layout-btn:not(.active):hover { border-color:var(--accent); background:#f0e8dc; }
 .layout-icon {
-  width: 28px; height: 20px;
-  border-radius: 3px;
-  border: 1.5px solid currentColor;
-  display: flex;
-  flex-shrink: 0;
-  overflow: hidden;
+  width:28px; height:20px; border-radius:3px;
+  border:1.5px solid currentColor;
+  display:flex; flex-shrink:0; overflow:hidden;
 }
-.layout-icon .map-part {
-  background: rgba(100,160,120,.5);
-}
-.layout-icon .text-part {
-  background: rgba(180,140,100,.35);
-}
-.layout-btn.active .map-part  { background: rgba(255,255,255,.45); }
-.layout-btn.active .text-part { background: rgba(255,255,255,.25); }
+.layout-icon .map-part  { background:rgba(100,160,120,.5); }
+.layout-icon .text-part { background:rgba(180,140,100,.35); }
+.layout-btn.active .map-part  { background:rgba(255,255,255,.45); }
+.layout-btn.active .text-part { background:rgba(255,255,255,.25); }
+.li-right  .map-part  { width:60%; height:100%; }
+.li-right  .text-part { flex:1; height:100%; }
+.li-left   .text-part { width:40%; height:100%; }
+.li-left   .map-part  { flex:1; height:100%; }
+.li-below  { flex-direction:column; }
+.li-below  .map-part  { width:100%; height:55%; }
+.li-below  .text-part { width:100%; flex:1; }
+.li-above  { flex-direction:column; }
+.li-above  .text-part { width:100%; height:45%; }
+.li-above  .map-part  { width:100%; flex:1; }
+.layout-btn .lbl { font-size:12px; font-weight:600; line-height:1.2; }
+.layout-btn .lbl small { display:block; font-size:10px; font-weight:400; opacity:.7; }
 
-/* layout icon variants */
-.li-right  .map-part  { width: 60%; height: 100%; }
-.li-right  .text-part { flex: 1; height: 100%; }
-.li-left   .text-part { width: 40%; height: 100%; }
-.li-left   .map-part  { flex: 1; height: 100%; }
-.li-below  { flex-direction: column; }
-.li-below  .map-part  { width: 100%; height: 55%; }
-.li-below  .text-part { width: 100%; flex: 1; }
-.li-above  { flex-direction: column; }
-.li-above  .text-part { width: 100%; height: 45%; }
-.li-above  .map-part  { width: 100%; flex: 1; }
-
-.layout-btn .lbl { font-size: 12px; font-weight: 600; line-height: 1.2; }
-.layout-btn .lbl small { display: block; font-size: 10px; font-weight: 400; opacity: .7; }
-
-/* Radius slider */
-.slider-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-.slider-row input[type=range] {
-  flex: 1;
-  accent-color: var(--accent);
-}
-.slider-val { font-size: 12px; font-weight: 600; color: var(--accent); min-width: 42px; }
-
-/* Coords row */
-.coords-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.coord-box label {
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
+/* Radius / zoom */
+.slider-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+.slider-row input[type=range] { flex:1; accent-color:var(--accent); }
+.slider-val { font-size:12px; font-weight:600; color:var(--accent); min-width:42px; }
+.coords-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.coord-box label { font-size:10px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
 .coord-box input {
-  width: 100%;
-  padding: 5px 7px;
-  border-radius: 6px;
-  border: 1.5px solid var(--border);
-  background: var(--panel);
-  font-size: 12px;
-  color: var(--text);
-  outline: none;
+  width:100%; padding:5px 7px; border-radius:6px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:12px; color:var(--text); outline:none;
 }
-.coord-box input:focus { border-color: var(--accent); }
+.coord-box input:focus { border-color:var(--accent); }
+.zoom-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+.zoom-row label { color:var(--muted); font-size:10px; text-transform:uppercase; }
+.zoom-val { font-size:18px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:4px; }
 
-.zoom-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-.zoom-row label { color: var(--muted); font-size: 10px; text-transform: uppercase; }
-.zoom-row .zoom-val {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Style selector */
-.style-tabs {
-  display: flex;
-  gap: 6px;
-}
+/* Style tabs */
+.style-tabs { display:flex; gap:6px; }
 .style-tab {
-  flex: 1;
-  padding: 6px 4px;
-  border-radius: 7px;
-  border: 1.5px solid var(--border);
-  background: var(--panel);
-  font-size: 11px;
-  text-align: center;
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--muted);
-  transition: all .15s;
+  flex:1; padding:6px 4px; border-radius:7px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:11px; text-align:center; cursor:pointer;
+  font-weight:600; color:var(--muted); transition:all .15s;
 }
-.style-tab.active {
-  background: var(--text);
-  color: #fff;
-  border-color: var(--text);
-}
+.style-tab.active { background:var(--text); color:#fff; border-color:var(--text); }
 
-/* ─── Center: Map ─── */
-#map-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-#map {
-  flex: 1;
-}
+/* ─── Map panel ─── */
+#map-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+#map { flex:1; }
 
-/* Export preview strip */
+/* Preview strip */
 #preview-strip {
-  height: 300px;
-  background: var(--bg);
-  border-top: 1px solid var(--border);
-  overflow-y: auto;
-  padding: 14px 20px;
-  flex-shrink: 0;
+  height:280px; background:var(--bg);
+  border-top:1px solid var(--border);
+  overflow-y:auto; padding:12px 18px; flex-shrink:0;
 }
-#preview-strip .strip-header {
-  font-size: 10px;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--accent);
-  font-weight: 700;
-  margin-bottom: 6px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.strip-header {
+  font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--accent); font-weight:700; margin-bottom:5px;
+  display:flex; justify-content:space-between; align-items:center;
 }
-#preview-strip .strip-header .dims {
-  color: var(--muted);
-  font-size: 10px;
-  letter-spacing: .06em;
-}
-#preview-strip h3 {
-  font-size: 14px;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
+.strip-header .dims { color:var(--muted); font-size:10px; }
+#preview-strip h3 { font-size:13px; font-weight:700; margin-bottom:8px; }
 
 /* A4 preview card */
 #a4-preview {
-  background: #fff;
-  box-shadow: var(--shadow);
-  border-radius: 6px;
-  overflow: hidden;
-  /* A4 landscape ratio 297:210 = 1.414:1 */
-  /* Show at roughly half size */
-  width: 100%;
-  max-width: 680px;
-  margin: 0 auto;
-  aspect-ratio: 297 / 210;
-  display: flex;
-  position: relative;
+  background:#fff; box-shadow:var(--shadow); border-radius:6px;
+  overflow:hidden; width:100%; max-width:660px;
+  margin:0 auto; aspect-ratio:297/210; display:flex; position:relative;
 }
-
-/* layout modes for preview */
-#a4-preview.layout-right  { flex-direction: row; }
-#a4-preview.layout-left   { flex-direction: row-reverse; }
-#a4-preview.layout-below  { flex-direction: column; }
-#a4-preview.layout-above  { flex-direction: column-reverse; }
+#a4-preview.layout-right  { flex-direction:row; }
+#a4-preview.layout-left   { flex-direction:row-reverse; }
+#a4-preview.layout-below  { flex-direction:column; }
+#a4-preview.layout-above  { flex-direction:column-reverse; }
 
 .preview-map-area {
-  background: #e8f0e8;
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
+  background:#e8f0e8; position:relative;
+  overflow:hidden; flex-shrink:0;
 }
 #a4-preview.layout-right .preview-map-area,
-#a4-preview.layout-left  .preview-map-area  { width: 58%; height: 100%; }
+#a4-preview.layout-left  .preview-map-area { width:58%; height:100%; }
 #a4-preview.layout-below .preview-map-area,
-#a4-preview.layout-above .preview-map-area  { width: 100%; height: 56%; }
+#a4-preview.layout-above .preview-map-area { width:100%; height:56%; }
 
-#preview-map-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+#preview-map-img { width:100%; height:100%; object-fit:cover; display:block; }
+.preview-placeholder {
+  width:100%; height:100%; display:flex;
+  align-items:center; justify-content:center;
+  color:#8aaa8a; font-size:11px;
 }
-.preview-map-placeholder {
-  width: 100%; height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #8aaa8a;
-  font-size: 12px;
-}
-
 .preview-text-area {
-  flex: 1;
-  padding: 14px 16px 10px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
+  flex:1; padding:12px 14px 8px;
+  display:flex; flex-direction:column; overflow:hidden;
 }
 .preview-meta {
-  font-size: 7px;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 6px;
-  line-height: 1.6;
+  font-size:7px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:5px; line-height:1.6;
 }
 .preview-title {
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 1.25;
-  margin-bottom: 7px;
-  color: var(--text);
+  font-weight:800; line-height:1.25; margin-bottom:6px; color:var(--text);
 }
-.preview-body {
-  font-size: 8px;
-  line-height: 1.65;
-  color: #3d3028;
-  flex: 1;
-  overflow: hidden;
-}
-.preview-body h2 { font-size: 9px; font-weight: 700; margin: 5px 0 3px; }
-.preview-body h3 { font-size: 8.5px; font-weight: 700; margin: 4px 0 2px; }
-.preview-body ul { padding-left: 12px; }
-.preview-body li { margin-bottom: 2px; }
-.preview-body blockquote {
-  border-left: 2.5px solid var(--accent);
-  padding-left: 7px;
-  margin: 4px 0;
-  color: var(--muted);
-  font-style: italic;
-}
+.preview-body { line-height:1.65; color:#3d3028; flex:1; overflow:hidden; }
+.preview-body h2 { font-weight:700; margin:4px 0 2px; }
+.preview-body h3 { font-weight:700; margin:3px 0 2px; }
+.preview-body ul { padding-left:12px; }
+.preview-body li { margin-bottom:2px; }
+.preview-body blockquote { border-left:2px solid var(--accent); padding-left:6px; margin:3px 0; color:var(--muted); font-style:italic; }
 .preview-footer {
-  font-size: 7px;
-  color: var(--muted);
-  margin-top: 6px;
-  border-top: 1px solid var(--border);
-  padding-top: 5px;
-  display: flex;
-  justify-content: space-between;
+  font-size:7px; color:var(--muted); margin-top:5px;
+  border-top:1px solid var(--border); padding-top:4px;
+  display:flex; justify-content:space-between;
 }
 
-/* ─── Right Panel ─── */
+/* Address badge */
+.addr-badge {
+  display:inline-flex; align-items:center; gap:3px;
+  background:#fff3e0; color:#b36800; border:1px solid #f0b849;
+  border-radius:4px; padding:1px 6px; font-size:.9em;
+  font-weight:600; font-style:normal;
+}
+
+/* ─── Right panel ─── */
 #right-panel {
-  width: 280px;
-  border-left: 1px solid var(--border);
-  background: var(--panel);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  flex-shrink: 0;
+  width:290px; border-left:1px solid var(--border);
+  background:var(--panel); display:flex; flex-direction:column;
+  overflow:hidden; flex-shrink:0;
 }
-.rp-section {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+.rp-sec {
+  padding:12px 14px; border-bottom:1px solid var(--border);
 }
-.rp-section:last-child { border-bottom: none; flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.rp-sec:last-child { border-bottom:none; flex:1; overflow:hidden; display:flex; flex-direction:column; }
 
 #md-editor {
-  width: 100%;
-  flex: 1;
-  min-height: 200px;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
-  font-family: 'Menlo', 'Consolas', monospace;
-  font-size: 12px;
-  line-height: 1.65;
-  resize: none;
-  background: #fffdf9;
-  color: var(--text);
-  outline: none;
-  margin-top: 6px;
+  width:100%; flex:1; min-height:180px;
+  border:1.5px solid var(--border); border-radius:8px;
+  padding:9px; font-family:'Menlo','Consolas',monospace;
+  font-size:12px; line-height:1.65; resize:none;
+  background:#fffdf9; color:var(--text); outline:none; margin-top:5px;
 }
-#md-editor:focus { border-color: var(--accent); }
+#md-editor:focus { border-color:var(--accent); }
 
 .photo-btn {
-  width: 100%;
-  padding: 9px;
-  margin-top: 8px;
-  border-radius: 8px;
-  border: 1.5px dashed var(--border);
-  background: transparent;
-  font-size: 12px;
-  color: var(--muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all .15s;
+  width:100%; padding:8px; margin-top:7px; border-radius:8px;
+  border:1.5px dashed var(--border); background:transparent;
+  font-size:12px; color:var(--muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  transition:all .15s;
 }
-.photo-btn:hover { border-color: var(--accent); color: var(--accent); }
+.photo-btn:hover { border-color:var(--accent); color:var(--accent); }
 
-/* Realtime preview panel */
+/* Font size grid */
+.fs-grid {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:6px; margin-top:6px;
+}
+.fs-item { display:flex; flex-direction:column; gap:3px; }
+.fs-item label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+.fs-item input[type=number] {
+  width:100%; padding:4px 6px; border-radius:6px;
+  border:1.5px solid var(--border); background:#fffdf9;
+  font-size:12px; font-weight:600; color:var(--text); outline:none;
+}
+.fs-item input[type=number]:focus { border-color:var(--accent); }
+
+/* Realtime preview */
 #rt-preview {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
-  background: #fffdf9;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  margin-top: 6px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--text);
+  flex:1; overflow-y:auto; padding:9px;
+  background:#fffdf9; border:1.5px solid var(--border);
+  border-radius:8px; margin-top:5px;
+  font-size:13px; line-height:1.7; color:var(--text);
 }
-#rt-preview h1 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
-#rt-preview h2 { font-size: 14px; font-weight: 700; margin: 10px 0 4px; }
-#rt-preview h3 { font-size: 13px; font-weight: 600; margin: 8px 0 4px; }
-#rt-preview ul { padding-left: 16px; }
-#rt-preview li { margin-bottom: 3px; }
-#rt-preview li::marker { color: var(--accent); }
+#rt-preview h1 { font-weight:800; margin-bottom:7px; }
+#rt-preview h2 { font-weight:700; margin:9px 0 4px; }
+#rt-preview h3 { font-weight:600; margin:7px 0 3px; }
+#rt-preview ul { padding-left:15px; }
+#rt-preview li { margin-bottom:3px; }
+#rt-preview li::marker { color:var(--accent); }
 #rt-preview blockquote {
-  border-left: 3px solid var(--accent);
-  padding-left: 10px;
-  margin: 8px 0;
-  color: var(--muted);
-  font-style: italic;
+  border-left:3px solid var(--accent); padding-left:9px;
+  margin:7px 0; color:var(--muted); font-style:italic;
 }
-#rt-preview p { margin-bottom: 6px; }
-#rt-preview strong { color: var(--accent); }
+#rt-preview p { margin-bottom:5px; }
+#rt-preview strong { color:var(--accent); }
 
-/* ─── Toast ─── */
+/* ─── Toast / Loading ─── */
 #toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%) translateY(60px);
-  background: #2a1f18;
-  color: #fff;
-  padding: 10px 22px;
-  border-radius: 30px;
-  font-size: 13px;
-  font-weight: 600;
-  opacity: 0;
-  transition: all .3s;
-  z-index: 9999;
-  pointer-events: none;
+  position:fixed; bottom:24px; left:50%;
+  transform:translateX(-50%) translateY(60px);
+  background:#2a1f18; color:#fff;
+  padding:9px 22px; border-radius:30px;
+  font-size:13px; font-weight:600; opacity:0;
+  transition:all .3s; z-index:9999; pointer-events:none;
 }
-#toast.show {
-  transform: translateX(-50%) translateY(0);
-  opacity: 1;
-}
-
-/* ─── Loading overlay ─── */
+#toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
 #loading {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(240,232,220,.7);
-  z-index: 9998;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
+  display:none; position:fixed; inset:0;
+  background:rgba(240,232,220,.75); z-index:9998;
+  align-items:center; justify-content:center;
+  flex-direction:column; gap:12px;
+  font-size:14px; font-weight:600; color:var(--text);
 }
-#loading.show { display: flex; }
+#loading.show { display:flex; }
 .spinner {
-  width: 36px; height: 36px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
+  width:36px; height:36px; border:3px solid var(--border);
+  border-top-color:var(--accent); border-radius:50%;
+  animation:spin .8s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin { to { transform:rotate(360deg); } }
 
-/* ─── Pin section ─── */
-.pin-search-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 7px;
-}
-.pin-search-row input {
-  flex: 1;
-  padding: 7px 9px;
-  border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: var(--panel);
-  font-size: 12px;
-  color: var(--text);
-  outline: none;
-}
-.pin-search-row input:focus { border-color: #e8920a; }
-.pin-search-row button {
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  background: #e8920a;
-  border: none;
-  color: #fff;
-  font-size: 15px;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
-.pin-mode-btn {
-  width: 100%;
-  padding: 7px 10px;
-  border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: var(--panel);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-  text-align: center;
-  transition: all .15s;
-  margin-bottom: 8px;
-}
-.pin-mode-btn.active {
-  background: #e8920a;
-  color: #fff;
-  border-color: #e8920a;
-}
-.pin-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  max-height: 160px;
-  overflow-y: auto;
-}
-.pin-item {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 8px;
-  background: var(--panel);
-  border-radius: 7px;
-  border: 1.5px solid var(--border);
-  font-size: 11px;
-}
-.pin-item .pin-num {
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: #e8920a;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.pin-item .pin-label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.pin-item .pin-label:hover { color: #e8920a; }
-.pin-item .pin-del {
-  width: 18px; height: 18px;
-  border-radius: 4px;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  font-size: 13px;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  line-height: 1;
-}
-.pin-item .pin-del:hover { color: var(--accent); background: #f5dbd9; }
-
-/* Pin mode cursor hint */
-body.pin-adding #map { cursor: crosshair !important; }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
 </style>
 </head>
 <body>
 
-<!-- Top Bar -->
+<!-- Topbar -->
 <div id="topbar">
   <div class="logo">
     <div class="logo-icon">📍</div>
@@ -683,87 +385,90 @@ body.pin-adding #map { cursor: crosshair !important; }
 <!-- Main -->
 <div id="main">
 
-  <!-- Left Sidebar -->
+  <!-- ── Left Sidebar ── -->
   <div id="sidebar">
 
-    <!-- Search -->
+    <!-- 場所検索 -->
     <div>
-      <div class="sidebar-section-label">🔍 場所検索</div>
+      <div class="sec-label">🔍 場所検索</div>
       <div class="search-box">
-        <input type="text" id="search-input" placeholder="東京駅" value="東京駅" onkeydown="if(event.key==='Enter')doSearch()">
+        <input type="text" id="search-input" placeholder="東京駅" value="東京駅"
+               onkeydown="if(event.key==='Enter')doSearch()">
         <button onclick="doSearch()">🔍</button>
       </div>
     </div>
 
-    <!-- Pin section -->
+    <!-- ピンを追加 -->
     <div>
-      <div class="sidebar-section-label">📌 ピンを追加</div>
+      <div class="sec-label">📌 ピンを追加</div>
       <div class="pin-search-row">
-        <input type="text" id="pin-input" placeholder="場所名・住所で検索" onkeydown="if(event.key==='Enter')addPinBySearch()">
-        <button onclick="addPinBySearch()" title="検索してピン追加">📌</button>
+        <input type="text" id="pin-input" placeholder="場所名・住所で検索"
+               onkeydown="if(event.key==='Enter')addPinBySearch()">
+        <button onclick="addPinBySearch()" title="ピン追加">📌</button>
       </div>
       <button class="pin-mode-btn" id="pin-mode-btn" onclick="togglePinMode()">
         🖱 地図クリックでピン追加
       </button>
-      <div class="pin-list" id="pin-list"></div>
+      <!-- Editable pin list -->
+      <textarea id="pin-textarea"
+        placeholder="（ピンがありません）"
+        onblur="parsePinListText()"
+        spellcheck="false"></textarea>
+      <div class="pin-textarea-hint">書式: ピン名称:緯度,経度（1行1ピン）<br>編集 → フォーカスを外すと地図に反映</div>
     </div>
 
-    <!-- Layout -->
+    <!-- A4 配置 -->
     <div>
-      <div class="sidebar-section-label">A4 配置</div>
-
-      <button class="layout-btn active" id="btn-right" onclick="setLayout('right',this)">
+      <div class="sec-label">A4 配置</div>
+      <button class="layout-btn active" onclick="setLayout('right',this)">
         <div class="layout-icon li-right"><div class="map-part"></div><div class="text-part"></div></div>
         <div class="lbl">文章を右に配置<small>地図を大きく、紹介文を右カラムに</small></div>
       </button>
-
-      <button class="layout-btn" id="btn-left" onclick="setLayout('left',this)">
+      <button class="layout-btn" onclick="setLayout('left',this)">
         <div class="layout-icon li-left"><div class="text-part"></div><div class="map-part"></div></div>
         <div class="lbl">文章を左に配置<small>紹介文を左・地図を右に配置</small></div>
       </button>
-
-      <button class="layout-btn" id="btn-above" onclick="setLayout('above',this)">
+      <button class="layout-btn" onclick="setLayout('above',this)">
         <div class="layout-icon li-above"><div class="text-part"></div><div class="map-part"></div></div>
         <div class="lbl">文章を上に配置<small>紹介文を上・地図を下に配置</small></div>
       </button>
-
-      <button class="layout-btn" id="btn-below" onclick="setLayout('below',this)">
+      <button class="layout-btn" onclick="setLayout('below',this)">
         <div class="layout-icon li-below"><div class="map-part"></div><div class="text-part"></div></div>
         <div class="lbl">文章を下に配置<small>地図を上・紹介文を下に配置</small></div>
       </button>
     </div>
 
-    <!-- Map settings -->
+    <!-- 地図表示 -->
     <div>
-      <div class="sidebar-section-label">🗺 地図の表示</div>
+      <div class="sec-label">🗺 地図の表示</div>
       <div class="slider-row">
         <span style="font-size:11px;color:var(--muted)">範囲</span>
         <input type="range" id="radius-slider" min="100" max="5000" step="50" value="650"
                oninput="updateRadius(this.value)">
         <span class="slider-val" id="radius-val">650m</span>
       </div>
-      <div class="coords-row" style="margin-top:10px">
+      <div class="coords-row" style="margin-top:9px">
         <div class="coord-box">
           <label>緯度</label>
-          <input type="text" id="lat-input" value="35.6812" onchange="applyCoords()">
+          <input type="text" id="lat-input" value="35.681200" onchange="applyCoords()">
         </div>
         <div class="coord-box">
           <label>経度</label>
-          <input type="text" id="lng-input" value="139.7671" onchange="applyCoords()">
+          <input type="text" id="lng-input" value="139.767100" onchange="applyCoords()">
         </div>
       </div>
-      <div class="zoom-row" style="margin-top:10px">
+      <div class="zoom-row" style="margin-top:9px">
         <label>ズーム</label>
         <div class="zoom-val">
-          <span style="font-size:12px;color:var(--muted)">/¹</span>
+          <span style="font-size:12px;color:var(--muted)">z</span>
           <span id="zoom-val">14</span>
         </div>
       </div>
     </div>
 
-    <!-- Text style -->
+    <!-- 文章スタイル -->
     <div>
-      <div class="sidebar-section-label">✏ 文章スタイル</div>
+      <div class="sec-label">✏ 文章スタイル</div>
       <div class="style-tabs">
         <div class="style-tab active" onclick="setStyle('guide',this)">紹介ガイド</div>
         <div class="style-tab" onclick="setStyle('memo',this)">観光メモ</div>
@@ -773,7 +478,7 @@ body.pin-adding #map { cursor: crosshair !important; }
 
   </div><!-- /sidebar -->
 
-  <!-- Center: Map + Preview strip -->
+  <!-- ── Center: Map + Preview ── -->
   <div id="map-panel">
     <div id="map"></div>
 
@@ -783,12 +488,10 @@ body.pin-adding #map { cursor: crosshair !important; }
         <span class="dims">297 × 210mm</span>
       </div>
       <h3>A4横の完成イメージ</h3>
-
-      <!-- A4 Preview Card -->
       <div id="a4-preview" class="layout-right">
         <div class="preview-map-area">
           <img id="preview-map-img" src="" alt="" style="display:none">
-          <div class="preview-map-placeholder" id="preview-placeholder">地図を移動するとここに反映されます</div>
+          <div class="preview-placeholder" id="preview-placeholder">地図を移動するとここに反映されます</div>
         </div>
         <div class="preview-text-area">
           <div class="preview-meta" id="preview-meta">MAPFOLIO / A4</div>
@@ -803,92 +506,98 @@ body.pin-adding #map { cursor: crosshair !important; }
     </div>
   </div>
 
-  <!-- Right Panel -->
+  <!-- ── Right Panel ── -->
   <div id="right-panel">
 
-    <div class="rp-section">
-      <div class="sidebar-section-label">✏ Markdown Editor</div>
-      <textarea id="md-editor" oninput="updatePreview()" placeholder="# タイトル
-
-説明文をここに入力...
-
-## 紹介ポイント
-- ポイント1
-- ポイント2
-
-> ヒント: 地図は少し引き気味にすると全体が見えやすい"></textarea>
+    <div class="rp-sec">
+      <div class="sec-label">✏ Markdown Editor</div>
+      <textarea id="md-editor" oninput="updatePreview()"
+        placeholder="# タイトル&#10;&#10;説明文...&#10;&#10;## 見出し2&#10;- 箇条書き&#10;&#10;@住所@でピンを自動追加"></textarea>
     </div>
 
-    <div class="rp-section" style="flex-shrink:0">
-      <div class="sidebar-section-label">🖼 写真を挿入</div>
+    <div class="rp-sec" style="flex-shrink:0">
+      <div class="sec-label">🖼 写真を挿入</div>
       <button class="photo-btn" onclick="document.getElementById('photo-input').click()">
         🖼 写真ファイルを選ぶ
       </button>
       <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="loadPhoto(this)">
     </div>
 
-    <div class="rp-section">
-      <div class="sidebar-section-label">👁 リアルタイムプレビュー</div>
+    <!-- Font size settings -->
+    <div class="rp-sec" style="flex-shrink:0">
+      <div class="sec-label">🔡 フォントサイズ（pt）</div>
+      <div class="fs-grid">
+        <div class="fs-item">
+          <label>見出し1 (H1)</label>
+          <input type="number" id="fs-h1" min="16" max="72" value="36" oninput="setFontSize('h1',this.value)">
+        </div>
+        <div class="fs-item">
+          <label>見出し2 (H2)</label>
+          <input type="number" id="fs-h2" min="10" max="48" value="18" oninput="setFontSize('h2',this.value)">
+        </div>
+        <div class="fs-item">
+          <label>見出し3 (H3)</label>
+          <input type="number" id="fs-h3" min="8" max="36" value="14" oninput="setFontSize('h3',this.value)">
+        </div>
+        <div class="fs-item">
+          <label>本文 (Body)</label>
+          <input type="number" id="fs-body" min="6" max="24" value="12" oninput="setFontSize('body',this.value)">
+        </div>
+      </div>
+    </div>
+
+    <div class="rp-sec">
+      <div class="sec-label">👁 リアルタイムプレビュー</div>
       <div id="rt-preview"></div>
     </div>
 
   </div>
 </div><!-- /main -->
 
-<!-- Loading overlay -->
+<!-- Loading -->
 <div id="loading">
   <div class="spinner"></div>
   <span id="loading-msg">処理中...</span>
 </div>
-
 <!-- Toast -->
 <div id="toast"></div>
 
-<!-- Hidden photo storage -->
-<img id="photo-data" src="" alt="" style="display:none">
-
 <script>
-// ─── State ───────────────────────────────────────────
+// ═══════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════
 const state = {
-  lat: 35.6812,
-  lng: 139.7671,
-  zoom: 14,
-  radius: 650,
-  layout: 'right',
-  style: 'guide',
-  locationName: '東京駅',
-  photoDataUrl: null,
+  lat: 35.6812, lng: 139.7671, zoom: 14, radius: 650,
+  layout: 'right', style: 'guide',
+  locationName: '東京駅', photoDataUrl: null,
+  fontSizes: { h1: 36, h2: 18, h3: 14, body: 12 },
 };
 
-// ─── Map init ────────────────────────────────────────
-const map = L.map('map', {
-  center: [state.lat, state.lng],
-  zoom: state.zoom,
-  zoomControl: true,
-});
-
+// ═══════════════════════════════════════════
+// Map init
+// ═══════════════════════════════════════════
+const map = L.map('map', { center: [state.lat, state.lng], zoom: state.zoom });
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   maxZoom: 19,
 }).addTo(map);
 
-// Center marker
-const markerIcon = L.divIcon({
-  className: '',
-  html: '<div style="width:18px;height:18px;background:var(--accent);border-radius:50% 50% 50% 0;transform:rotate(-45deg) translate(-4px,-4px);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>',
-  iconSize: [18,18],
-  iconAnchor: [9,18],
-});
-const marker = L.marker([state.lat, state.lng], { icon: markerIcon, draggable: true }).addTo(map);
-const circle = L.circle([state.lat, state.lng], {
-  radius: state.radius,
-  color: '#d63c2f',
-  weight: 2,
-  fillColor: '#d63c2f',
-  fillOpacity: .08,
+// Center marker (red teardrop)
+function makeCenterIcon() {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:18px;height:18px;background:#d63c2f;border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg) translate(-4px,-4px);border:2px solid #fff;
+      box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>`,
+    iconSize: [18,18], iconAnchor: [9,18],
+  });
+}
+const mainMarker = L.marker([state.lat, state.lng], { icon: makeCenterIcon(), draggable: true }).addTo(map);
+const radiusCircle = L.circle([state.lat, state.lng], {
+  radius: state.radius, color:'#d63c2f', weight:2,
+  fillColor:'#d63c2f', fillOpacity:.07,
 }).addTo(map);
 
-// Sync coords display
 function syncCoordDisplay() {
   document.getElementById('lat-input').value = state.lat.toFixed(6);
   document.getElementById('lng-input').value = state.lng.toFixed(6);
@@ -898,41 +607,44 @@ function syncCoordDisplay() {
   scheduleMapSnapshot();
 }
 
-marker.on('dragend', e => {
+mainMarker.on('dragend', e => {
   const p = e.target.getLatLng();
   state.lat = p.lat; state.lng = p.lng;
-  circle.setLatLng([state.lat, state.lng]);
+  radiusCircle.setLatLng([state.lat, state.lng]);
   syncCoordDisplay();
 });
-
-map.on('moveend zoomend', () => { syncCoordDisplay(); });
+map.on('moveend zoomend', () => syncCoordDisplay());
 map.on('click', e => {
   if (pinMode) {
     addPin(e.latlng.lat, e.latlng.lng, null);
     return;
   }
   state.lat = e.latlng.lat; state.lng = e.latlng.lng;
-  marker.setLatLng([state.lat, state.lng]);
-  circle.setLatLng([state.lat, state.lng]);
+  mainMarker.setLatLng([state.lat, state.lng]);
+  radiusCircle.setLatLng([state.lat, state.lng]);
   syncCoordDisplay();
 });
 
-// ─── Pin management ──────────────────────────────────
-const pins = [];     // { id, lat, lng, label, marker }
+// ═══════════════════════════════════════════
+// Pin management
+// ═══════════════════════════════════════════
+const pins = [];          // { id, lat, lng, label, marker }
 let pinMode = false;
 let nextPinId = 1;
+const autoPinAddrs = new Set(); // @addr@ strings already geocoded
 
 function makePinIcon(num) {
   return L.divIcon({
     className: '',
     html: `<div style="
-      width:22px;height:22px;border-radius:50% 50% 50% 0;
-      background:#e8920a;transform:rotate(-45deg) translate(-5px,-5px);
+      width:22px;height:22px;background:#e8920a;
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg) translate(-5px,-5px);
       border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);
-      display:flex;align-items:center;justify-content:center;
-    "><span style="transform:rotate(45deg);font-size:9px;font-weight:700;color:#fff;line-height:22px;display:block;text-align:center">${num}</span></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 22],
+      display:flex;align-items:center;justify-content:center;">
+      <span style="transform:rotate(45deg);font-size:9px;font-weight:700;color:#fff">${num}</span>
+    </div>`,
+    iconSize: [22,22], iconAnchor: [11,22],
   });
 }
 
@@ -940,28 +652,33 @@ function togglePinMode() {
   pinMode = !pinMode;
   const btn = document.getElementById('pin-mode-btn');
   btn.classList.toggle('active', pinMode);
-  btn.textContent = pinMode ? '✅ クリックでピン追加中（もう一度で解除）' : '🖱 地図クリックでピン追加';
+  btn.textContent = pinMode
+    ? '✅ クリック追加中（再度クリックで解除）'
+    : '🖱 地図クリックでピン追加';
   document.body.classList.toggle('pin-adding', pinMode);
 }
 
 function addPin(lat, lng, label) {
   const id = nextPinId++;
-  const defaultLabel = label || `ピン ${id}`;
-  const m = L.marker([lat, lng], { icon: makePinIcon(id), draggable: true })
+  const displayNum = pins.length + 1;
+  const defaultLabel = label || `ピン ${displayNum}`;
+  const m = L.marker([lat, lng], { icon: makePinIcon(displayNum), draggable: true })
     .addTo(map)
     .bindPopup(`<b>${defaultLabel}</b><br><small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`)
     .openPopup();
 
   m.on('dragend', ev => {
-    const p = ev.target.getLatLng();
+    const pos = ev.target.getLatLng();
     const pin = pins.find(x => x.id === id);
-    if (pin) { pin.lat = p.lat; pin.lng = p.lng; }
-    m.setPopupContent(`<b>${defaultLabel}</b><br><small>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</small>`);
+    if (!pin) return;
+    pin.lat = pos.lat; pin.lng = pos.lng;
+    m.setPopupContent(`<b>${pin.label}</b><br><small>${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}</small>`);
+    renderPinList();
     scheduleMapSnapshot();
   });
 
   pins.push({ id, lat, lng, label: defaultLabel, marker: m });
-  renderPinList();
+  renumberPins(); // updates icons + textarea
   scheduleMapSnapshot();
   toast(`📌 ${defaultLabel}`);
 }
@@ -971,33 +688,85 @@ function removePin(id) {
   if (idx === -1) return;
   map.removeLayer(pins[idx].marker);
   pins.splice(idx, 1);
-  renderPinList();
+  renumberPins();
   scheduleMapSnapshot();
 }
 
-function flyToPin(id) {
-  const pin = pins.find(p => p.id === id);
-  if (!pin) return;
-  map.setView([pin.lat, pin.lng], Math.max(map.getZoom(), 15));
-  pin.marker.openPopup();
+// Re-index all marker icons to match current array order
+function renumberPins() {
+  pins.forEach((pin, i) => {
+    pin.marker.setIcon(makePinIcon(i + 1));
+  });
+  renderPinList();
 }
 
+// Update the editable textarea (skip if user is editing it)
 function renderPinList() {
-  const list = document.getElementById('pin-list');
-  if (pins.length === 0) {
-    list.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:6px 0">まだピンがありません</div>';
-    return;
-  }
-  list.innerHTML = pins.map((p, i) => `
-    <div class="pin-item">
-      <div class="pin-num">${i + 1}</div>
-      <div class="pin-label" onclick="flyToPin(${p.id})" title="${p.label}">${p.label}</div>
-      <button class="pin-del" onclick="removePin(${p.id})" title="削除">×</button>
-    </div>
-  `).join('');
+  const ta = document.getElementById('pin-textarea');
+  if (document.activeElement === ta) return;
+  ta.value = pins.length
+    ? pins.map(p => `${p.label}:${p.lat.toFixed(6)},${p.lng.toFixed(6)}`).join('\n')
+    : '';
 }
 
-// ─── Pin search (Nominatim) ──────────────────────────
+// Parse textarea on blur → reconcile with map pins
+function parsePinListText() {
+  const ta = document.getElementById('pin-textarea');
+  const lines = ta.value.split('\n').map(l => l.trim()).filter(l => l);
+
+  // Parse each line
+  const parsed = lines.map(line => {
+    const ci = line.lastIndexOf(':');
+    if (ci === -1) return null;
+    const label = line.slice(0, ci).trim();
+    const coords = line.slice(ci + 1).trim().split(',');
+    if (coords.length < 2) return null;
+    const lat = parseFloat(coords[0]);
+    const lng = parseFloat(coords[1]);
+    return (label && !isNaN(lat) && !isNaN(lng)) ? { label, lat, lng } : null;
+  }).filter(Boolean);
+
+  // Remove excess pins (array tail)
+  while (pins.length > parsed.length) {
+    const removed = pins.pop();
+    map.removeLayer(removed.marker);
+  }
+
+  // Update existing or add new entries
+  parsed.forEach((p, i) => {
+    if (i < pins.length) {
+      pins[i].label = p.label;
+      pins[i].lat = p.lat;
+      pins[i].lng = p.lng;
+      pins[i].marker.setLatLng([p.lat, p.lng]);
+      pins[i].marker.setPopupContent(`<b>${p.label}</b><br><small>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</small>`);
+    } else {
+      // New line added manually in textarea
+      const id = nextPinId++;
+      const m = L.marker([p.lat, p.lng], { icon: makePinIcon(i + 1), draggable: true })
+        .addTo(map)
+        .bindPopup(`<b>${p.label}</b><br><small>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</small>`);
+      const capturedId = id;
+      m.on('dragend', ev => {
+        const pos = ev.target.getLatLng();
+        const pin = pins.find(x => x.id === capturedId);
+        if (!pin) return;
+        pin.lat = pos.lat; pin.lng = pos.lng;
+        renderPinList();
+        scheduleMapSnapshot();
+      });
+      pins.push({ id, lat: p.lat, lng: p.lng, label: p.label, marker: m });
+    }
+  });
+
+  renumberPins();
+  scheduleMapSnapshot();
+  toast('📌 ピンを更新しました');
+}
+
+// ═══════════════════════════════════════════
+// Pin search (Nominatim)
+// ═══════════════════════════════════════════
 async function addPinBySearch() {
   const q = document.getElementById('pin-input').value.trim();
   if (!q) return;
@@ -1006,7 +775,7 @@ async function addPinBySearch() {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=ja`;
     const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
     const data = await res.json();
-    if (data.length === 0) { toast('場所が見つかりませんでした'); return; }
+    if (!data.length) { toast('場所が見つかりませんでした'); return; }
     const place = data[0];
     const lat = parseFloat(place.lat);
     const lng = parseFloat(place.lon);
@@ -1021,7 +790,69 @@ async function addPinBySearch() {
   }
 }
 
-// ─── Geocoding (Nominatim) ────────────────────────────
+// ═══════════════════════════════════════════
+// @address@ auto-pin detection (req 4)
+// ═══════════════════════════════════════════
+let addrDetectTimer = null;
+
+function scheduleAddrDetect() {
+  clearTimeout(addrDetectTimer);
+  addrDetectTimer = setTimeout(detectAddrPins, 2000);
+}
+
+async function detectAddrPins() {
+  const md = document.getElementById('md-editor').value;
+  // Split markdown into H1 blocks
+  const sections = splitByH1(md);
+
+  for (const { h1, body } of sections) {
+    const addrRe = /@([^@\n]+)@/g;
+    let m;
+    while ((m = addrRe.exec(body)) !== null) {
+      const addr = m[1].trim();
+      if (autoPinAddrs.has(addr)) continue;
+      autoPinAddrs.add(addr);
+      const label = h1 || addr;
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&accept-language=ja`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+        const data = await res.json();
+        if (data.length) {
+          addPin(parseFloat(data[0].lat), parseFloat(data[0].lon), label);
+          toast(`📍 自動ピン追加: ${label}`);
+        }
+      } catch(e) { /* network error — silently skip */ }
+    }
+  }
+}
+
+function splitByH1(md) {
+  const lines = md.split('\n');
+  const sections = [];
+  let curH1 = null;
+  let curLines = [];
+
+  for (const line of lines) {
+    const h1m = line.match(/^#\s+(.+)/);
+    if (h1m) {
+      if (curH1 !== null || curLines.length) {
+        sections.push({ h1: curH1, body: curLines.join('\n') });
+      }
+      curH1 = h1m[1].trim();
+      curLines = [];
+    } else {
+      curLines.push(line);
+    }
+  }
+  if (curH1 !== null || curLines.length) {
+    sections.push({ h1: curH1, body: curLines.join('\n') });
+  }
+  return sections;
+}
+
+// ═══════════════════════════════════════════
+// Main location search (Nominatim)
+// ═══════════════════════════════════════════
 async function doSearch() {
   const q = document.getElementById('search-input').value.trim();
   if (!q) return;
@@ -1030,14 +861,14 @@ async function doSearch() {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=ja`;
     const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
     const data = await res.json();
-    if (data.length === 0) { toast('場所が見つかりませんでした'); return; }
+    if (!data.length) { toast('場所が見つかりませんでした'); return; }
     const place = data[0];
     state.lat = parseFloat(place.lat);
     state.lng = parseFloat(place.lon);
     state.locationName = place.display_name.split(',')[0];
     map.setView([state.lat, state.lng], state.zoom);
-    marker.setLatLng([state.lat, state.lng]);
-    circle.setLatLng([state.lat, state.lng]);
+    mainMarker.setLatLng([state.lat, state.lng]);
+    radiusCircle.setLatLng([state.lat, state.lng]);
     document.getElementById('preview-location').textContent = state.locationName;
     syncCoordDisplay();
     toast(`📍 ${state.locationName}`);
@@ -1048,79 +879,128 @@ async function doSearch() {
   }
 }
 
-// ─── Radius ──────────────────────────────────────────
+// ═══════════════════════════════════════════
+// Map controls
+// ═══════════════════════════════════════════
 function updateRadius(v) {
   state.radius = parseInt(v);
   document.getElementById('radius-val').textContent = v + 'm';
-  circle.setRadius(state.radius);
+  radiusCircle.setRadius(state.radius);
   updatePreviewMeta();
 }
 
-// ─── Coords manual input ─────────────────────────────
 function applyCoords() {
   const lat = parseFloat(document.getElementById('lat-input').value);
   const lng = parseFloat(document.getElementById('lng-input').value);
   if (isNaN(lat) || isNaN(lng)) return;
   state.lat = lat; state.lng = lng;
   map.setView([lat, lng], state.zoom);
-  marker.setLatLng([lat, lng]);
-  circle.setLatLng([lat, lng]);
+  mainMarker.setLatLng([lat, lng]);
+  radiusCircle.setLatLng([lat, lng]);
   updatePreviewMeta();
 }
 
-// ─── Layout ──────────────────────────────────────────
+// ═══════════════════════════════════════════
+// Layout / Style
+// ═══════════════════════════════════════════
 function setLayout(layout, el) {
   state.layout = layout;
   document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   const preview = document.getElementById('a4-preview');
   preview.className = 'layout-' + layout;
-  updatePreviewMapSizes(layout);
-}
-
-function updatePreviewMapSizes(layout) {
   const mapArea = document.querySelector('.preview-map-area');
   if (layout === 'right' || layout === 'left') {
-    mapArea.style.width = '58%';
-    mapArea.style.height = '100%';
+    mapArea.style.width = '58%'; mapArea.style.height = '100%';
   } else {
-    mapArea.style.width = '100%';
-    mapArea.style.height = '56%';
+    mapArea.style.width = '100%'; mapArea.style.height = '56%';
   }
 }
 
-// ─── Style ───────────────────────────────────────────
 function setStyle(style, el) {
   state.style = style;
   document.querySelectorAll('.style-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
 }
 
-// ─── Markdown → Preview ──────────────────────────────
-function updatePreview() {
-  const md = document.getElementById('md-editor').value;
-  const html = marked.parse(md);
-  document.getElementById('rt-preview').innerHTML = html;
+// ═══════════════════════════════════════════
+// Font sizes (req 5)
+// ═══════════════════════════════════════════
+function setFontSize(level, val) {
+  state.fontSizes[level] = Math.max(6, parseInt(val) || 12);
+  applyFontSizesToPreview();
+}
 
-  // Extract first h1 as title
-  const m = md.match(/^#\s+(.+)/m);
+function applyFontSizesToPreview() {
+  const fs = state.fontSizes;
+  // Scale factors: preview card is roughly 44% of export size
+  // realtime preview is roughly 80%
+  document.getElementById('dynamic-font-style').textContent = `
+    /* A4 preview card */
+    .preview-title { font-size:${Math.round(fs.h1 * 0.44)}px !important; }
+    .preview-body h2 { font-size:${Math.round(fs.h2 * 0.52)}px !important; }
+    .preview-body h3 { font-size:${Math.round(fs.h3 * 0.52)}px !important; }
+    .preview-body, .preview-body p, .preview-body li {
+      font-size:${Math.round(fs.body * 0.66)}px !important;
+    }
+    /* Realtime preview */
+    #rt-preview h1 { font-size:${Math.round(fs.h1 * 0.56)}px !important; }
+    #rt-preview h2 { font-size:${Math.round(fs.h2 * 0.84)}px !important; }
+    #rt-preview h3 { font-size:${Math.round(fs.h3 * 0.84)}px !important; }
+    #rt-preview p, #rt-preview li { font-size:${Math.round(fs.body * 0.9)}px !important; }
+  `;
+}
+
+// ═══════════════════════════════════════════
+// Markdown → Preview (req 4: @address@ badge)
+// ═══════════════════════════════════════════
+function mdToHtml(md) {
+  // Replace @addr@ with styled badge BEFORE parsing
+  const withBadges = md.replace(/@([^@\n]+)@/g,
+    '<span class="addr-badge">📍 $1</span>');
+  return marked.parse(withBadges);
+}
+
+// Apply inline font-size styles to exported HTML
+function inlineHtmlFontSizes(html) {
+  const fs = state.fontSizes;
+  return html
+    .replace(/<h1>/gi, `<h1 style="font-size:${fs.h1}px;font-weight:800;line-height:1.2;margin-bottom:14px">`)
+    .replace(/<h2>/gi, `<h2 style="font-size:${fs.h2}px;font-weight:700;margin:12px 0 5px">`)
+    .replace(/<h3>/gi, `<h3 style="font-size:${fs.h3}px;font-weight:600;margin:10px 0 4px">`)
+    .replace(/<p>/gi,  `<p style="font-size:${fs.body}px;line-height:1.85;margin-bottom:7px">`)
+    .replace(/<li>/gi, `<li style="font-size:${fs.body}px;line-height:1.75;margin-bottom:3px">`)
+    .replace(/<blockquote>/gi, `<blockquote style="border-left:3px solid #d63c2f;padding-left:10px;margin:8px 0;color:#8a7a6e;font-style:italic">`);
+}
+
+function updatePreview() {
+  const rawMd = document.getElementById('md-editor').value;
+
+  // Realtime preview (right panel)
+  document.getElementById('rt-preview').innerHTML = mdToHtml(rawMd);
+
+  // Title extraction
+  const m = rawMd.match(/^#\s+(.+)/m);
   const title = m ? m[1] : '';
   document.getElementById('preview-title').textContent = title;
 
-  // Body: everything after the first h1
-  const bodyMd = m ? md.replace(m[0], '').trim() : md;
-  document.getElementById('preview-body').innerHTML = marked.parse(bodyMd);
+  // Body (everything after first H1)
+  const bodyMd = m ? rawMd.slice(rawMd.indexOf(m[0]) + m[0].length).trim() : rawMd;
+  document.getElementById('preview-body').innerHTML = mdToHtml(bodyMd);
+
+  // Schedule @address@ detection
+  scheduleAddrDetect();
 }
 
 function updatePreviewMeta() {
-  const lat = state.lat.toFixed(4);
-  const lng = state.lng.toFixed(4);
-  const meta = `MAPFOLIO / A4\n${lat}°N · ${lng}°E    RADIUS ${state.radius}m`;
+  const meta = `MAPFOLIO / A4\n${state.lat.toFixed(4)}°N · ${state.lng.toFixed(4)}°E    RADIUS ${state.radius}m`;
   document.getElementById('preview-meta').textContent = meta;
   document.getElementById('preview-location').textContent = state.locationName || '—';
 }
 
-// ─── Map snapshot for preview ─────────────────────────
+// ═══════════════════════════════════════════
+// Map snapshot for preview strip
+// ═══════════════════════════════════════════
 let snapshotTimer = null;
 function scheduleMapSnapshot() {
   clearTimeout(snapshotTimer);
@@ -1131,71 +1011,91 @@ async function takeMapSnapshot() {
   try {
     const mapEl = document.getElementById('map');
     const canvas = await html2canvas(mapEl, { useCORS: true, logging: false, scale: 1 });
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     const img = document.getElementById('preview-map-img');
-    img.src = dataUrl;
+    img.src = canvas.toDataURL('image/jpeg', 0.82);
     img.style.display = 'block';
     document.getElementById('preview-placeholder').style.display = 'none';
-  } catch(e) {
-    // silently ignore — preview just shows placeholder
-  }
+  } catch(e) { /* silently ignore */ }
 }
 
-// ─── Photo insert ─────────────────────────────────────
+// ═══════════════════════════════════════════
+// Photo insert
+// ═══════════════════════════════════════════
 function loadPhoto(input) {
   if (!input.files[0]) return;
   const reader = new FileReader();
-  reader.onload = e => {
-    state.photoDataUrl = e.target.result;
-    toast('📷 写真を読み込みました');
-  };
+  reader.onload = e => { state.photoDataUrl = e.target.result; toast('📷 写真を読み込みました'); };
   reader.readAsDataURL(input.files[0]);
 }
 
-// ─── Build A4 DOM for export ──────────────────────────
+// ═══════════════════════════════════════════
+// Build A4 element for export (req 3: aspect ratio fix)
+// ═══════════════════════════════════════════
 async function buildA4Element() {
-  const md = document.getElementById('md-editor').value;
-  const htmlBody = marked.parse(md);
-  const m = md.match(/^#\s+(.+)/m);
+  const rawMd = document.getElementById('md-editor').value;
+  const m = rawMd.match(/^#\s+(.+)/m);
   const title = m ? m[1] : '';
-  const bodyMd = m ? md.replace(m[0], '').trim() : md;
-  const bodyHtml = marked.parse(bodyMd);
+  const bodyMd = m ? rawMd.slice(rawMd.indexOf(m[0]) + m[0].length).trim() : rawMd;
+  const bodyHtml = inlineHtmlFontSizes(mdToHtml(bodyMd));
 
-  // Capture live map
+  // A4 landscape dimensions (px at 96dpi)
+  const A4W = 1123, A4H = 794;
+  const isCol = state.layout === 'right' || state.layout === 'left';
+  // Map area size within A4
+  const mapAreaW = isCol ? Math.round(A4W * 0.58) : A4W;
+  const mapAreaH = isCol ? A4H : Math.round(A4H * 0.56);
+
+  // Capture live map at 2x scale
   let mapImgSrc = '';
   try {
     const mapEl = document.getElementById('map');
-    const canvas = await html2canvas(mapEl, { useCORS: true, logging: false, scale: 2 });
-    mapImgSrc = canvas.toDataURL('image/jpeg', 0.92);
-  } catch(e) {}
+    const rawCanvas = await html2canvas(mapEl, { useCORS: true, logging: false, scale: 2 });
 
-  const isCol = state.layout === 'right' || state.layout === 'left';
-  const flexDir = { right: 'row', left: 'row-reverse', below: 'column', above: 'column-reverse' }[state.layout];
-  const mapW  = isCol ? '58%' : '100%';
-  const mapH  = isCol ? '100%' : '56%';
-  const imgOrPhoto = state.photoDataUrl && !mapImgSrc
-    ? state.photoDataUrl
-    : mapImgSrc;
+    // ── Aspect-ratio fix: centre-crop to exact target ratio ──
+    const targetCanvas = document.createElement('canvas');
+    targetCanvas.width  = mapAreaW * 2;
+    targetCanvas.height = mapAreaH * 2;
+    const ctx = targetCanvas.getContext('2d');
+    const sw = rawCanvas.width, sh = rawCanvas.height;
+    const dstRatio = mapAreaW / mapAreaH;
+    const srcRatio = sw / sh;
+    let sx = 0, sy = 0, cropW = sw, cropH = sh;
+    if (srcRatio > dstRatio) {
+      cropW = sh * dstRatio;
+      sx = (sw - cropW) / 2;
+    } else {
+      cropH = sw / dstRatio;
+      sy = (sh - cropH) / 2;
+    }
+    ctx.drawImage(rawCanvas, sx, sy, cropW, cropH, 0, 0, targetCanvas.width, targetCanvas.height);
+    mapImgSrc = targetCanvas.toDataURL('image/jpeg', 0.92);
+  } catch(e) { /* map capture failed */ }
+
+  const imgSrc = mapImgSrc || state.photoDataUrl || '';
+  const flexDir = { right:'row', left:'row-reverse', below:'column', above:'column-reverse' }[state.layout];
+  const fs = state.fontSizes;
 
   const el = document.createElement('div');
   el.style.cssText = `
-    width:1123px; height:794px;
+    width:${A4W}px; height:${A4H}px;
     display:flex; flex-direction:${flexDir};
     background:#fff; font-family:'Hiragino Sans','Noto Sans JP',sans-serif;
     position:fixed; top:-9999px; left:-9999px; z-index:0;
   `;
 
   el.innerHTML = `
-    <div style="width:${mapW};height:${mapH};background:#e8f0e8;position:relative;overflow:hidden;flex-shrink:0">
-      ${imgOrPhoto ? `<img src="${imgOrPhoto}" style="width:100%;height:100%;object-fit:cover;display:block">` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8aaa8a;font-size:20px">🗺</div>'}
+    <div style="width:${mapAreaW}px;height:${mapAreaH}px;flex-shrink:0;overflow:hidden;background:#e8f0e8">
+      ${imgSrc
+        ? `<img src="${imgSrc}" style="width:${mapAreaW}px;height:${mapAreaH}px;display:block">`
+        : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8aaa8a;font-size:24px">🗺</div>'}
     </div>
-    <div style="flex:1;padding:40px 42px 30px;display:flex;flex-direction:column;overflow:hidden">
-      <div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#8a7a6e;margin-bottom:16px;line-height:1.8">
-        MAPFOLIO / A4 &nbsp;&nbsp; ${state.lat.toFixed(4)}°N · ${state.lng.toFixed(4)}°E &nbsp;&nbsp; RADIUS ${state.radius}m
+    <div style="flex:1;padding:38px 42px 28px;display:flex;flex-direction:column;overflow:hidden">
+      <div style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#8a7a6e;margin-bottom:14px;line-height:1.8">
+        MAPFOLIO / A4 &nbsp; ${state.lat.toFixed(4)}°N · ${state.lng.toFixed(4)}°E &nbsp; RADIUS ${state.radius}m
       </div>
-      <div style="font-size:36px;font-weight:800;line-height:1.2;margin-bottom:20px;color:#2a1f18">${title}</div>
-      <div style="font-size:13px;line-height:1.85;color:#3d3028;flex:1;overflow:hidden">${bodyHtml}</div>
-      <div style="font-size:9px;color:#8a7a6e;margin-top:16px;border-top:1px solid #d4c9bb;padding-top:12px;display:flex;justify-content:space-between">
+      <div style="font-size:${fs.h1}px;font-weight:800;line-height:1.2;margin-bottom:18px;color:#2a1f18">${title}</div>
+      <div style="flex:1;overflow:hidden;color:#3d3028">${bodyHtml}</div>
+      <div style="font-size:8px;color:#8a7a6e;margin-top:14px;border-top:1px solid #d4c9bb;padding-top:10px;display:flex;justify-content:space-between">
         <span>${state.locationName || '—'}</span>
         <span>© OpenStreetMap contributors · Mapfolio</span>
       </div>
@@ -1205,62 +1105,53 @@ async function buildA4Element() {
   return el;
 }
 
-// ─── Export PNG ──────────────────────────────────────
+// ═══════════════════════════════════════════
+// Export PNG / PDF
+// ═══════════════════════════════════════════
 async function exportPNG() {
   showLoading('PNG を生成中...');
   try {
     const el = await buildA4Element();
-    await new Promise(r => setTimeout(r, 200));
+    await delay(200);
     const canvas = await html2canvas(el, {
-      useCORS: true,
-      scale: 2,
-      width: 1123, height: 794,
-      logging: false,
+      useCORS: true, scale: 2, width: 1123, height: 794, logging: false,
     });
     document.body.removeChild(el);
-    const link = document.createElement('a');
-    link.download = `mapfolio_${Date.now()}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    download(canvas.toDataURL('image/png'), `mapfolio_${Date.now()}.png`);
     toast('✅ PNG を保存しました');
-  } catch(e) {
-    toast('エラー: ' + e.message);
-  } finally {
-    hideLoading();
-  }
+  } catch(e) { toast('エラー: ' + e.message); }
+  finally { hideLoading(); }
 }
 
-// ─── Export PDF ──────────────────────────────────────
 async function exportPDF() {
   showLoading('PDF を生成中...');
   try {
     const el = await buildA4Element();
-    await new Promise(r => setTimeout(r, 200));
+    await delay(200);
     const canvas = await html2canvas(el, {
-      useCORS: true,
-      scale: 2,
-      width: 1123, height: 794,
-      logging: false,
+      useCORS: true, scale: 2, width: 1123, height: 794, logging: false,
     });
     document.body.removeChild(el);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 297, 210);
     pdf.save(`mapfolio_${Date.now()}.pdf`);
     toast('✅ PDF を保存しました');
-  } catch(e) {
-    toast('エラー: ' + e.message);
-  } finally {
-    hideLoading();
-  }
+  } catch(e) { toast('エラー: ' + e.message); }
+  finally { hideLoading(); }
 }
 
-// ─── Utility ─────────────────────────────────────────
+// ═══════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function download(dataUrl, filename) {
+  const a = document.createElement('a');
+  a.download = filename; a.href = dataUrl; a.click();
+}
 function toast(msg) {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
+  el.textContent = msg; el.classList.add('show');
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove('show'), 2600);
 }
@@ -1268,16 +1159,18 @@ function showLoading(msg) {
   document.getElementById('loading-msg').textContent = msg || '処理中...';
   document.getElementById('loading').classList.add('show');
 }
-function hideLoading() {
-  document.getElementById('loading').classList.remove('show');
-}
+function hideLoading() { document.getElementById('loading').classList.remove('show'); }
 
-// ─── Init ─────────────────────────────────────────────
+// ═══════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════
 (function init() {
-  // Default markdown
-  document.getElementById('md-editor').value = `# 東京駅 丸の内駅舎
+  document.getElementById('md-editor').value =
+`# 東京駅 丸の内駅舎
 
 赤レンガの駅舎が美しい、東京の玄関口。復原されたドーム天井と行幸通りの趣ある佇まいが、歴史と都市の現在を同時に見せてくれます。
+
+@東京都千代田区丸の内1丁目@
 
 ## 紹介ポイント
 - 午前中は駅舎正面に光が入り、写真が撮りやすい
@@ -1288,11 +1181,10 @@ function hideLoading() {
 
   updatePreview();
   updatePreviewMeta();
-  document.getElementById('preview-location').textContent = '東京駅';
+  applyFontSizesToPreview();
   renderPinList();
-
-  // Take initial snapshot after map loads
-  map.whenReady(() => { setTimeout(takeMapSnapshot, 1500); });
+  document.getElementById('preview-location').textContent = '東京駅';
+  map.whenReady(() => setTimeout(takeMapSnapshot, 1500));
 })();
 </script>
 </body>
