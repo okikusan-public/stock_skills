@@ -560,6 +560,104 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ─── Pin section ─── */
+.pin-search-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.pin-search-row input {
+  flex: 1;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--panel);
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+}
+.pin-search-row input:focus { border-color: #e8920a; }
+.pin-search-row button {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: #e8920a;
+  border: none;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.pin-mode-btn {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--panel);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+  margin-bottom: 8px;
+}
+.pin-mode-btn.active {
+  background: #e8920a;
+  color: #fff;
+  border-color: #e8920a;
+}
+.pin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.pin-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  background: var(--panel);
+  border-radius: 7px;
+  border: 1.5px solid var(--border);
+  font-size: 11px;
+}
+.pin-item .pin-num {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #e8920a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.pin-item .pin-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pin-item .pin-label:hover { color: #e8920a; }
+.pin-item .pin-del {
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.pin-item .pin-del:hover { color: var(--accent); background: #f5dbd9; }
+
+/* Pin mode cursor hint */
+body.pin-adding #map { cursor: crosshair !important; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -595,6 +693,19 @@ body {
         <input type="text" id="search-input" placeholder="東京駅" value="東京駅" onkeydown="if(event.key==='Enter')doSearch()">
         <button onclick="doSearch()">🔍</button>
       </div>
+    </div>
+
+    <!-- Pin section -->
+    <div>
+      <div class="sidebar-section-label">📌 ピンを追加</div>
+      <div class="pin-search-row">
+        <input type="text" id="pin-input" placeholder="場所名・住所で検索" onkeydown="if(event.key==='Enter')addPinBySearch()">
+        <button onclick="addPinBySearch()" title="検索してピン追加">📌</button>
+      </div>
+      <button class="pin-mode-btn" id="pin-mode-btn" onclick="togglePinMode()">
+        🖱 地図クリックでピン追加
+      </button>
+      <div class="pin-list" id="pin-list"></div>
     </div>
 
     <!-- Layout -->
@@ -796,11 +907,119 @@ marker.on('dragend', e => {
 
 map.on('moveend zoomend', () => { syncCoordDisplay(); });
 map.on('click', e => {
+  if (pinMode) {
+    addPin(e.latlng.lat, e.latlng.lng, null);
+    return;
+  }
   state.lat = e.latlng.lat; state.lng = e.latlng.lng;
   marker.setLatLng([state.lat, state.lng]);
   circle.setLatLng([state.lat, state.lng]);
   syncCoordDisplay();
 });
+
+// ─── Pin management ──────────────────────────────────
+const pins = [];     // { id, lat, lng, label, marker }
+let pinMode = false;
+let nextPinId = 1;
+
+function makePinIcon(num) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:22px;height:22px;border-radius:50% 50% 50% 0;
+      background:#e8920a;transform:rotate(-45deg) translate(-5px,-5px);
+      border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);
+      display:flex;align-items:center;justify-content:center;
+    "><span style="transform:rotate(45deg);font-size:9px;font-weight:700;color:#fff;line-height:22px;display:block;text-align:center">${num}</span></div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 22],
+  });
+}
+
+function togglePinMode() {
+  pinMode = !pinMode;
+  const btn = document.getElementById('pin-mode-btn');
+  btn.classList.toggle('active', pinMode);
+  btn.textContent = pinMode ? '✅ クリックでピン追加中（もう一度で解除）' : '🖱 地図クリックでピン追加';
+  document.body.classList.toggle('pin-adding', pinMode);
+}
+
+function addPin(lat, lng, label) {
+  const id = nextPinId++;
+  const defaultLabel = label || `ピン ${id}`;
+  const m = L.marker([lat, lng], { icon: makePinIcon(id), draggable: true })
+    .addTo(map)
+    .bindPopup(`<b>${defaultLabel}</b><br><small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`)
+    .openPopup();
+
+  m.on('dragend', ev => {
+    const p = ev.target.getLatLng();
+    const pin = pins.find(x => x.id === id);
+    if (pin) { pin.lat = p.lat; pin.lng = p.lng; }
+    m.setPopupContent(`<b>${defaultLabel}</b><br><small>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</small>`);
+    scheduleMapSnapshot();
+  });
+
+  pins.push({ id, lat, lng, label: defaultLabel, marker: m });
+  renderPinList();
+  scheduleMapSnapshot();
+  toast(`📌 ${defaultLabel}`);
+}
+
+function removePin(id) {
+  const idx = pins.findIndex(p => p.id === id);
+  if (idx === -1) return;
+  map.removeLayer(pins[idx].marker);
+  pins.splice(idx, 1);
+  renderPinList();
+  scheduleMapSnapshot();
+}
+
+function flyToPin(id) {
+  const pin = pins.find(p => p.id === id);
+  if (!pin) return;
+  map.setView([pin.lat, pin.lng], Math.max(map.getZoom(), 15));
+  pin.marker.openPopup();
+}
+
+function renderPinList() {
+  const list = document.getElementById('pin-list');
+  if (pins.length === 0) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:6px 0">まだピンがありません</div>';
+    return;
+  }
+  list.innerHTML = pins.map((p, i) => `
+    <div class="pin-item">
+      <div class="pin-num">${i + 1}</div>
+      <div class="pin-label" onclick="flyToPin(${p.id})" title="${p.label}">${p.label}</div>
+      <button class="pin-del" onclick="removePin(${p.id})" title="削除">×</button>
+    </div>
+  `).join('');
+}
+
+// ─── Pin search (Nominatim) ──────────────────────────
+async function addPinBySearch() {
+  const q = document.getElementById('pin-input').value.trim();
+  if (!q) return;
+  showLoading('ピンを検索中...');
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=ja`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+    const data = await res.json();
+    if (data.length === 0) { toast('場所が見つかりませんでした'); return; }
+    const place = data[0];
+    const lat = parseFloat(place.lat);
+    const lng = parseFloat(place.lon);
+    const label = place.display_name.split(',')[0];
+    addPin(lat, lng, label);
+    map.setView([lat, lng], Math.max(map.getZoom(), 15));
+    document.getElementById('pin-input').value = '';
+  } catch(e) {
+    toast('検索エラー: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
 
 // ─── Geocoding (Nominatim) ────────────────────────────
 async function doSearch() {
@@ -1070,6 +1289,7 @@ function hideLoading() {
   updatePreview();
   updatePreviewMeta();
   document.getElementById('preview-location').textContent = '東京駅';
+  renderPinList();
 
   // Take initial snapshot after map loads
   map.whenReady(() => { setTimeout(takeMapSnapshot, 1500); });
