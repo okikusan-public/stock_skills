@@ -71,6 +71,96 @@ body {
 .btn-png { background:var(--panel); border:1.5px solid var(--border); color:var(--text); }
 .btn-pdf { background:var(--accent); color:#fff; }
 
+/* ─── Project bar ─── */
+#project-bar {
+  display:flex; align-items:center;
+  padding:0 14px; height:40px;
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0; gap:8px; position:relative;
+}
+.proj-name-wrap {
+  display:flex; align-items:center; gap:4px; position:relative;
+}
+#proj-name-input {
+  padding:4px 8px; border-radius:6px;
+  border:1.5px solid transparent; background:transparent;
+  font-size:13px; font-weight:600; color:var(--text);
+  outline:none; min-width:120px; max-width:200px;
+  cursor:pointer;
+}
+#proj-name-input:hover { border-color:var(--border); background:var(--sidebar); }
+#proj-name-input:focus { border-color:var(--accent); background:#fff; cursor:text; }
+#proj-dropdown-btn {
+  padding:3px 6px; border-radius:5px;
+  border:1.5px solid var(--border); background:transparent;
+  font-size:10px; color:var(--muted); cursor:pointer;
+  transition:all .15s;
+}
+#proj-dropdown-btn:hover { border-color:var(--accent); color:var(--accent); }
+/* Dropdown */
+#proj-dropdown {
+  display:none; position:absolute;
+  top:calc(100% + 4px); left:0; z-index:200;
+  background:#fff; border:1.5px solid var(--border);
+  border-radius:10px; box-shadow:var(--shadow);
+  min-width:240px; overflow:hidden;
+}
+#proj-dropdown.open { display:block; }
+.proj-list-inner { max-height:240px; overflow-y:auto; }
+.proj-item {
+  display:flex; align-items:center; gap:8px;
+  padding:9px 12px; cursor:pointer;
+  border-bottom:1px solid var(--border);
+  transition:background .1s;
+}
+.proj-item:last-child { border-bottom:none; }
+.proj-item:hover { background:var(--bg); }
+.proj-item.current { background:#fdf6ee; }
+.proj-item-icon { font-size:14px; flex-shrink:0; }
+.proj-item-info { flex:1; min-width:0; }
+.proj-item-name {
+  font-size:13px; font-weight:600; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.proj-item-meta { font-size:10px; color:var(--muted); margin-top:1px; }
+.proj-item-del {
+  width:20px; height:20px; border-radius:4px;
+  border:none; background:transparent; color:var(--muted);
+  font-size:14px; cursor:pointer; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  transition:all .15s;
+}
+.proj-item-del:hover { background:#f5dbd9; color:var(--accent); }
+.proj-new-btn {
+  display:flex; align-items:center; gap:6px;
+  padding:10px 12px; width:100%;
+  border:none; background:transparent; cursor:pointer;
+  font-size:13px; color:var(--muted);
+  transition:background .1s;
+}
+.proj-new-btn:hover { background:var(--bg); color:var(--accent); }
+/* Divider */
+.proj-bar-sep {
+  width:1px; height:20px; background:var(--border); flex-shrink:0;
+}
+/* Action buttons */
+.proj-btn {
+  display:flex; align-items:center; gap:4px;
+  padding:5px 11px; border-radius:7px;
+  border:1.5px solid var(--border); background:transparent;
+  font-size:12px; font-weight:600; color:var(--text);
+  cursor:pointer; transition:all .15s; white-space:nowrap;
+}
+.proj-btn:hover { border-color:var(--accent); color:var(--accent); }
+.proj-btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.proj-btn.primary:hover { opacity:.85; }
+.proj-spacer { flex:1; }
+#autosave-status {
+  font-size:10px; color:var(--muted);
+  letter-spacing:.04em; white-space:nowrap;
+}
+
 /* ─── Main ─── */
 #main { display:flex; flex:1; overflow:hidden; }
 
@@ -554,6 +644,29 @@ body.pin-adding #map { cursor:crosshair !important; }
   </div>
 </div><!-- /main -->
 
+<!-- Project bar -->
+<div id="project-bar">
+  <div class="proj-name-wrap">
+    <input type="text" id="proj-name-input" value="新規プロジェクト"
+           title="クリックして名前を編集"
+           onchange="state.projectName=this.value"
+           onblur="state.projectName=this.value">
+    <button id="proj-dropdown-btn" onclick="toggleProjDropdown(event)">▼</button>
+    <div id="proj-dropdown">
+      <div class="proj-list-inner" id="proj-list-inner"></div>
+      <button class="proj-new-btn" onclick="newProject();closeProjDropdown()">＋ 新規プロジェクト</button>
+    </div>
+  </div>
+  <div class="proj-bar-sep"></div>
+  <button class="proj-btn primary" onclick="saveToLocal()">💾 保存</button>
+  <button class="proj-btn" onclick="document.getElementById('import-input').click()">📂 開く</button>
+  <button class="proj-btn" onclick="exportJSON()">⬇ 書き出し</button>
+  <div class="proj-spacer"></div>
+  <span id="autosave-status">—</span>
+  <input type="file" id="import-input" accept=".json" style="display:none"
+         onchange="importJSON(this.files[0]);this.value=''">
+</div>
+
 <!-- Loading -->
 <div id="loading">
   <div class="spinner"></div>
@@ -571,6 +684,8 @@ const state = {
   layout: 'right', style: 'guide',
   locationName: '東京駅', photoDataUrl: null,
   fontSizes: { h1: 36, h2: 18, h3: 14, body: 12 },
+  projectId:   null,
+  projectName: '新規プロジェクト',
 };
 
 // ═══════════════════════════════════════════
@@ -658,14 +773,14 @@ function togglePinMode() {
   document.body.classList.toggle('pin-adding', pinMode);
 }
 
-function addPin(lat, lng, label) {
+function addPin(lat, lng, label, silent = false) {
   const id = nextPinId++;
   const displayNum = pins.length + 1;
   const defaultLabel = label || `ピン ${displayNum}`;
   const m = L.marker([lat, lng], { icon: makePinIcon(displayNum), draggable: true })
     .addTo(map)
-    .bindPopup(`<b>${defaultLabel}</b><br><small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`)
-    .openPopup();
+    .bindPopup(`<b>${defaultLabel}</b><br><small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`);
+  if (!silent) m.openPopup();
 
   m.on('dragend', ev => {
     const pos = ev.target.getLatLng();
@@ -680,7 +795,7 @@ function addPin(lat, lng, label) {
   pins.push({ id, lat, lng, label: defaultLabel, marker: m });
   renumberPins(); // updates icons + textarea
   scheduleMapSnapshot();
-  toast(`📌 ${defaultLabel}`);
+  if (!silent) toast(`📌 ${defaultLabel}`);
 }
 
 function removePin(id) {
@@ -1142,6 +1257,266 @@ async function exportPDF() {
 }
 
 // ═══════════════════════════════════════════
+// Project management
+// ═══════════════════════════════════════════
+const LS_INDEX   = 'mapfolio_index';
+const LS_CURRENT = 'mapfolio_current';
+const LS_PFX     = 'mapfolio_proj_';
+
+// ── Serialise current state (pins without Leaflet markers) ──
+function serializeState() {
+  return {
+    version: 1,
+    name:         state.projectName,
+    savedAt:      new Date().toISOString(),
+    center:       { lat: state.lat, lng: state.lng, zoom: state.zoom },
+    radius:       state.radius,
+    layout:       state.layout,
+    style:        state.style,
+    locationName: state.locationName,
+    fontSizes:    { ...state.fontSizes },
+    markdown:     document.getElementById('md-editor').value,
+    pins:         pins.map(p => ({ label: p.label, lat: p.lat, lng: p.lng })),
+  };
+}
+
+// ── Deserialise and restore full state ──
+function deserializeState(data) {
+  // Clear pins
+  pins.forEach(p => map.removeLayer(p.marker));
+  pins.length = 0;
+  nextPinId = 1;
+  autoPinAddrs.clear();
+
+  // Core state
+  state.lat          = data.center?.lat  ?? 35.6812;
+  state.lng          = data.center?.lng  ?? 139.7671;
+  state.zoom         = data.center?.zoom ?? 14;
+  state.radius       = data.radius       ?? 650;
+  state.layout       = data.layout       ?? 'right';
+  state.style        = data.style        ?? 'guide';
+  state.locationName = data.locationName ?? '';
+  state.projectName  = data.name         ?? '新規プロジェクト';
+  state.fontSizes    = { h1:36, h2:18, h3:14, body:12, ...(data.fontSizes ?? {}) };
+
+  // Map
+  map.setView([state.lat, state.lng], state.zoom);
+  mainMarker.setLatLng([state.lat, state.lng]);
+  radiusCircle.setLatLng([state.lat, state.lng]);
+  radiusCircle.setRadius(state.radius);
+
+  // Markdown
+  document.getElementById('md-editor').value = data.markdown ?? '';
+
+  // Pins (silent — no toast per pin)
+  (data.pins ?? []).forEach(p => addPin(p.lat, p.lng, p.label, true));
+
+  // Sync all UI widgets
+  syncAllUI();
+}
+
+// ── Sync every UI widget to current state ──
+function syncAllUI() {
+  // Project name field
+  document.getElementById('proj-name-input').value = state.projectName;
+  // Coords / zoom
+  syncCoordDisplay();
+  // Radius
+  document.getElementById('radius-slider').value = state.radius;
+  document.getElementById('radius-val').textContent = state.radius + 'm';
+  // Layout buttons
+  document.querySelectorAll('.layout-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['right','left','above','below'][i] === state.layout);
+  });
+  const preview = document.getElementById('a4-preview');
+  preview.className = 'layout-' + state.layout;
+  const mapArea = document.querySelector('.preview-map-area');
+  const isCol = state.layout === 'right' || state.layout === 'left';
+  mapArea.style.width = isCol ? '58%' : '100%';
+  mapArea.style.height = isCol ? '100%' : '56%';
+  // Style tabs
+  document.querySelectorAll('.style-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['guide','memo','photo'][i] === state.style);
+  });
+  // Font sizes
+  ['h1','h2','h3','body'].forEach(k => {
+    const el = document.getElementById('fs-' + k);
+    if (el) el.value = state.fontSizes[k];
+  });
+  // Preview content
+  updatePreview();
+  updatePreviewMeta();
+  applyFontSizesToPreview();
+  renderPinList();
+  scheduleMapSnapshot();
+}
+
+// ── localStorage helpers ──
+function lsIndex() {
+  try { return JSON.parse(localStorage.getItem(LS_INDEX) || '[]'); }
+  catch { return []; }
+}
+
+function saveToLocal(silent = false) {
+  const data = serializeState();
+  let id = state.projectId;
+  if (!id) { id = 'proj_' + Date.now(); state.projectId = id; }
+
+  const entry = { id, name: data.name, savedAt: data.savedAt };
+  const idx = lsIndex();
+  const pos = idx.findIndex(e => e.id === id);
+  if (pos >= 0) idx[pos] = entry; else idx.unshift(entry);
+  localStorage.setItem(LS_INDEX, JSON.stringify(idx));
+  localStorage.setItem(LS_CURRENT, id);
+  try {
+    localStorage.setItem(LS_PFX + id, JSON.stringify(data));
+  } catch (e) {
+    toast('⚠️ 保存容量超過。古いプロジェクトを削除してください。'); return;
+  }
+
+  updateAutosaveStatus();
+  renderProjList();
+  if (!silent) toast('💾 保存しました');
+}
+
+function loadFromLocal(id) {
+  try {
+    const raw = localStorage.getItem(LS_PFX + id);
+    if (!raw) throw new Error('データなし');
+    const data = JSON.parse(raw);
+    state.projectId = id;
+    localStorage.setItem(LS_CURRENT, id);
+    deserializeState(data);
+    closeProjDropdown();
+    toast(`📂 "${data.name}" を開きました`);
+  } catch (e) { toast('読み込みエラー: ' + e.message); }
+}
+
+function deleteProject(id, e) {
+  e.stopPropagation();
+  const idx = lsIndex().filter(p => p.id !== id);
+  localStorage.setItem(LS_INDEX, JSON.stringify(idx));
+  localStorage.removeItem(LS_PFX + id);
+  if (state.projectId === id) {
+    if (idx.length) loadFromLocal(idx[0].id);
+    else             newProject();
+  }
+  renderProjList();
+}
+
+function newProject() {
+  pins.forEach(p => map.removeLayer(p.marker));
+  pins.length = 0; nextPinId = 1; autoPinAddrs.clear();
+  state.projectId   = null;
+  state.projectName = '新規プロジェクト';
+  state.lat = 35.6812; state.lng = 139.7671; state.zoom = 14;
+  state.radius = 650; state.layout = 'right'; state.style = 'guide';
+  state.locationName = ''; state.photoDataUrl = null;
+  state.fontSizes = { h1:36, h2:18, h3:14, body:12 };
+  document.getElementById('md-editor').value = '';
+  map.setView([state.lat, state.lng], 14);
+  mainMarker.setLatLng([state.lat, state.lng]);
+  radiusCircle.setLatLng([state.lat, state.lng]);
+  radiusCircle.setRadius(state.radius);
+  syncAllUI();
+  toast('📄 新規プロジェクト');
+}
+
+// ── Project dropdown ──
+function toggleProjDropdown(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('proj-dropdown');
+  const isOpen = dd.classList.contains('open');
+  if (!isOpen) renderProjList();
+  dd.classList.toggle('open', !isOpen);
+}
+function closeProjDropdown() {
+  document.getElementById('proj-dropdown').classList.remove('open');
+}
+document.addEventListener('click', () => closeProjDropdown());
+
+function renderProjList() {
+  const idx = lsIndex();
+  const inner = document.getElementById('proj-list-inner');
+  if (!idx.length) {
+    inner.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--muted);text-align:center">保存済みプロジェクトはありません</div>';
+    return;
+  }
+  inner.innerHTML = idx.map(p => {
+    const isCur = p.id === state.projectId;
+    const when  = relTime(p.savedAt);
+    return `<div class="proj-item${isCur?' current':''}" onclick="loadFromLocal('${p.id}')">
+      <div class="proj-item-icon">${isCur ? '▸' : '📄'}</div>
+      <div class="proj-item-info">
+        <div class="proj-item-name">${escHtml(p.name)}</div>
+        <div class="proj-item-meta">${when}</div>
+      </div>
+      <button class="proj-item-del" onclick="deleteProject('${p.id}',event)" title="削除">×</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Auto-save ──
+let lastSavedAt = null;
+function updateAutosaveStatus() {
+  lastSavedAt = new Date();
+  document.getElementById('autosave-status').textContent = '⏱ たった今保存';
+}
+setInterval(() => {
+  if (state.projectId) saveToLocal(true);
+  if (lastSavedAt) {
+    document.getElementById('autosave-status').textContent =
+      '⏱ ' + relTime(lastSavedAt.toISOString());
+  }
+}, 30000);
+// Refresh relative-time label every minute
+setInterval(() => {
+  if (lastSavedAt) {
+    document.getElementById('autosave-status').textContent =
+      '⏱ ' + relTime(lastSavedAt.toISOString());
+  }
+}, 60000);
+
+// ── JSON export / import ──
+function exportJSON() {
+  const data = serializeState();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.download = (state.projectName || 'mapfolio').replace(/[\/\\:*?"<>|]/g,'_') + '.mapfolio.json';
+  a.href = url; a.click();
+  URL.revokeObjectURL(url);
+  toast('⬇ 書き出しました');
+}
+
+function importJSON(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.version) throw new Error('Mapfolioファイルではありません');
+      state.projectId = null; // new slot on next save
+      deserializeState(data);
+      toast(`📂 "${data.name}" を読み込みました`);
+    } catch (err) { toast('読み込みエラー: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+// ── Helpers ──
+function relTime(iso) {
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60)   return 'たった今';
+  if (diff < 3600) return Math.floor(diff/60) + '分前';
+  if (diff < 86400)return Math.floor(diff/3600) + '時間前';
+  return Math.floor(diff/86400) + '日前';
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════
 // Utilities
 // ═══════════════════════════════════════════
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1165,7 +1540,7 @@ function hideLoading() { document.getElementById('loading').classList.remove('sh
 // Init
 // ═══════════════════════════════════════════
 (function init() {
-  document.getElementById('md-editor').value =
+  const DEFAULT_MD =
 `# 東京駅 丸の内駅舎
 
 赤レンガの駅舎が美しい、東京の玄関口。復原されたドーム天井と行幸通りの趣ある佇まいが、歴史と都市の現在を同時に見せてくれます。
@@ -1179,6 +1554,23 @@ function hideLoading() { document.getElementById('loading').classList.remove('sh
 
 > 地図は少し引き気味にして、丸の内エリア全体の位置関係が分かる縮図がおすすめです。`;
 
+  // ── Restore last session from localStorage ──
+  const lastId = localStorage.getItem(LS_CURRENT);
+  const idx    = lsIndex();
+  if (lastId && idx.find(e => e.id === lastId)) {
+    try {
+      const raw  = localStorage.getItem(LS_PFX + lastId);
+      const data = JSON.parse(raw);
+      state.projectId = lastId;
+      deserializeState(data);
+      updateAutosaveStatus();
+      map.whenReady(() => setTimeout(takeMapSnapshot, 1500));
+      return;
+    } catch { /* fall through to default */ }
+  }
+
+  // ── First launch: load demo content ──
+  document.getElementById('md-editor').value = DEFAULT_MD;
   updatePreview();
   updatePreviewMeta();
   applyFontSizesToPreview();
