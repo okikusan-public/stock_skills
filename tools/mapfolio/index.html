@@ -363,6 +363,38 @@ body.pin-adding #map { cursor:crosshair !important; }
   font-weight:600; font-style:normal;
 }
 
+/* ── Pin label tooltips ── */
+.pin-label-tt {
+  background:rgba(28,20,14,.82) !important;
+  border:none !important; color:#fff !important;
+  font-size:11px !important; font-weight:600 !important;
+  padding:2px 8px !important; border-radius:4px !important;
+  box-shadow:0 1px 5px rgba(0,0,0,.45) !important;
+  white-space:nowrap !important; pointer-events:none !important;
+}
+.pin-label-tt.leaflet-tooltip-top::before,
+.pin-label-tt.leaflet-tooltip-bottom::before,
+.pin-label-tt.leaflet-tooltip-left::before,
+.pin-label-tt.leaflet-tooltip-right::before { display:none !important; }
+
+/* ── Pin color & label controls ── */
+.pin-options-row {
+  display:flex; align-items:center; gap:6px;
+  font-size:12px; color:var(--muted); margin-top:6px;
+}
+.pin-options-row input[type=checkbox] { accent-color:var(--orange); width:14px; height:14px; cursor:pointer; }
+.pin-options-row label { cursor:pointer; }
+#pin-colors-wrap { margin-top:6px; }
+.pin-color-row { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
+.pin-color-num { font-size:11px; color:var(--muted); min-width:20px; font-weight:600; }
+.pin-dot {
+  width:13px; height:13px; border-radius:50%;
+  cursor:pointer; border:2px solid transparent; flex-shrink:0;
+  transition:transform .12s;
+}
+.pin-dot:hover { transform:scale(1.3); }
+.pin-dot.active { border-color:#fff !important; box-shadow:0 0 0 2px rgba(0,0,0,.5); }
+
 /* ─── Right panel ─── */
 #right-panel {
   width:290px; border-left:1px solid var(--border);
@@ -505,6 +537,11 @@ body.pin-adding #map { cursor:crosshair !important; }
         onblur="parsePinListText()"
         spellcheck="false"></textarea>
       <div class="pin-textarea-hint">書式: ピン名称:緯度,経度（1行1ピン）<br>編集 → フォーカスを外すと地図に反映</div>
+      <div class="pin-options-row">
+        <input type="checkbox" id="pin-label-toggle" onchange="togglePinLabels(this.checked)">
+        <label for="pin-label-toggle">地図にラベル表示</label>
+      </div>
+      <div id="pin-colors-wrap"></div>
     </div>
 
     <!-- A4 配置 -->
@@ -678,11 +715,15 @@ body.pin-adding #map { cursor:crosshair !important; }
 // ═══════════════════════════════════════════
 // State
 // ═══════════════════════════════════════════
+const PIN_COLORS      = ['#e8920a','#d63c2f','#4a90d9','#27ae60','#8e44ad'];
+const PIN_COLOR_NAMES = ['オレンジ','赤','青','緑','紫'];
+
 const state = {
   lat: 35.6812, lng: 139.7671, zoom: 14, radius: 650,
   layout: 'right', style: 'guide',
   locationName: '東京駅', photoDataUrl: null,
   fontSizes: { h1: 36, h2: 18, h3: 14, body: 12 },
+  showPinLabels: false,
   projectId:   null,
   projectName: '新規プロジェクト',
 };
@@ -729,7 +770,7 @@ mainMarker.on('dragend', e => {
   radiusCircle.setLatLng([state.lat, state.lng]);
   syncCoordDisplay();
 });
-map.on('moveend zoomend', () => syncCoordDisplay());
+map.on('moveend zoomend', () => { syncCoordDisplay(); recomputeLabelPositions(); });
 map.on('click', e => {
   if (pinMode) {
     addPin(e.latlng.lat, e.latlng.lng, null);
@@ -749,11 +790,11 @@ let pinMode = false;
 let nextPinId = 1;
 const autoPinAddrs = new Set(); // @addr@ strings already geocoded
 
-function makePinIcon(num) {
+function makePinIcon(num, color = PIN_COLORS[0]) {
   return L.divIcon({
     className: '',
     html: `<div style="
-      width:22px;height:22px;background:#e8920a;
+      width:22px;height:22px;background:${color};
       border-radius:50% 50% 50% 0;
       transform:rotate(-45deg) translate(-5px,-5px);
       border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);
@@ -774,11 +815,12 @@ function togglePinMode() {
   document.body.classList.toggle('pin-adding', pinMode);
 }
 
-function addPin(lat, lng, label, silent = false) {
+function addPin(lat, lng, label, silent = false, color = null) {
   const id = nextPinId++;
   const displayNum = pins.length + 1;
+  const pinColor = color || PIN_COLORS[0];
   const defaultLabel = label || `ピン ${displayNum}`;
-  const m = L.marker([lat, lng], { icon: makePinIcon(displayNum), draggable: true })
+  const m = L.marker([lat, lng], { icon: makePinIcon(displayNum, pinColor), draggable: true })
     .addTo(map)
     .bindPopup(`<b>${defaultLabel}</b><br><small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`);
   if (!silent) m.openPopup();
@@ -790,11 +832,12 @@ function addPin(lat, lng, label, silent = false) {
     pin.lat = pos.lat; pin.lng = pos.lng;
     m.setPopupContent(`<b>${pin.label}</b><br><small>${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}</small>`);
     renderPinList();
+    recomputeLabelPositions();
     scheduleMapSnapshot();
   });
 
-  pins.push({ id, lat, lng, label: defaultLabel, marker: m });
-  renumberPins(); // updates icons + textarea
+  pins.push({ id, lat, lng, label: defaultLabel, color: pinColor, marker: m });
+  renumberPins();
   scheduleMapSnapshot();
   if (!silent) toast(`📌 ${defaultLabel}`);
 }
@@ -811,9 +854,11 @@ function removePin(id) {
 // Re-index all marker icons to match current array order
 function renumberPins() {
   pins.forEach((pin, i) => {
-    pin.marker.setIcon(makePinIcon(i + 1));
+    pin.marker.setIcon(makePinIcon(i + 1, pin.color || PIN_COLORS[0]));
   });
   renderPinList();
+  renderPinColorPickers();
+  recomputeLabelPositions();
 }
 
 // Update the editable textarea (skip if user is editing it)
@@ -859,7 +904,7 @@ function parsePinListText() {
     } else {
       // New line added manually in textarea
       const id = nextPinId++;
-      const m = L.marker([p.lat, p.lng], { icon: makePinIcon(i + 1), draggable: true })
+      const m = L.marker([p.lat, p.lng], { icon: makePinIcon(i + 1, PIN_COLORS[0]), draggable: true })
         .addTo(map)
         .bindPopup(`<b>${p.label}</b><br><small>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</small>`);
       const capturedId = id;
@@ -871,7 +916,7 @@ function parsePinListText() {
         renderPinList();
         scheduleMapSnapshot();
       });
-      pins.push({ id, lat: p.lat, lng: p.lng, label: p.label, marker: m });
+      pins.push({ id, lat: p.lat, lng: p.lng, label: p.label, color: PIN_COLORS[0], marker: m });
     }
   });
 
@@ -996,6 +1041,104 @@ async function doSearch() {
 }
 
 // ═══════════════════════════════════════════
+// Pin label management
+// ═══════════════════════════════════════════
+function clearPinLabels() {
+  pins.forEach(pin => { try { pin.marker.unbindTooltip(); } catch(e){} });
+}
+
+function recomputeLabelPositions() {
+  clearPinLabels();
+  if (!state.showPinLabels || !pins.length) return;
+
+  const placed = []; // placed label boxes {x,y,w,h}
+  const DIRS   = ['top','right','left','bottom'];
+  // anchor offsets from pin centre (px) — moves label centre away from pin
+  const ANCH   = { top:[0,-30], right:[26,0], left:[-26,0], bottom:[0,26] };
+  // Leaflet tooltip offset (fine-tune position)
+  const TTOFF  = { top:L.point(0,-6), right:L.point(6,0), left:L.point(-6,0), bottom:L.point(0,6) };
+
+  pins.forEach(pin => {
+    const pt  = map.latLngToContainerPoint([pin.lat, pin.lng]);
+    const lw  = Math.min(Math.max(pin.label.length * 7 + 14, 40), 120);
+    const lh  = 18;
+    let bestDir = 'top', minScore = Infinity;
+
+    for (const dir of DIRS) {
+      const [ax,ay] = ANCH[dir];
+      const bx = pt.x + ax - lw / 2;
+      const by = pt.y + ay - lh / 2;
+      const box = { x:bx, y:by, w:lw, h:lh };
+
+      let score = 0;
+      // overlap with already-placed labels
+      placed.forEach(b => {
+        if (!(box.x+lw<b.x||b.x+b.w<box.x||box.y+lh<b.y||b.y+b.h<box.y)) score += 30;
+      });
+      // proximity to other pin icons
+      pins.forEach(other => {
+        if (other === pin) return;
+        const ot = map.latLngToContainerPoint([other.lat, other.lng]);
+        const dx = ot.x - pt.x, dy = ot.y - pt.y;
+        const d  = Math.sqrt(dx*dx + dy*dy);
+        if (d < 55) {
+          const inDir = (dir==='right'&&dx>10)||(dir==='left'&&dx<-10)||
+                        (dir==='top'&&dy<-10)||(dir==='bottom'&&dy>10);
+          if (inDir) score += (55 - d) * 0.35;
+        }
+      });
+
+      if (score < minScore) { minScore = score; bestDir = dir; }
+    }
+
+    const [ax,ay] = ANCH[bestDir];
+    placed.push({ x: pt.x+ax - lw/2, y: pt.y+ay - lh/2, w:lw, h:lh });
+
+    pin.marker.bindTooltip(pin.label, {
+      permanent: true,
+      direction: bestDir,
+      className: 'pin-label-tt',
+      offset: TTOFF[bestDir],
+    });
+  });
+}
+
+function togglePinLabels(checked) {
+  state.showPinLabels = checked;
+  recomputeLabelPositions();
+}
+
+// ═══════════════════════════════════════════
+// Pin color management
+// ═══════════════════════════════════════════
+function renderPinColorPickers() {
+  const wrap = document.getElementById('pin-colors-wrap');
+  if (!wrap) return;
+  if (!pins.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">ピン色</div>' +
+    pins.map((pin, i) => `
+      <div class="pin-color-row">
+        <span class="pin-color-num">${i+1}</span>
+        ${PIN_COLORS.map((c, ci) => `
+          <div class="pin-dot${pin.color===c?' active':''}"
+            style="background:${c}" title="${PIN_COLOR_NAMES[ci]}"
+            onclick="setPinColor(${pin.id},${JSON.stringify(c)})"></div>
+        `).join('')}
+      </div>`).join('');
+}
+
+function setPinColor(id, color) {
+  const pin = pins.find(p => p.id === id);
+  if (!pin) return;
+  pin.color = color;
+  const idx = pins.indexOf(pin);
+  pin.marker.setIcon(makePinIcon(idx + 1, color));
+  renderPinColorPickers();
+  recomputeLabelPositions();
+  scheduleMapSnapshot();
+}
+
+// ═══════════════════════════════════════════
 // Map controls
 // ═══════════════════════════════════════════
 function updateRadius(v) {
@@ -1056,21 +1199,25 @@ function setFontSize(level, val) {
 
 function applyFontSizesToPreview() {
   const fs = state.fontSizes;
-  // Scale factors: preview card is roughly 44% of export size
-  // realtime preview is roughly 80%
-  document.getElementById('dynamic-font-style').textContent = `
-    /* A4 preview card */
-    .preview-title { font-size:${Math.round(fs.h1 * 0.44)}px !important; }
-    .preview-body h2 { font-size:${Math.round(fs.h2 * 0.52)}px !important; }
-    .preview-body h3 { font-size:${Math.round(fs.h3 * 0.52)}px !important; }
-    .preview-body, .preview-body p, .preview-body li {
-      font-size:${Math.round(fs.body * 0.66)}px !important;
-    }
+  // Ensure dynamic style is last in head so it wins over static styles
+  let styleEl = document.getElementById('dynamic-font-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'dynamic-font-style';
+  }
+  document.head.appendChild(styleEl); // move to end of head
+  styleEl.textContent = `
+    /* A4 preview card — scaled down (~50% of export) */
+    .preview-title { font-size:${Math.round(fs.h1 * 0.50)}px !important; }
+    .preview-body h1 { font-size:${Math.round(fs.h1 * 0.50)}px !important; font-weight:800; }
+    .preview-body h2 { font-size:${Math.round(fs.h2 * 0.54)}px !important; }
+    .preview-body h3 { font-size:${Math.round(fs.h3 * 0.54)}px !important; }
+    .preview-body p, .preview-body li { font-size:${Math.round(fs.body * 0.68)}px !important; }
     /* Realtime preview */
-    #rt-preview h1 { font-size:${Math.round(fs.h1 * 0.56)}px !important; }
-    #rt-preview h2 { font-size:${Math.round(fs.h2 * 0.84)}px !important; }
-    #rt-preview h3 { font-size:${Math.round(fs.h3 * 0.84)}px !important; }
-    #rt-preview p, #rt-preview li { font-size:${Math.round(fs.body * 0.9)}px !important; }
+    #rt-preview h1 { font-size:${Math.round(fs.h1 * 0.70)}px !important; }
+    #rt-preview h2 { font-size:${Math.round(fs.h2 * 0.88)}px !important; }
+    #rt-preview h3 { font-size:${Math.round(fs.h3 * 0.88)}px !important; }
+    #rt-preview p, #rt-preview li { font-size:${Math.round(fs.body * 0.92)}px !important; }
   `;
 }
 
@@ -1085,15 +1232,16 @@ function mdToHtml(md) {
 }
 
 // Apply inline font-size styles to exported HTML
+// Use \b[^>]* to match Marked's output which may include id/class attributes
 function inlineHtmlFontSizes(html) {
   const fs = state.fontSizes;
   return html
-    .replace(/<h1>/gi, `<h1 style="font-size:${fs.h1}px;font-weight:800;line-height:1.2;margin-bottom:14px">`)
-    .replace(/<h2>/gi, `<h2 style="font-size:${fs.h2}px;font-weight:700;margin:12px 0 5px">`)
-    .replace(/<h3>/gi, `<h3 style="font-size:${fs.h3}px;font-weight:600;margin:10px 0 4px">`)
-    .replace(/<p>/gi,  `<p style="font-size:${fs.body}px;line-height:1.85;margin-bottom:7px">`)
-    .replace(/<li>/gi, `<li style="font-size:${fs.body}px;line-height:1.75;margin-bottom:3px">`)
-    .replace(/<blockquote>/gi, `<blockquote style="border-left:3px solid #d63c2f;padding-left:10px;margin:8px 0;color:#8a7a6e;font-style:italic">`);
+    .replace(/<h1\b[^>]*>/gi, `<h1 style="font-size:${fs.h1}px;font-weight:800;line-height:1.2;margin-bottom:14px">`)
+    .replace(/<h2\b[^>]*>/gi, `<h2 style="font-size:${fs.h2}px;font-weight:700;margin:12px 0 5px">`)
+    .replace(/<h3\b[^>]*>/gi, `<h3 style="font-size:${fs.h3}px;font-weight:600;margin:10px 0 4px">`)
+    .replace(/<p\b[^>]*>/gi,  `<p style="font-size:${fs.body}px;line-height:1.85;margin-bottom:7px">`)
+    .replace(/<li\b[^>]*>/gi, `<li style="font-size:${fs.body}px;line-height:1.75;margin-bottom:3px">`)
+    .replace(/<blockquote\b[^>]*>/gi, `<blockquote style="border-left:3px solid #d63c2f;padding-left:10px;margin:8px 0;color:#8a7a6e;font-style:italic">`);
 }
 
 function updatePreview() {
@@ -1152,60 +1300,62 @@ function loadPhoto(input) {
 }
 
 // ═══════════════════════════════════════════
-// Build A4 element for export (req 3: aspect ratio fix)
+// Multi-page build helpers
 // ═══════════════════════════════════════════
-async function buildA4Element() {
-  const rawMd = document.getElementById('md-editor').value;
-  const m = rawMd.match(/^#\s+(.+)/m);
-  const title = m ? m[1] : '';
-  const bodyMd = m ? rawMd.slice(rawMd.indexOf(m[0]) + m[0].length).trim() : rawMd;
-  const bodyHtml = inlineHtmlFontSizes(mdToHtml(bodyMd));
+const A4W = 1123, A4H = 794;
 
-  // A4 landscape dimensions (px at 96dpi)
-  const A4W = 1123, A4H = 794;
-  const isCol = state.layout === 'right' || state.layout === 'left';
-  // Map area size within A4
+// Capture map canvas, centre-crop to target aspect ratio
+async function captureMapImg(mapAreaW, mapAreaH) {
+  try {
+    const rawCanvas = await html2canvas(document.getElementById('map'), { useCORS:true, logging:false, scale:2 });
+    const tc = document.createElement('canvas');
+    tc.width  = mapAreaW * 2; tc.height = mapAreaH * 2;
+    const ctx = tc.getContext('2d');
+    const sw = rawCanvas.width, sh = rawCanvas.height;
+    const dr = mapAreaW / mapAreaH, sr = sw / sh;
+    let sx=0, sy=0, cw=sw, ch=sh;
+    if (sr > dr) { cw = sh * dr; sx = (sw - cw) / 2; }
+    else          { ch = sw / dr; sy = (sh - ch) / 2; }
+    ctx.drawImage(rawCanvas, sx, sy, cw, ch, 0, 0, tc.width, tc.height);
+    return tc.toDataURL('image/jpeg', 0.92);
+  } catch(e) { return ''; }
+}
+
+// Split HTML content into pages by rendering height
+function splitHtmlAtHeight(html, maxH, containerW, baseFontPx) {
+  const probe = document.createElement('div');
+  probe.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${containerW}px;
+    font-family:'Hiragino Sans','Noto Sans JP',sans-serif;
+    font-size:${baseFontPx}px;line-height:1.85;visibility:hidden`;
+  probe.innerHTML = html;
+  document.body.appendChild(probe);
+
+  const children = Array.from(probe.children);
+  let cumH = 0, cutIdx = children.length;
+  for (let i = 0; i < children.length; i++) {
+    const h = children[i].getBoundingClientRect().height + 8; // 8px margin
+    if (cumH + h > maxH && i > 0) { cutIdx = i; break; }
+    cumH += h;
+  }
+  const html1 = children.slice(0, cutIdx).map(c => c.outerHTML).join('');
+  const html2 = children.slice(cutIdx).map(c => c.outerHTML).join('');
+  document.body.removeChild(probe);
+  return { html1, html2 };
+}
+
+// Build the first A4 element (with map)
+async function buildPage1(title, bodyHtml, mapImgSrc) {
+  const isCol   = state.layout === 'right' || state.layout === 'left';
   const mapAreaW = isCol ? Math.round(A4W * 0.58) : A4W;
   const mapAreaH = isCol ? A4H : Math.round(A4H * 0.56);
-
-  // Capture live map at 2x scale
-  let mapImgSrc = '';
-  try {
-    const mapEl = document.getElementById('map');
-    const rawCanvas = await html2canvas(mapEl, { useCORS: true, logging: false, scale: 2 });
-
-    // ── Aspect-ratio fix: centre-crop to exact target ratio ──
-    const targetCanvas = document.createElement('canvas');
-    targetCanvas.width  = mapAreaW * 2;
-    targetCanvas.height = mapAreaH * 2;
-    const ctx = targetCanvas.getContext('2d');
-    const sw = rawCanvas.width, sh = rawCanvas.height;
-    const dstRatio = mapAreaW / mapAreaH;
-    const srcRatio = sw / sh;
-    let sx = 0, sy = 0, cropW = sw, cropH = sh;
-    if (srcRatio > dstRatio) {
-      cropW = sh * dstRatio;
-      sx = (sw - cropW) / 2;
-    } else {
-      cropH = sw / dstRatio;
-      sy = (sh - cropH) / 2;
-    }
-    ctx.drawImage(rawCanvas, sx, sy, cropW, cropH, 0, 0, targetCanvas.width, targetCanvas.height);
-    mapImgSrc = targetCanvas.toDataURL('image/jpeg', 0.92);
-  } catch(e) { /* map capture failed */ }
-
-  const imgSrc = mapImgSrc || state.photoDataUrl || '';
-  const flexDir = { right:'row', left:'row-reverse', below:'column', above:'column-reverse' }[state.layout];
+  const flexDir  = { right:'row', left:'row-reverse', below:'column', above:'column-reverse' }[state.layout];
   const fs = state.fontSizes;
+  const imgSrc = mapImgSrc || state.photoDataUrl || '';
 
   const el = document.createElement('div');
-  el.style.cssText = `
-    width:${A4W}px; height:${A4H}px;
-    display:flex; flex-direction:${flexDir};
-    background:#fff; font-family:'Hiragino Sans','Noto Sans JP',sans-serif;
-    position:fixed; top:-9999px; left:-9999px; z-index:0;
-  `;
-
+  el.style.cssText = `width:${A4W}px;height:${A4H}px;display:flex;flex-direction:${flexDir};
+    background:#fff;font-family:'Hiragino Sans','Noto Sans JP',sans-serif;
+    position:fixed;top:-9999px;left:-9999px;z-index:0;`;
   el.innerHTML = `
     <div style="width:${mapAreaW}px;height:${mapAreaH}px;flex-shrink:0;overflow:hidden;background:#e8f0e8">
       ${imgSrc
@@ -1222,10 +1372,85 @@ async function buildA4Element() {
         <span>${state.locationName || '—'}</span>
         <span>© OpenStreetMap contributors · Mapfolio</span>
       </div>
-    </div>
-  `;
+    </div>`;
   document.body.appendChild(el);
   return el;
+}
+
+// Build a continuation page (text only)
+function buildPageN(bodyHtml, pageNum, title) {
+  const fs = state.fontSizes;
+  const el = document.createElement('div');
+  el.style.cssText = `width:${A4W}px;height:${A4H}px;padding:38px 56px 28px;
+    display:flex;flex-direction:column;background:#fff;
+    font-family:'Hiragino Sans','Noto Sans JP',sans-serif;
+    position:fixed;top:-9999px;left:-9999px;z-index:0;`;
+  el.innerHTML = `
+    <div style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#8a7a6e;margin-bottom:14px">
+      MAPFOLIO / A4 &nbsp;·&nbsp; ${escHtml(title)} — p.${pageNum}
+    </div>
+    <div style="flex:1;overflow:hidden;color:#3d3028">${bodyHtml}</div>
+    <div style="font-size:8px;color:#8a7a6e;margin-top:14px;border-top:1px solid #d4c9bb;padding-top:10px;display:flex;justify-content:space-between">
+      <span>${escHtml(state.locationName || '—')}</span>
+      <span>© OpenStreetMap contributors · Mapfolio · p.${pageNum}</span>
+    </div>`;
+  document.body.appendChild(el);
+  return el;
+}
+
+// Build all page elements (returns array of DOM elements, caller must remove them)
+async function buildAllPages() {
+  const rawMd = document.getElementById('md-editor').value;
+  const m = rawMd.match(/^#\s+(.+)/m);
+  const title   = m ? m[1] : '';
+  const bodyMd  = m ? rawMd.slice(rawMd.indexOf(m[0]) + m[0].length).trim() : rawMd;
+  const bodyHtml = inlineHtmlFontSizes(mdToHtml(bodyMd));
+  const fs = state.fontSizes;
+
+  const isCol    = state.layout === 'right' || state.layout === 'left';
+  const mapAreaW = isCol ? Math.round(A4W * 0.58) : A4W;
+  const mapAreaH = isCol ? A4H : Math.round(A4H * 0.56);
+  const textInnerW = (A4W - mapAreaW) - 84; // padding 42px each side
+  // Available body height on page 1
+  const p1AvailH = A4H - 38 - 28 - 30 - (fs.h1 + 18) - 36; // pads + meta + title + footer
+  const pNAvailH = A4H - 38 - 28 - 30 - 36;                 // pads + meta + footer
+
+  const mapImgSrc = await captureMapImg(mapAreaW, mapAreaH);
+
+  // Check if body fits on page 1
+  const probe = document.createElement('div');
+  probe.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${textInnerW}px;
+    font-family:'Hiragino Sans','Noto Sans JP',sans-serif;font-size:${fs.body}px;visibility:hidden`;
+  probe.innerHTML = bodyHtml;
+  document.body.appendChild(probe);
+  const totalH = probe.scrollHeight;
+  document.body.removeChild(probe);
+
+  const pages = [];
+  if (totalH <= p1AvailH) {
+    pages.push(await buildPage1(title, bodyHtml, mapImgSrc));
+    return pages;
+  }
+
+  // Split content across pages
+  const { html1, html2: rest1 } = splitHtmlAtHeight(bodyHtml, p1AvailH, textInnerW, fs.body);
+  pages.push(await buildPage1(title, html1, mapImgSrc));
+
+  let remaining = rest1;
+  for (let pn = 2; remaining.trim() && pn <= 12; pn++) {
+    const { html1: cur, html2: rest } = splitHtmlAtHeight(remaining, pNAvailH, A4W - 112, fs.body);
+    pages.push(buildPageN(cur || remaining, pn, title));
+    remaining = rest;
+  }
+  return pages;
+}
+
+// Legacy alias for single-page (used where only one element is needed)
+async function buildA4Element() {
+  const pages = await buildAllPages();
+  // Remove extra pages from DOM except the first
+  pages.slice(1).forEach(el => document.body.removeChild(el));
+  return pages[0];
 }
 
 // ═══════════════════════════════════════════
@@ -1234,14 +1459,18 @@ async function buildA4Element() {
 async function exportPNG() {
   showLoading('PNG を生成中...');
   try {
-    const el = await buildA4Element();
+    const pages = await buildAllPages();
     await delay(200);
-    const canvas = await html2canvas(el, {
-      useCORS: true, scale: 2, width: 1123, height: 794, logging: false,
-    });
-    document.body.removeChild(el);
-    download(canvas.toDataURL('image/png'), `mapfolio_${Date.now()}.png`);
-    toast('✅ PNG を保存しました');
+    const ts = Date.now();
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await html2canvas(pages[i], {
+        useCORS:true, scale:2, width:A4W, height:A4H, logging:false,
+      });
+      document.body.removeChild(pages[i]);
+      const suffix = pages.length > 1 ? `_p${i+1}` : '';
+      download(canvas.toDataURL('image/png'), `mapfolio_${ts}${suffix}.png`);
+    }
+    toast(`✅ PNG を保存しました${pages.length > 1 ? ` (${pages.length}ページ)` : ''}`);
   } catch(e) { toast('エラー: ' + e.message); }
   finally { hideLoading(); }
 }
@@ -1249,17 +1478,20 @@ async function exportPNG() {
 async function exportPDF() {
   showLoading('PDF を生成中...');
   try {
-    const el = await buildA4Element();
+    const pages = await buildAllPages();
     await delay(200);
-    const canvas = await html2canvas(el, {
-      useCORS: true, scale: 2, width: 1123, height: 794, logging: false,
-    });
-    document.body.removeChild(el);
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 297, 210);
+    const pdf = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+    for (let i = 0; i < pages.length; i++) {
+      if (i > 0) pdf.addPage();
+      const canvas = await html2canvas(pages[i], {
+        useCORS:true, scale:2, width:A4W, height:A4H, logging:false,
+      });
+      document.body.removeChild(pages[i]);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 297, 210);
+    }
     pdf.save(`mapfolio_${Date.now()}.pdf`);
-    toast('✅ PDF を保存しました');
+    toast(`✅ PDF を保存しました${pages.length > 1 ? ` (${pages.length}ページ)` : ''}`);
   } catch(e) { toast('エラー: ' + e.message); }
   finally { hideLoading(); }
 }
@@ -1283,8 +1515,9 @@ function serializeState() {
     style:        state.style,
     locationName: state.locationName,
     fontSizes:    { ...state.fontSizes },
+    showPinLabels: state.showPinLabels,
     markdown:     document.getElementById('md-editor').value,
-    pins:         pins.map(p => ({ label: p.label, lat: p.lat, lng: p.lng })),
+    pins:         pins.map(p => ({ label: p.label, lat: p.lat, lng: p.lng, color: p.color || PIN_COLORS[0] })),
   };
 }
 
@@ -1306,6 +1539,7 @@ function deserializeState(data) {
   state.locationName = data.locationName ?? '';
   state.projectName  = data.name         ?? '新規プロジェクト';
   state.fontSizes    = { h1:36, h2:18, h3:14, body:12, ...(data.fontSizes ?? {}) };
+  state.showPinLabels = data.showPinLabels ?? false;
 
   // Map
   map.setView([state.lat, state.lng], state.zoom);
@@ -1317,7 +1551,7 @@ function deserializeState(data) {
   document.getElementById('md-editor').value = data.markdown ?? '';
 
   // Pins (silent — no toast per pin)
-  (data.pins ?? []).forEach(p => addPin(p.lat, p.lng, p.label, true));
+  (data.pins ?? []).forEach(p => addPin(p.lat, p.lng, p.label, true, p.color ?? null));
 
   // Sync all UI widgets
   syncAllUI();
@@ -1351,11 +1585,15 @@ function syncAllUI() {
     const el = document.getElementById('fs-' + k);
     if (el) el.value = state.fontSizes[k];
   });
+  // Pin label toggle
+  const ltEl = document.getElementById('pin-label-toggle');
+  if (ltEl) ltEl.checked = state.showPinLabels;
   // Preview content
   updatePreview();
   updatePreviewMeta();
   applyFontSizesToPreview();
   renderPinList();
+  renderPinColorPickers();
   scheduleMapSnapshot();
 }
 
@@ -1421,6 +1659,7 @@ function newProject() {
   state.radius = 650; state.layout = 'right'; state.style = 'guide';
   state.locationName = ''; state.photoDataUrl = null;
   state.fontSizes = { h1:36, h2:18, h3:14, body:12 };
+  state.showPinLabels = false;
   document.getElementById('md-editor').value = '';
   map.setView([state.lat, state.lng], 14);
   mainMarker.setLatLng([state.lat, state.lng]);
