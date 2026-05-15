@@ -440,6 +440,14 @@ html, body {
     </div>
   </div>
   <div class="p-section" style="margin-top:14px">
+    <div class="p-label">縮尺（ズームレベル）</div>
+    <div class="slider-wrap">
+      <input type="range" id="zoom-slider" min="1" max="19" step="1" value="14"
+             oninput="updateZoom(this.value)">
+      <span class="slider-val" id="zoom-val">z14</span>
+    </div>
+  </div>
+  <div class="p-section" style="margin-top:14px">
     <div class="p-label">🔡 フォントサイズ (pt)</div>
     <div class="fs-grid">
       <div class="fs-item">
@@ -536,7 +544,12 @@ mainMarker.on('dragend', e => {
   radiusCircle.setLatLng([state.lat, state.lng]);
   updateMiniMeta(); scheduleSnapshot();
 });
-map.on('moveend zoomend', () => { state.zoom = map.getZoom(); updateMiniMeta(); scheduleSnapshot(); });
+map.on('moveend zoomend', () => {
+  const z=map.getZoom(); state.zoom=z;
+  const sl=document.getElementById('zoom-slider');
+  if(sl){ sl.value=z; document.getElementById('zoom-val').textContent='z'+z; }
+  updateMiniMeta(); scheduleSnapshot();
+});
 map.on('click', e => {
   if (pinMode) { addPin(e.latlng.lat, e.latlng.lng, null); return; }
   state.lat = e.latlng.lat; state.lng = e.latlng.lng;
@@ -753,6 +766,12 @@ function updateRadius(v) {
   radiusCircle.setRadius(state.radius);
   updateMiniMeta();
 }
+function updateZoom(v) {
+  const z=parseInt(v);
+  state.zoom=z;
+  document.getElementById('zoom-val').textContent='z'+z;
+  map.setZoom(z);
+}
 function setFontSize(k,v) {
   state.fontSizes[k]=Math.max(6,parseInt(v)||12);
   applyFontSizes();
@@ -929,6 +948,8 @@ setInterval(()=>{ if(state.projectId) saveToLocal(true); },30000);
       (data.pins||[]).forEach(p=>addPin(p.lat,p.lng,p.label,true));
       document.getElementById('radius-slider').value=state.radius;
       document.getElementById('radius-val').textContent=state.radius+'m';
+      document.getElementById('zoom-slider').value=state.zoom;
+      document.getElementById('zoom-val').textContent='z'+state.zoom;
       document.querySelectorAll('.layout-card').forEach(c=>c.classList.toggle('active',c.dataset.layout===state.layout));
       document.getElementById('mini-preview').className='layout-'+state.layout;
       ['h1','h2','h3','body'].forEach(k=>{const el=document.getElementById('fs-'+k);if(el)el.value=state.fontSizes[k];});
