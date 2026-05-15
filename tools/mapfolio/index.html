@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapfolio — OSM Document Studio</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="lib/leaflet.css">
+<script src="lib/leaflet.js"></script>
+<!-- Marked (Markdown parser) -->
+<script src="lib/marked.min.js"></script>
+<!-- html2canvas -->
+<script src="lib/html2canvas.min.js"></script>
+<!-- jsPDF -->
+<script src="lib/jspdf.umd.min.js"></script>
+
+<!-- Dynamic font sizes (updated by JS) -->
+<style id="dynamic-font-style"></style>
+
+<style>
+/* ─── Design tokens ─── */
+:root {
+  --bg:      #ede6da;
+  --panel:   #f5efe5;
+  --sidebar: #e8dfd1;
+  --accent:  #d63c2f;
+  --orange:  #e8920a;
+  --text:    #2a1f18;
+  --muted:   #8a7a6e;
+  --border:  #d4c9bb;
+  --radius:  10px;
+  --shadow:  0 2px 12px rgba(0,0,0,.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Topbar ─── */
+#topbar {
+  display: flex; align-items: center;
+  padding: 0 18px; height: 52px;
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; gap: 12px;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon {
+  width: 34px; height: 34px; background: var(--accent);
+  border-radius: 8px; display: flex; align-items: center;
+  justify-content: center; color: #fff; font-size: 18px;
+}
+.brand-sub  { font-size: 9px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); line-height:1; }
+.brand-name { font-size: 20px; font-weight:700; letter-spacing:.02em; line-height:1; }
+.spacer { flex: 1; }
+.btn-export {
+  display:flex; align-items:center; gap:6px;
+  padding:7px 16px; border-radius:var(--radius);
+  border:none; font-size:13px; font-weight:600;
+  cursor:pointer; transition:opacity .15s;
+}
+.btn-export:hover { opacity:.85; }
+.btn-png { background:var(--panel); border:1.5px solid var(--border); color:var(--text); }
+.btn-pdf { background:var(--accent); color:#fff; }
+
+/* ─── Project bar ─── */
+#project-bar {
+  display:flex; align-items:center;
+  padding:0 14px; height:40px;
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0; gap:8px; position:relative;
+}
+.proj-name-wrap {
+  display:flex; align-items:center; gap:4px; position:relative;
+}
+#proj-name-input {
+  padding:4px 8px; border-radius:6px;
+  border:1.5px solid transparent; background:transparent;
+  font-size:13px; font-weight:600; color:var(--text);
+  outline:none; min-width:120px; max-width:200px;
+  cursor:pointer;
+}
+#proj-name-input:hover { border-color:var(--border); background:var(--sidebar); }
+#proj-name-input:focus { border-color:var(--accent); background:#fff; cursor:text; }
+#proj-dropdown-btn {
+  padding:3px 6px; border-radius:5px;
+  border:1.5px solid var(--border); background:transparent;
+  font-size:10px; color:var(--muted); cursor:pointer;
+  transition:all .15s;
+}
+#proj-dropdown-btn:hover { border-color:var(--accent); color:var(--accent); }
+/* Dropdown */
+#proj-dropdown {
+  display:none; position:absolute;
+  top:calc(100% + 4px); left:0; z-index:200;
+  background:#fff; border:1.5px solid var(--border);
+  border-radius:10px; box-shadow:var(--shadow);
+  min-width:240px; overflow:hidden;
+}
+#proj-dropdown.open { display:block; }
+.proj-list-inner { max-height:240px; overflow-y:auto; }
+.proj-item {
+  display:flex; align-items:center; gap:8px;
+  padding:9px 12px; cursor:pointer;
+  border-bottom:1px solid var(--border);
+  transition:background .1s;
+}
+.proj-item:last-child { border-bottom:none; }
+.proj-item:hover { background:var(--bg); }
+.proj-item.current { background:#fdf6ee; }
+.proj-item-icon { font-size:14px; flex-shrink:0; }
+.proj-item-info { flex:1; min-width:0; }
+.proj-item-name {
+  font-size:13px; font-weight:600; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.proj-item-meta { font-size:10px; color:var(--muted); margin-top:1px; }
+.proj-item-del {
+  width:20px; height:20px; border-radius:4px;
+  border:none; background:transparent; color:var(--muted);
+  font-size:14px; cursor:pointer; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  transition:all .15s;
+}
+.proj-item-del:hover { background:#f5dbd9; color:var(--accent); }
+.proj-new-btn {
+  display:flex; align-items:center; gap:6px;
+  padding:10px 12px; width:100%;
+  border:none; background:transparent; cursor:pointer;
+  font-size:13px; color:var(--muted);
+  transition:background .1s;
+}
+.proj-new-btn:hover { background:var(--bg); color:var(--accent); }
+/* Divider */
+.proj-bar-sep {
+  width:1px; height:20px; background:var(--border); flex-shrink:0;
+}
+/* Action buttons */
+.proj-btn {
+  display:flex; align-items:center; gap:4px;
+  padding:5px 11px; border-radius:7px;
+  border:1.5px solid var(--border); background:transparent;
+  font-size:12px; font-weight:600; color:var(--text);
+  cursor:pointer; transition:all .15s; white-space:nowrap;
+}
+.proj-btn:hover { border-color:var(--accent); color:var(--accent); }
+.proj-btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.proj-btn.primary:hover { opacity:.85; }
+.proj-spacer { flex:1; }
+#autosave-status {
+  font-size:10px; color:var(--muted);
+  letter-spacing:.04em; white-space:nowrap;
+}
+
+/* ─── Main ─── */
+#main { display:flex; flex:1; overflow:hidden; }
+
+/* ─── Sidebar ─── */
+#sidebar {
+  width:240px; background:var(--sidebar);
+  border-right:1px solid var(--border);
+  overflow-y:auto; flex-shrink:0;
+  padding:14px 13px;
+  display:flex; flex-direction:column; gap:16px;
+}
+.sec-label {
+  font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--muted); font-weight:700; margin-bottom:7px;
+  display:flex; align-items:center; gap:5px;
+}
+
+/* Search */
+.search-box { display:flex; gap:6px; }
+.search-box input {
+  flex:1; padding:8px 10px; border-radius:8px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:13px; color:var(--text); outline:none;
+}
+.search-box input:focus { border-color:var(--accent); }
+.search-box button {
+  width:34px; height:34px; border-radius:8px;
+  background:var(--accent); border:none; color:#fff;
+  cursor:pointer; display:flex; align-items:center;
+  justify-content:center; font-size:15px;
+}
+
+/* Pin section */
+.pin-search-row { display:flex; gap:6px; margin-bottom:6px; }
+.pin-search-row input {
+  flex:1; padding:7px 9px; border-radius:8px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:12px; color:var(--text); outline:none;
+}
+.pin-search-row input:focus { border-color:var(--orange); }
+.pin-search-row button {
+  width:32px; height:32px; border-radius:8px;
+  background:var(--orange); border:none; color:#fff;
+  font-size:14px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.pin-mode-btn {
+  width:100%; padding:6px 10px; border-radius:8px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:11px; font-weight:600; color:var(--muted);
+  cursor:pointer; transition:all .15s; margin-bottom:7px;
+}
+.pin-mode-btn.active { background:var(--orange); color:#fff; border-color:var(--orange); }
+
+/* Editable pin textarea */
+#pin-textarea {
+  width:100%; min-height:70px; max-height:160px;
+  padding:8px 9px; border-radius:8px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-family:'Menlo','Consolas',monospace; font-size:11px;
+  line-height:1.7; color:var(--text); resize:vertical; outline:none;
+}
+#pin-textarea:focus { border-color:var(--orange); }
+.pin-textarea-hint {
+  font-size:10px; color:var(--muted); margin-top:4px; line-height:1.5;
+}
+body.pin-adding #map { cursor:crosshair !important; }
+
+/* Layout buttons */
+.layout-btn {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 11px; border-radius:8px;
+  border:1.5px solid transparent; background:var(--panel);
+  cursor:pointer; font-size:12px; color:var(--text);
+  margin-bottom:5px; transition:all .15s; text-align:left; width:100%;
+}
+.layout-btn:last-child { margin-bottom:0; }
+.layout-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.layout-btn:not(.active):hover { border-color:var(--accent); background:#f0e8dc; }
+.layout-icon {
+  width:28px; height:20px; border-radius:3px;
+  border:1.5px solid currentColor;
+  display:flex; flex-shrink:0; overflow:hidden;
+}
+.layout-icon .map-part  { background:rgba(100,160,120,.5); }
+.layout-icon .text-part { background:rgba(180,140,100,.35); }
+.layout-btn.active .map-part  { background:rgba(255,255,255,.45); }
+.layout-btn.active .text-part { background:rgba(255,255,255,.25); }
+.li-right  .map-part  { width:60%; height:100%; }
+.li-right  .text-part { flex:1; height:100%; }
+.li-left   .text-part { width:40%; height:100%; }
+.li-left   .map-part  { flex:1; height:100%; }
+.li-below  { flex-direction:column; }
+.li-below  .map-part  { width:100%; height:55%; }
+.li-below  .text-part { width:100%; flex:1; }
+.li-above  { flex-direction:column; }
+.li-above  .text-part { width:100%; height:45%; }
+.li-above  .map-part  { width:100%; flex:1; }
+.layout-btn .lbl { font-size:12px; font-weight:600; line-height:1.2; }
+.layout-btn .lbl small { display:block; font-size:10px; font-weight:400; opacity:.7; }
+
+/* Radius / zoom */
+.slider-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+.slider-row input[type=range] { flex:1; accent-color:var(--accent); }
+.slider-val { font-size:12px; font-weight:600; color:var(--accent); min-width:42px; }
+.coords-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.coord-box label { font-size:10px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
+.coord-box input {
+  width:100%; padding:5px 7px; border-radius:6px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:12px; color:var(--text); outline:none;
+}
+.coord-box input:focus { border-color:var(--accent); }
+.zoom-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+.zoom-row label { color:var(--muted); font-size:10px; text-transform:uppercase; }
+.zoom-val { font-size:12px; font-weight:600; color:var(--accent); min-width:32px; }
+
+/* Style tabs */
+.style-tabs { display:flex; gap:6px; }
+.style-tab {
+  flex:1; padding:6px 4px; border-radius:7px;
+  border:1.5px solid var(--border); background:var(--panel);
+  font-size:11px; text-align:center; cursor:pointer;
+  font-weight:600; color:var(--muted); transition:all .15s;
+}
+.style-tab.active { background:var(--text); color:#fff; border-color:var(--text); }
+
+/* ─── Map panel ─── */
+#map-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+#map { flex:1; }
+
+/* Preview strip */
+#preview-strip {
+  height:280px; background:var(--bg);
+  border-top:1px solid var(--border);
+  overflow-y:auto; padding:12px 18px; flex-shrink:0;
+}
+.strip-header {
+  font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--accent); font-weight:700; margin-bottom:5px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.strip-header .dims { color:var(--muted); font-size:10px; }
+#preview-strip h3 { font-size:13px; font-weight:700; margin-bottom:8px; }
+
+/* A4 preview card */
+#a4-preview {
+  background:#fff; box-shadow:var(--shadow); border-radius:6px;
+  overflow:hidden; width:100%; max-width:660px;
+  margin:0 auto; aspect-ratio:297/210; display:flex; position:relative;
+}
+#a4-preview.layout-right  { flex-direction:row; }
+#a4-preview.layout-left   { flex-direction:row-reverse; }
+#a4-preview.layout-below  { flex-direction:column; }
+#a4-preview.layout-above  { flex-direction:column-reverse; }
+
+.preview-map-area {
+  background:#e8f0e8; position:relative;
+  overflow:hidden; flex-shrink:0;
+}
+#a4-preview.layout-right .preview-map-area,
+#a4-preview.layout-left  .preview-map-area { width:58%; height:100%; }
+#a4-preview.layout-below .preview-map-area,
+#a4-preview.layout-above .preview-map-area { width:100%; height:56%; }
+
+#preview-map-img { width:100%; height:100%; object-fit:cover; display:block; }
+.preview-placeholder {
+  width:100%; height:100%; display:flex;
+  align-items:center; justify-content:center;
+  color:#8aaa8a; font-size:11px;
+}
+.preview-text-area {
+  flex:1; padding:12px 14px 8px;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.preview-meta {
+  font-size:7px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:5px; line-height:1.6;
+}
+.preview-title {
+  font-weight:800; line-height:1.25; margin-bottom:6px; color:var(--text);
+}
+.preview-body { line-height:1.65; color:#3d3028; flex:1; overflow:hidden; }
+.preview-body h2 { font-weight:700; margin:4px 0 2px; }
+.preview-body h3 { font-weight:700; margin:3px 0 2px; }
+.preview-body ul { padding-left:12px; }
+.preview-body li { margin-bottom:2px; }
+.preview-body blockquote { border-left:2px solid var(--accent); padding-left:6px; margin:3px 0; color:var(--muted); font-style:italic; }
+.preview-footer {
+  font-size:7px; color:var(--muted); margin-top:5px;
+  border-top:1px solid var(--border); padding-top:4px;
+  display:flex; justify-content:space-between;
+}
+
+/* Address badge */
+.addr-badge {
+  display:inline-flex; align-items:center; gap:3px;
+  background:#fff3e0; color:#b36800; border:1px solid #f0b849;
+  border-radius:4px; padding:1px 6px; font-size:.9em;
+  font-weight:600; font-style:normal;
+}
+
+/* ── Pin label tooltips ── */
+.pin-label-tt {
+  background:rgba(28,20,14,.82) !important;
+  border:none !important; color:#fff !important;
+  font-size:11px !important; font-weight:600 !important;
+  padding:2px 8px !important; border-radius:4px !important;
+  box-shadow:0 1px 5px rgba(0,0,0,.45) !important;
+  white-space:nowrap !important; pointer-events:none !important;
+}
+.pin-label-tt.leaflet-tooltip-top::before,
+.pin-label-tt.leaflet-tooltip-bottom::before,
+.pin-label-tt.leaflet-tooltip-left::before,
+.pin-label-tt.leaflet-tooltip-right::before { display:none !important; }
+
+/* ── Pin color & label controls ── */
+.pin-options-row {
+  display:flex; align-items:center; gap:6px;
+  font-size:12px; color:var(--muted); margin-top:6px;
+}
+.pin-options-row input[type=checkbox] { accent-color:var(--orange); width:14px; height:14px; cursor:pointer; }
+.pin-options-row label { cursor:pointer; }
+#pin-colors-wrap { margin-top:6px; }
+.pin-color-row { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
+.pin-color-num { font-size:11px; color:var(--muted); min-width:20px; font-weight:600; }
+.pin-dot {
+  width:13px; height:13px; border-radius:50%;
+  cursor:pointer; border:2px solid transparent; flex-shrink:0;
+  transition:transform .12s;
+}
+.pin-dot:hover { transform:scale(1.3); }
+.pin-dot.active { border-color:#fff !important; box-shadow:0 0 0 2px rgba(0,0,0,.5); }
+
+/* ─── Right panel ─── */
+#right-panel {
+  width:290px; border-left:1px solid var(--border);
+  background:var(--panel); display:flex; flex-direction:column;
+  overflow:hidden; flex-shrink:0;
+}
+.rp-sec {
+  padding:12px 14px; border-bottom:1px solid var(--border);
+}
+.rp-sec:last-child { border-bottom:none; flex:1; overflow:hidden; display:flex; flex-direction:column; }
+
+#md-editor {
+  width:100%; flex:1; min-height:180px;
+  border:1.5px solid var(--border); border-radius:8px;
+  padding:9px; font-family:'Menlo','Consolas',monospace;
+  font-size:12px; line-height:1.65; resize:none;
+  background:#fffdf9; color:var(--text); outline:none; margin-top:5px;
+}
+#md-editor:focus { border-color:var(--accent); }
+
+.photo-btn {
+  width:100%; padding:8px; margin-top:7px; border-radius:8px;
+  border:1.5px dashed var(--border); background:transparent;
+  font-size:12px; color:var(--muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  transition:all .15s;
+}
+.photo-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Font size grid */
+.fs-grid {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:6px; margin-top:6px;
+}
+.fs-item { display:flex; flex-direction:column; gap:3px; }
+.fs-item label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+.fs-item input[type=number] {
+  width:100%; padding:4px 6px; border-radius:6px;
+  border:1.5px solid var(--border); background:#fffdf9;
+  font-size:12px; font-weight:600; color:var(--text); outline:none;
+}
+.fs-item input[type=number]:focus { border-color:var(--accent); }
+
+/* Realtime preview */
+#rt-preview {
+  flex:1; overflow-y:auto; padding:9px;
+  background:#fffdf9; border:1.5px solid var(--border);
+  border-radius:8px; margin-top:5px;
+  font-size:13px; line-height:1.7; color:var(--text);
+}
+#rt-preview h1 { font-weight:800; margin-bottom:7px; }
+#rt-preview h2 { font-weight:700; margin:9px 0 4px; }
+#rt-preview h3 { font-weight:600; margin:7px 0 3px; }
+#rt-preview ul { padding-left:15px; }
+#rt-preview li { margin-bottom:3px; }
+#rt-preview li::marker { color:var(--accent); }
+#rt-preview blockquote {
+  border-left:3px solid var(--accent); padding-left:9px;
+  margin:7px 0; color:var(--muted); font-style:italic;
+}
+#rt-preview p { margin-bottom:5px; }
+#rt-preview strong { color:var(--accent); }
+
+/* ─── Toast / Loading ─── */
+#toast {
+  position:fixed; bottom:24px; left:50%;
+  transform:translateX(-50%) translateY(60px);
+  background:#2a1f18; color:#fff;
+  padding:9px 22px; border-radius:30px;
+  font-size:13px; font-weight:600; opacity:0;
+  transition:all .3s; z-index:9999; pointer-events:none;
+}
+#toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+#loading {
+  display:none; position:fixed; inset:0;
+  background:rgba(240,232,220,.75); z-index:9998;
+  align-items:center; justify-content:center;
+  flex-direction:column; gap:12px;
+  font-size:14px; font-weight:600; color:var(--text);
+}
+#loading.show { display:flex; }
+.spinner {
+  width:36px; height:36px; border:3px solid var(--border);
+  border-top-color:var(--accent); border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div id="topbar">
+  <div class="logo">
+    <div class="logo-icon">📍</div>
+    <div>
+      <div class="brand-sub">OSM Document Studio</div>
+      <div class="brand-name">Mapfolio</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn-export btn-png" onclick="exportPNG()">📷 PNG保存</button>
+  <button class="btn-export btn-pdf" onclick="exportPDF()">📄 PDF保存</button>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+  <!-- ── Left Sidebar ── -->
+  <div id="sidebar">
+
+    <!-- 場所検索 -->
+    <div>
+      <div class="sec-label">🔍 場所検索</div>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="東京駅" value="東京駅"
+               onkeydown="if(event.key==='Enter')doSearch()">
+        <button onclick="doSearch()">🔍</button>
+      </div>
+    </div>
+
+    <!-- ピンを追加 -->
+    <div>
+      <div class="sec-label">📌 ピンを追加</div>
+      <div class="pin-search-row">
+        <input type="text" id="pin-input" placeholder="場所名・住所で検索"
+               onkeydown="if(event.key==='Enter')addPinBySearch()">
+        <button onclick="addPinBySearch()" title="ピン追加">📌</button>
+      </div>
+      <button class="pin-mode-btn" id="pin-mode-btn" onclick="togglePinMode()">
+        🖱 地図クリックでピン追加
+      </button>
+      <!-- Editable pin list -->
+      <textarea id="pin-textarea"
+        placeholder="（ピンがありません）"
+        onblur="parsePinListText()"
+        spellcheck="false"></textarea>
+      <div class="pin-textarea-hint">書式: ピン名称:緯度,経度（1行1ピン）<br>編集 → フォーカスを外すと地図に反映</div>
+      <div class="pin-options-row">
+        <input type="checkbox" id="pin-label-toggle" onchange="togglePinLabels(this.checked)">
+        <label for="pin-label-toggle">地図にラベル表示</label>
+      </div>
+      <div id="pin-colors-wrap"></div>
+    </div>
+
+    <!-- A4 配置 -->
+    <div>
+      <div class="sec-label">A4 配置</div>
+      <button class="layout-btn active" onclick="setLayout('right',this)">
+        <div class="layout-icon li-right"><div class="map-part"></div><div class="text-part"></div></div>
+        <div class="lbl">文章を右に配置<small>地図を大きく、紹介文を右カラムに</small></div>
+      </button>
+      <button class="layout-btn" onclick="setLayout('left',this)">
+        <div class="layout-icon li-left"><div class="text-part"></div><div class="map-part"></div></div>
+        <div class="lbl">文章を左に配置<small>紹介文を左・地図を右に配置</small></div>
+      </button>
+      <button class="layout-btn" onclick="setLayout('above',this)">
+        <div class="layout-icon li-above"><div class="text-part"></div><div class="map-part"></div></div>
+        <div class="lbl">文章を上に配置<small>紹介文を上・地図を下に配置</small></div>
+      </button>
+      <button class="layout-btn" onclick="setLayout('below',this)">
+        <div class="layout-icon li-below"><div class="map-part"></div><div class="text-part"></div></div>
+        <div class="lbl">文章を下に配置<small>地図を上・紹介文を下に配置</small></div>
+      </button>
+    </div>
+
+    <!-- 地図表示 -->
+    <div>
+      <div class="sec-label">🗺 地図の表示</div>
+      <div class="slider-row">
+        <span style="font-size:11px;color:var(--muted)">範囲</span>
+        <input type="range" id="radius-slider" min="100" max="5000" step="50" value="650"
+               oninput="updateRadius(this.value)">
+        <span class="slider-val" id="radius-val">650m</span>
+      </div>
+      <div class="coords-row" style="margin-top:9px">
+        <div class="coord-box">
+          <label>緯度</label>
+          <input type="text" id="lat-input" value="35.681200" onchange="applyCoords()">
+        </div>
+        <div class="coord-box">
+          <label>経度</label>
+          <input type="text" id="lng-input" value="139.767100" onchange="applyCoords()">
+        </div>
+      </div>
+      <div class="slider-row" style="margin-top:9px">
+        <span style="font-size:11px;color:var(--muted)">縮尺</span>
+        <input type="range" id="zoom-slider" min="1" max="19" step="1" value="14"
+               oninput="updateZoom(this.value)">
+        <span class="slider-val" id="zoom-val">z14</span>
+      </div>
+    </div>
+
+    <!-- 文章スタイル -->
+    <div>
+      <div class="sec-label">✏ 文章スタイル</div>
+      <div class="style-tabs">
+        <div class="style-tab active" onclick="setStyle('guide',this)">紹介ガイド</div>
+        <div class="style-tab" onclick="setStyle('memo',this)">観光メモ</div>
+        <div class="style-tab" onclick="setStyle('photo',this)">写真紹介</div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- ── Center: Map + Preview ── -->
+  <div id="map-panel">
+    <div id="map"></div>
+
+    <div id="preview-strip">
+      <div class="strip-header">
+        <span>Export Preview</span>
+        <span class="dims">297 × 210mm</span>
+      </div>
+      <h3>A4横の完成イメージ</h3>
+      <div id="a4-preview" class="layout-right">
+        <div class="preview-map-area">
+          <img id="preview-map-img" src="" alt="" style="display:none">
+          <div class="preview-placeholder" id="preview-placeholder">地図を移動するとここに反映されます</div>
+        </div>
+        <div class="preview-text-area">
+          <div class="preview-meta" id="preview-meta">MAPFOLIO / A4</div>
+          <div class="preview-title" id="preview-title">タイトル</div>
+          <div class="preview-body" id="preview-body"></div>
+          <div class="preview-footer">
+            <span id="preview-location">—</span>
+            <span>Mapfolio</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right Panel ── -->
+  <div id="right-panel">
+
+    <div class="rp-sec">
+      <div class="sec-label">✏ Markdown Editor</div>
+      <textarea id="md-editor" oninput="updatePreview()"
+        placeholder="# タイトル&#10;&#10;説明文...&#10;&#10;## 見出し2&#10;- 箇条書き&#10;&#10;@住所@でピンを自動追加"></textarea>
+    </div>
+
+    <div class="rp-sec" style="flex-shrink:0">
+      <div class="sec-label">🖼 写真を挿入</div>
+      <button class="photo-btn" onclick="document.getElementById('photo-input').click()">
+        🖼 写真ファイルを選ぶ
+      </button>
+      <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="loadPhoto(this)">
+    </div>
+
+    <!-- Font size settings -->
+    <div class="rp-sec" style="flex-shrink:0">
+      <div class="sec-label">🔡 フォントサイズ（pt）</div>
+      <div class="fs-grid">
+        <div class="fs-item">
+          <label>見出し1 (H1)</label>
+          <input type="number" id="fs-h1" min="16" max="72" value="36" oninput="setFontSize('h1',this.value)">
+        </div>
+        <div class="fs-item">
+          <label>見出し2 (H2)</label>
+          <input type="number" id="fs-h2" min="10" max="48" value="18" oninput="setFontSize('h2',this.value)">
+        </div>
+        <div class="fs-item">
+          <label>見出し3 (H3)</label>
+          <input type="number" id="fs-h3" min="8" max="36" value="14" oninput="setFontSize('h3',this.value)">
+        </div>
+        <div class="fs-item">
+          <label>本文 (Body)</label>
+          <input type="number" id="fs-body" min="6" max="24" value="12" oninput="setFontSize('body',this.value)">
+        </div>
+      </div>
+    </div>
+
+    <div class="rp-sec">
+      <div class="sec-label">👁 リアルタイムプレビュー</div>
+      <div id="rt-preview"></div>
+    </div>
+
+  </div>
+</div><!-- /main -->
+
+<!-- Project bar -->
+<div id="project-bar">
+  <div class="proj-name-wrap">
+    <input type="text" id="proj-name-input" value="新規プロジェクト"
+           title="クリックして名前を編集"
+           onchange="state.projectName=this.value"
+           onblur="state.projectName=this.value">
+    <button id="proj-dropdown-btn" onclick="toggleProjDropdown(event)">▼</button>
+    <div id="proj-dropdown">
+      <div class="proj-list-inner" id="proj-list-inner"></div>
+      <button class="proj-new-btn" onclick="newProject();closeProjDropdown()">＋ 新規プロジェクト</button>
+    </div>
+  </div>
+  <div class="proj-bar-sep"></div>
+  <button class="proj-btn primary" onclick="saveToLocal()">💾 保存</button>
+  <button class="proj-btn" onclick="document.getElementById('import-input').click()">📂 開く</button>
+  <button class="proj-btn" onclick="exportJSON()">⬇ 書き出し</button>
+  <div class="proj-spacer"></div>
+  <span id="autosave-status">—</span>
+  <input type="file" id="import-input" accept=".json" style="display:none"
+         onchange="importJSON(this.files[0]);this.value=''">
+</div>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <span id="loading-msg">処理中...</span>
+</div>
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════
+const PIN_COLORS      = ['#e8920a','#d63c2f','#4a90d9','#27ae60','#8e44ad'];
+const PIN_COLOR_NAMES = ['オレンジ','赤','青','緑','紫'];
+
+const state = {
+  lat: 35.6812, lng: 139.7671, zoom: 14, radius: 650,
+  layout: 'right', style: 'guide',
+  locationName: '東京駅', photoDataUrl: null,
+  fontSizes: { h1: 36, h2: 18, h3: 14, body: 12 },
+  showPinLabels: false,
+  projectId:   null,
+  projectName: '新規プロジェクト',
+};
+
+// ═══════════════════════════════════════════
+// Map init
+// ═══════════════════════════════════════════
+const map = L.map('map', { center: [state.lat, state.lng], zoom: state.zoom });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+}).addTo(map);
+
+// Center marker (red teardrop)
+function makeCenterIcon() {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:18px;height:18px;background:#d63c2f;border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg) translate(-4px,-4px);border:2px solid #fff;
+      box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>`,
+    iconSize: [18,18], iconAnchor: [9,18],
+  });
+}
+const mainMarker = L.marker([state.lat, state.lng], { icon: makeCenterIcon(), draggable: true }).addTo(map);
+const radiusCircle = L.circle([state.lat, state.lng], {
+  radius: state.radius, color:'#d63c2f', weight:2,
+  fillColor:'#d63c2f', fillOpacity:.07,
+}).addTo(map);
+
+function syncCoordDisplay() {
+  document.getElementById('lat-input').value = state.lat.toFixed(6);
+  document.getElementById('lng-input').value = state.lng.toFixed(6);
+  const z = map.getZoom();
+  state.zoom = z;
+  document.getElementById('zoom-slider').value = z;
+  document.getElementById('zoom-val').textContent = 'z' + z;
+  updatePreviewMeta();
+  scheduleMapSnapshot();
+}
+
+mainMarker.on('dragend', e => {
+  const p = e.target.getLatLng();
+  state.lat = p.lat; state.lng = p.lng;
+  radiusCircle.setLatLng([state.lat, state.lng]);
+  syncCoordDisplay();
+});
+map.on('moveend zoomend', () => { syncCoordDisplay(); recomputeLabelPositions(); });
+map.on('click', e => {
+  if (pinMode) {
+    addPin(e.latlng.lat, e.latlng.lng, null);
+    return;
+  }
+  state.lat = e.latlng.lat; state.lng = e.latlng.lng;
+  mainMarker.setLatLng([state.lat, state.lng]);
+  radiusCircle.setLatLng([state.lat, state.lng]);
+  syncCoordDisplay();
+});
+
+// ═══════════════════════════════════════════
+// Pin management
+// ═══════════════════════════════════════════
+const pins = [];          // { id, lat, lng, label, marker }
+let pinMode = false;
+let nextPinId = 1;
+const autoPinAddrs = new Set(); // @addr@ strings already geocoded
+
+function makePinIcon(num, color = PIN_COLORS[0]) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:22px;height:22px;background:${color};
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg) translate(-5px,-5px);
+      border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);
+      display:flex;align-items:center;justify-content:center;">
+      <span style="transform:rotate(45deg);font-size:9px;font-weight:700;color:#fff">${num}</span>
+    </div>`,
+    iconSize: [22,22], iconAnchor: [11,22],
+  });
+}
+
+function togglePinMode() {
+  pinMode = !pinMode;
+  const btn = document.getElementById('pin-mode-btn');
+  btn.classList.toggle('active', pinMode);
+  btn.textContent = pinMode
+    ? '✅ クリック追加中（再度クリックで解除）'
+    : '🖱 地図クリックでピン追加';
+  document.body.classList.toggle('pin-adding', pinMode);
+}
+
+function addPin(lat, lng, label, silent = false, color = null) {
+  const id = nextPinId++;
+  const displayNum = pins.length + 1;
+  const pinColor = color || PIN_COLORS[0];
+  const defaultLabel = label || `ピン ${displayNum}`;
+  const m = L.marker([lat, lng], { icon: makePinIcon(displayNum, pinColor), draggable: true })
+    .addTo(map)
+    .bindPopup(`<b>${defaultLabel}</b><br><small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`);
+  if (!silent) m.openPopup();
+
+  m.on('dragend', ev => {
+    const pos = ev.target.getLatLng();
+    const pin = pins.find(x => x.id === id);
+    if (!pin) return;
+    pin.lat = pos.lat; pin.lng = pos.lng;
+    m.setPopupContent(`<b>${pin.label}</b><br><small>${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}</small>`);
+    renderPinList();
+    recomputeLabelPositions();
+    scheduleMapSnapshot();
+  });
+
+  pins.push({ id, lat, lng, label: defaultLabel, color: pinColor, marker: m });
+  renumberPins();
+  scheduleMapSnapshot();
+  if (!silent) toast(`📌 ${defaultLabel}`);
+}
+
+function removePin(id) {
+  const idx = pins.findIndex(p => p.id === id);
+  if (idx === -1) return;
+  map.removeLayer(pins[idx].marker);
+  pins.splice(idx, 1);
+  renumberPins();
+  scheduleMapSnapshot();
+}
+
+// Re-index all marker icons to match current array order
+function renumberPins() {
+  pins.forEach((pin, i) => {
+    pin.marker.setIcon(makePinIcon(i + 1, pin.color || PIN_COLORS[0]));
+  });
+  renderPinList();
+  renderPinColorPickers();
+  recomputeLabelPositions();
+}
+
+// Update the editable textarea (skip if user is editing it)
+function renderPinList() {
+  const ta = document.getElementById('pin-textarea');
+  if (document.activeElement === ta) return;
+  ta.value = pins.length
+    ? pins.map(p => `${p.label}:${p.lat.toFixed(6)},${p.lng.toFixed(6)}`).join('\n')
+    : '';
+}
+
+// Parse textarea on blur → reconcile with map pins
+function parsePinListText() {
+  const ta = document.getElementById('pin-textarea');
+  const lines = ta.value.split('\n').map(l => l.trim()).filter(l => l);
+
+  // Parse each line
+  const parsed = lines.map(line => {
+    const ci = line.lastIndexOf(':');
+    if (ci === -1) return null;
+    const label = line.slice(0, ci).trim();
+    const coords = line.slice(ci + 1).trim().split(',');
+    if (coords.length < 2) return null;
+    const lat = parseFloat(coords[0]);
+    const lng = parseFloat(coords[1]);
+    return (label && !isNaN(lat) && !isNaN(lng)) ? { label, lat, lng } : null;
+  }).filter(Boolean);
+
+  // Remove excess pins (array tail)
+  while (pins.length > parsed.length) {
+    const removed = pins.pop();
+    map.removeLayer(removed.marker);
+  }
+
+  // Update existing or add new entries
+  parsed.forEach((p, i) => {
+    if (i < pins.length) {
+      pins[i].label = p.label;
+      pins[i].lat = p.lat;
+      pins[i].lng = p.lng;
+      pins[i].marker.setLatLng([p.lat, p.lng]);
+      pins[i].marker.setPopupContent(`<b>${p.label}</b><br><small>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</small>`);
+    } else {
+      // New line added manually in textarea
+      const id = nextPinId++;
+      const m = L.marker([p.lat, p.lng], { icon: makePinIcon(i + 1, PIN_COLORS[0]), draggable: true })
+        .addTo(map)
+        .bindPopup(`<b>${p.label}</b><br><small>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</small>`);
+      const capturedId = id;
+      m.on('dragend', ev => {
+        const pos = ev.target.getLatLng();
+        const pin = pins.find(x => x.id === capturedId);
+        if (!pin) return;
+        pin.lat = pos.lat; pin.lng = pos.lng;
+        renderPinList();
+        scheduleMapSnapshot();
+      });
+      pins.push({ id, lat: p.lat, lng: p.lng, label: p.label, color: PIN_COLORS[0], marker: m });
+    }
+  });
+
+  renumberPins();
+  scheduleMapSnapshot();
+  toast('📌 ピンを更新しました');
+}
+
+// ═══════════════════════════════════════════
+// Pin search (Nominatim)
+// ═══════════════════════════════════════════
+async function addPinBySearch() {
+  const q = document.getElementById('pin-input').value.trim();
+  if (!q) return;
+  showLoading('ピンを検索中...');
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=ja`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+    const data = await res.json();
+    if (!data.length) { toast('場所が見つかりませんでした'); return; }
+    const place = data[0];
+    const lat = parseFloat(place.lat);
+    const lng = parseFloat(place.lon);
+    const label = place.display_name.split(',')[0];
+    addPin(lat, lng, label);
+    map.setView([lat, lng], Math.max(map.getZoom(), 15));
+    document.getElementById('pin-input').value = '';
+  } catch(e) {
+    toast('検索エラー: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ═══════════════════════════════════════════
+// @address@ auto-pin detection (req 4)
+// ═══════════════════════════════════════════
+let addrDetectTimer = null;
+
+function scheduleAddrDetect() {
+  clearTimeout(addrDetectTimer);
+  addrDetectTimer = setTimeout(detectAddrPins, 2000);
+}
+
+async function detectAddrPins() {
+  const md = document.getElementById('md-editor').value;
+  // Split markdown into H1 blocks
+  const sections = splitByH1(md);
+
+  for (const { h1, body } of sections) {
+    const addrRe = /@([^@\n]+)@/g;
+    let m;
+    while ((m = addrRe.exec(body)) !== null) {
+      const addr = m[1].trim();
+      if (autoPinAddrs.has(addr)) continue;
+      autoPinAddrs.add(addr);
+      const label = h1 || addr;
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1&accept-language=ja`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+        const data = await res.json();
+        if (data.length) {
+          addPin(parseFloat(data[0].lat), parseFloat(data[0].lon), label);
+          toast(`📍 自動ピン追加: ${label}`);
+        }
+      } catch(e) { /* network error — silently skip */ }
+    }
+  }
+}
+
+function splitByH1(md) {
+  const lines = md.split('\n');
+  const sections = [];
+  let curH1 = null;
+  let curLines = [];
+
+  for (const line of lines) {
+    const h1m = line.match(/^#\s+(.+)/);
+    if (h1m) {
+      if (curH1 !== null || curLines.length) {
+        sections.push({ h1: curH1, body: curLines.join('\n') });
+      }
+      curH1 = h1m[1].trim();
+      curLines = [];
+    } else {
+      curLines.push(line);
+    }
+  }
+  if (curH1 !== null || curLines.length) {
+    sections.push({ h1: curH1, body: curLines.join('\n') });
+  }
+  return sections;
+}
+
+// ═══════════════════════════════════════════
+// Main location search (Nominatim)
+// ═══════════════════════════════════════════
+async function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  showLoading('場所を検索中...');
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=ja`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'ja' } });
+    const data = await res.json();
+    if (!data.length) { toast('場所が見つかりませんでした'); return; }
+    const place = data[0];
+    state.lat = parseFloat(place.lat);
+    state.lng = parseFloat(place.lon);
+    state.locationName = place.display_name.split(',')[0];
+    map.setView([state.lat, state.lng], state.zoom);
+    mainMarker.setLatLng([state.lat, state.lng]);
+    radiusCircle.setLatLng([state.lat, state.lng]);
+    document.getElementById('preview-location').textContent = state.locationName;
+    syncCoordDisplay();
+    toast(`📍 ${state.locationName}`);
+  } catch(e) {
+    toast('検索エラー: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ═══════════════════════════════════════════
+// Pin label management
+// ═══════════════════════════════════════════
+function clearPinLabels() {
+  pins.forEach(pin => { try { pin.marker.unbindTooltip(); } catch(e){} });
+}
+
+function recomputeLabelPositions() {
+  clearPinLabels();
+  if (!state.showPinLabels || !pins.length) return;
+
+  const placed = []; // placed label boxes {x,y,w,h}
+  const DIRS   = ['top','right','left','bottom'];
+  // anchor offsets from pin centre (px) — moves label centre away from pin
+  const ANCH   = { top:[0,-30], right:[26,0], left:[-26,0], bottom:[0,26] };
+  // Leaflet tooltip offset (fine-tune position)
+  const TTOFF  = { top:L.point(0,-6), right:L.point(6,0), left:L.point(-6,0), bottom:L.point(0,6) };
+
+  pins.forEach(pin => {
+    const pt  = map.latLngToContainerPoint([pin.lat, pin.lng]);
+    const lw  = Math.min(Math.max(pin.label.length * 7 + 14, 40), 120);
+    const lh  = 18;
+    let bestDir = 'top', minScore = Infinity;
+
+    for (const dir of DIRS) {
+      const [ax,ay] = ANCH[dir];
+      const bx = pt.x + ax - lw / 2;
+      const by = pt.y + ay - lh / 2;
+      const box = { x:bx, y:by, w:lw, h:lh };
+
+      let score = 0;
+      // overlap with already-placed labels
+      placed.forEach(b => {
+        if (!(box.x+lw<b.x||b.x+b.w<box.x||box.y+lh<b.y||b.y+b.h<box.y)) score += 30;
+      });
+      // proximity to other pin icons
+      pins.forEach(other => {
+        if (other === pin) return;
+        const ot = map.latLngToContainerPoint([other.lat, other.lng]);
+        const dx = ot.x - pt.x, dy = ot.y - pt.y;
+        const d  = Math.sqrt(dx*dx + dy*dy);
+        if (d < 55) {
+          const inDir = (dir==='right'&&dx>10)||(dir==='left'&&dx<-10)||
+                        (dir==='top'&&dy<-10)||(dir==='bottom'&&dy>10);
+          if (inDir) score += (55 - d) * 0.35;
+        }
+      });
+
+      if (score < minScore) { minScore = score; bestDir = dir; }
+    }
+
+    const [ax,ay] = ANCH[bestDir];
+    placed.push({ x: pt.x+ax - lw/2, y: pt.y+ay - lh/2, w:lw, h:lh });
+
+    pin.marker.bindTooltip(pin.label, {
+      permanent: true,
+      direction: bestDir,
+      className: 'pin-label-tt',
+      offset: TTOFF[bestDir],
+    });
+  });
+}
+
+function togglePinLabels(checked) {
+  state.showPinLabels = checked;
+  recomputeLabelPositions();
+}
+
+// ═══════════════════════════════════════════
+// Pin color management
+// ═══════════════════════════════════════════
+function renderPinColorPickers() {
+  const wrap = document.getElementById('pin-colors-wrap');
+  if (!wrap) return;
+  if (!pins.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">ピン色</div>' +
+    pins.map((pin, i) => `
+      <div class="pin-color-row">
+        <span class="pin-color-num">${i+1}</span>
+        ${PIN_COLORS.map((c, ci) => `
+          <div class="pin-dot${pin.color===c?' active':''}"
+            style="background:${c}" title="${PIN_COLOR_NAMES[ci]}"
+            onclick="setPinColor(${pin.id},${JSON.stringify(c)})"></div>
+        `).join('')}
+      </div>`).join('');
+}
+
+function setPinColor(id, color) {
+  const pin = pins.find(p => p.id === id);
+  if (!pin) return;
+  pin.color = color;
+  const idx = pins.indexOf(pin);
+  pin.marker.setIcon(makePinIcon(idx + 1, color));
+  renderPinColorPickers();
+  recomputeLabelPositions();
+  scheduleMapSnapshot();
+}
+
+// ═══════════════════════════════════════════
+// Map controls
+// ═══════════════════════════════════════════
+function updateRadius(v) {
+  state.radius = parseInt(v);
+  document.getElementById('radius-val').textContent = v + 'm';
+  radiusCircle.setRadius(state.radius);
+  updatePreviewMeta();
+}
+
+function updateZoom(v) {
+  const z = parseInt(v);
+  state.zoom = z;
+  document.getElementById('zoom-val').textContent = 'z' + z;
+  map.setZoom(z);
+}
+
+function applyCoords() {
+  const lat = parseFloat(document.getElementById('lat-input').value);
+  const lng = parseFloat(document.getElementById('lng-input').value);
+  if (isNaN(lat) || isNaN(lng)) return;
+  state.lat = lat; state.lng = lng;
+  map.setView([lat, lng], state.zoom);
+  mainMarker.setLatLng([lat, lng]);
+  radiusCircle.setLatLng([lat, lng]);
+  updatePreviewMeta();
+}
+
+// ═══════════════════════════════════════════
+// Layout / Style
+// ═══════════════════════════════════════════
+function setLayout(layout, el) {
+  state.layout = layout;
+  document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const preview = document.getElementById('a4-preview');
+  preview.className = 'layout-' + layout;
+  const mapArea = document.querySelector('.preview-map-area');
+  if (layout === 'right' || layout === 'left') {
+    mapArea.style.width = '58%'; mapArea.style.height = '100%';
+  } else {
+    mapArea.style.width = '100%'; mapArea.style.height = '56%';
+  }
+}
+
+function setStyle(style, el) {
+  state.style = style;
+  document.querySelectorAll('.style-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ═══════════════════════════════════════════
+// Font sizes (req 5)
+// ═══════════════════════════════════════════
+function setFontSize(level, val) {
+  state.fontSizes[level] = Math.max(6, parseInt(val) || 12);
+  applyFontSizesToPreview();
+}
+
+function applyFontSizesToPreview() {
+  const fs = state.fontSizes;
+  // Ensure dynamic style is last in head so it wins over static styles
+  let styleEl = document.getElementById('dynamic-font-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'dynamic-font-style';
+  }
+  document.head.appendChild(styleEl); // move to end of head
+  styleEl.textContent = `
+    /* A4 preview card — scaled down (~50% of export) */
+    .preview-title { font-size:${Math.round(fs.h1 * 0.50)}px !important; }
+    .preview-body h1 { font-size:${Math.round(fs.h1 * 0.50)}px !important; font-weight:800; }
+    .preview-body h2 { font-size:${Math.round(fs.h2 * 0.54)}px !important; }
+    .preview-body h3 { font-size:${Math.round(fs.h3 * 0.54)}px !important; }
+    .preview-body p, .preview-body li { font-size:${Math.round(fs.body * 0.68)}px !important; }
+    /* Realtime preview */
+    #rt-preview h1 { font-size:${Math.round(fs.h1 * 0.70)}px !important; }
+    #rt-preview h2 { font-size:${Math.round(fs.h2 * 0.88)}px !important; }
+    #rt-preview h3 { font-size:${Math.round(fs.h3 * 0.88)}px !important; }
+    #rt-preview p, #rt-preview li { font-size:${Math.round(fs.body * 0.92)}px !important; }
+  `;
+}
+
+// ═══════════════════════════════════════════
+// Markdown → Preview (req 4: @address@ badge)
+// ═══════════════════════════════════════════
+function mdToHtml(md) {
+  // Replace @addr@ with styled badge BEFORE parsing
+  const withBadges = md.replace(/@([^@\n]+)@/g,
+    '<span class="addr-badge">📍 $1</span>');
+  return marked.parse(withBadges);
+}
+
+// Apply inline font-size styles to exported HTML
+// Use \b[^>]* to match Marked's output which may include id/class attributes
+function inlineHtmlFontSizes(html) {
+  const fs = state.fontSizes;
+  return html
+    .replace(/<h1\b[^>]*>/gi, `<h1 style="font-size:${fs.h1}px;font-weight:800;line-height:1.2;margin-bottom:14px">`)
+    .replace(/<h2\b[^>]*>/gi, `<h2 style="font-size:${fs.h2}px;font-weight:700;margin:12px 0 5px">`)
+    .replace(/<h3\b[^>]*>/gi, `<h3 style="font-size:${fs.h3}px;font-weight:600;margin:10px 0 4px">`)
+    .replace(/<p\b[^>]*>/gi,  `<p style="font-size:${fs.body}px;line-height:1.85;margin-bottom:7px">`)
+    .replace(/<li\b[^>]*>/gi, `<li style="font-size:${fs.body}px;line-height:1.75;margin-bottom:3px">`)
+    .replace(/<blockquote\b[^>]*>/gi, `<blockquote style="border-left:3px solid #d63c2f;padding-left:10px;margin:8px 0;color:#8a7a6e;font-style:italic">`);
+}
+
+function updatePreview() {
+  const rawMd = document.getElementById('md-editor').value;
+
+  // Realtime preview (right panel)
+  document.getElementById('rt-preview').innerHTML = mdToHtml(rawMd);
+
+  // Title extraction
+  const m = rawMd.match(/^#\s+(.+)/m);
+  const title = m ? m[1] : '';
+  document.getElementById('preview-title').textContent = title;
+
+  // Body (everything after first H1)
+  const bodyMd = m ? rawMd.slice(rawMd.indexOf(m[0]) + m[0].length).trim() : rawMd;
+  document.getElementById('preview-body').innerHTML = mdToHtml(bodyMd);
+
+  // Schedule @address@ detection
+  scheduleAddrDetect();
+}
+
+function updatePreviewMeta() {
+  const meta = `MAPFOLIO / A4\n${state.lat.toFixed(4)}°N · ${state.lng.toFixed(4)}°E    RADIUS ${state.radius}m`;
+  document.getElementById('preview-meta').textContent = meta;
+  document.getElementById('preview-location').textContent = state.locationName || '—';
+}
+
+// ═══════════════════════════════════════════
+// Map snapshot for preview strip
+// ═══════════════════════════════════════════
+let snapshotTimer = null;
+function scheduleMapSnapshot() {
+  clearTimeout(snapshotTimer);
+  snapshotTimer = setTimeout(takeMapSnapshot, 800);
+}
+
+async function takeMapSnapshot() {
+  try {
+    const mapEl = document.getElementById('map');
+    const canvas = await html2canvas(mapEl, { useCORS: true, logging: false, scale: 1 });
+    const img = document.getElementById('preview-map-img');
+    img.src = canvas.toDataURL('image/jpeg', 0.82);
+    img.style.display = 'block';
+    document.getElementById('preview-placeholder').style.display = 'none';
+  } catch(e) { /* silently ignore */ }
+}
+
+// ═══════════════════════════════════════════
+// Photo insert
+// ═══════════════════════════════════════════
+function loadPhoto(input) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => { state.photoDataUrl = e.target.result; toast('📷 写真を読み込みました'); };
+  reader.readAsDataURL(input.files[0]);
+}
+
+// ═══════════════════════════════════════════
+// Multi-page build helpers
+// ═══════════════════════════════════════════
+const A4W = 1123, A4H = 794;
+
+// Capture map canvas, centre-crop to target aspect ratio
+async function captureMapImg(mapAreaW, mapAreaH) {
+  try {
+    const rawCanvas = await html2canvas(document.getElementById('map'), { useCORS:true, logging:false, scale:2 });
+    const tc = document.createElement('canvas');
+    tc.width  = mapAreaW * 2; tc.height = mapAreaH * 2;
+    const ctx = tc.getContext('2d');
+    const sw = rawCanvas.width, sh = rawCanvas.height;
+    const dr = mapAreaW / mapAreaH, sr = sw / sh;
+    let sx=0, sy=0, cw=sw, ch=sh;
+    if (sr > dr) { cw = sh * dr; sx = (sw - cw) / 2; }
+    else          { ch = sw / dr; sy = (sh - ch) / 2; }
+    ctx.drawImage(rawCanvas, sx, sy, cw, ch, 0, 0, tc.width, tc.height);
+    return tc.toDataURL('image/jpeg', 0.92);
+  } catch(e) { return ''; }
+}
+
+// Split HTML content into pages by rendering height
+function splitHtmlAtHeight(html, maxH, containerW, baseFontPx) {
+  const probe = document.createElement('div');
+  probe.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${containerW}px;
+    font-family:'Hiragino Sans','Noto Sans JP',sans-serif;
+    font-size:${baseFontPx}px;line-height:1.85;visibility:hidden`;
+  probe.innerHTML = html;
+  document.body.appendChild(probe);
+
+  const children = Array.from(probe.children);
+  let cumH = 0, cutIdx = children.length;
+  for (let i = 0; i < children.length; i++) {
+    const h = children[i].getBoundingClientRect().height + 8; // 8px margin
+    if (cumH + h > maxH && i > 0) { cutIdx = i; break; }
+    cumH += h;
+  }
+  const html1 = children.slice(0, cutIdx).map(c => c.outerHTML).join('');
+  const html2 = children.slice(cutIdx).map(c => c.outerHTML).join('');
+  document.body.removeChild(probe);
+  return { html1, html2 };
+}
+
+// Build the first A4 element (with map)
+async function buildPage1(title, bodyHtml, mapImgSrc) {
+  const isCol   = state.layout === 'right' || state.layout === 'left';
+  const mapAreaW = isCol ? Math.round(A4W * 0.58) : A4W;
+  const mapAreaH = isCol ? A4H : Math.round(A4H * 0.56);
+  const flexDir  = { right:'row', left:'row-reverse', below:'column', above:'column-reverse' }[state.layout];
+  const fs = state.fontSizes;
+  const imgSrc = mapImgSrc || state.photoDataUrl || '';
+
+  const el = document.createElement('div');
+  el.style.cssText = `width:${A4W}px;height:${A4H}px;display:flex;flex-direction:${flexDir};
+    background:#fff;font-family:'Hiragino Sans','Noto Sans JP',sans-serif;
+    position:fixed;top:-9999px;left:-9999px;z-index:0;`;
+  el.innerHTML = `
+    <div style="width:${mapAreaW}px;height:${mapAreaH}px;flex-shrink:0;overflow:hidden;background:#e8f0e8">
+      ${imgSrc
+        ? `<img src="${imgSrc}" style="width:${mapAreaW}px;height:${mapAreaH}px;display:block">`
+        : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8aaa8a;font-size:24px">🗺</div>'}
+    </div>
+    <div style="flex:1;padding:38px 42px 28px;display:flex;flex-direction:column;overflow:hidden">
+      <div style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#8a7a6e;margin-bottom:14px;line-height:1.8">
+        MAPFOLIO / A4 &nbsp; ${state.lat.toFixed(4)}°N · ${state.lng.toFixed(4)}°E &nbsp; RADIUS ${state.radius}m
+      </div>
+      <div style="font-size:${fs.h1}px;font-weight:800;line-height:1.2;margin-bottom:18px;color:#2a1f18">${title}</div>
+      <div style="flex:1;overflow:hidden;color:#3d3028">${bodyHtml}</div>
+      <div style="font-size:8px;color:#8a7a6e;margin-top:14px;border-top:1px solid #d4c9bb;padding-top:10px;display:flex;justify-content:space-between">
+        <span>${state.locationName || '—'}</span>
+        <span>© OpenStreetMap contributors · Mapfolio</span>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  return el;
+}
+
+// Build a continuation page (text only)
+function buildPageN(bodyHtml, pageNum, title) {
+  const fs = state.fontSizes;
+  const el = document.createElement('div');
+  el.style.cssText = `width:${A4W}px;height:${A4H}px;padding:38px 56px 28px;
+    display:flex;flex-direction:column;background:#fff;
+    font-family:'Hiragino Sans','Noto Sans JP',sans-serif;
+    position:fixed;top:-9999px;left:-9999px;z-index:0;`;
+  el.innerHTML = `
+    <div style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#8a7a6e;margin-bottom:14px">
+      MAPFOLIO / A4 &nbsp;·&nbsp; ${escHtml(title)} — p.${pageNum}
+    </div>
+    <div style="flex:1;overflow:hidden;color:#3d3028">${bodyHtml}</div>
+    <div style="font-size:8px;color:#8a7a6e;margin-top:14px;border-top:1px solid #d4c9bb;padding-top:10px;display:flex;justify-content:space-between">
+      <span>${escHtml(state.locationName || '—')}</span>
+      <span>© OpenStreetMap contributors · Mapfolio · p.${pageNum}</span>
+    </div>`;
+  document.body.appendChild(el);
+  return el;
+}
+
+// Build all page elements (returns array of DOM elements, caller must remove them)
+async function buildAllPages() {
+  const rawMd = document.getElementById('md-editor').value;
+  const m = rawMd.match(/^#\s+(.+)/m);
+  const title   = m ? m[1] : '';
+  const bodyMd  = m ? rawMd.slice(rawMd.indexOf(m[0]) + m[0].length).trim() : rawMd;
+  const bodyHtml = inlineHtmlFontSizes(mdToHtml(bodyMd));
+  const fs = state.fontSizes;
+
+  const isCol    = state.layout === 'right' || state.layout === 'left';
+  const mapAreaW = isCol ? Math.round(A4W * 0.58) : A4W;
+  const mapAreaH = isCol ? A4H : Math.round(A4H * 0.56);
+  const textInnerW = (A4W - mapAreaW) - 84; // padding 42px each side
+  // Available body height on page 1
+  const p1AvailH = A4H - 38 - 28 - 30 - (fs.h1 + 18) - 36; // pads + meta + title + footer
+  const pNAvailH = A4H - 38 - 28 - 30 - 36;                 // pads + meta + footer
+
+  const mapImgSrc = await captureMapImg(mapAreaW, mapAreaH);
+
+  // Check if body fits on page 1
+  const probe = document.createElement('div');
+  probe.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${textInnerW}px;
+    font-family:'Hiragino Sans','Noto Sans JP',sans-serif;font-size:${fs.body}px;visibility:hidden`;
+  probe.innerHTML = bodyHtml;
+  document.body.appendChild(probe);
+  const totalH = probe.scrollHeight;
+  document.body.removeChild(probe);
+
+  const pages = [];
+  if (totalH <= p1AvailH) {
+    pages.push(await buildPage1(title, bodyHtml, mapImgSrc));
+    return pages;
+  }
+
+  // Split content across pages
+  const { html1, html2: rest1 } = splitHtmlAtHeight(bodyHtml, p1AvailH, textInnerW, fs.body);
+  pages.push(await buildPage1(title, html1, mapImgSrc));
+
+  let remaining = rest1;
+  for (let pn = 2; remaining.trim() && pn <= 12; pn++) {
+    const { html1: cur, html2: rest } = splitHtmlAtHeight(remaining, pNAvailH, A4W - 112, fs.body);
+    pages.push(buildPageN(cur || remaining, pn, title));
+    remaining = rest;
+  }
+  return pages;
+}
+
+// Legacy alias for single-page (used where only one element is needed)
+async function buildA4Element() {
+  const pages = await buildAllPages();
+  // Remove extra pages from DOM except the first
+  pages.slice(1).forEach(el => document.body.removeChild(el));
+  return pages[0];
+}
+
+// ═══════════════════════════════════════════
+// Export PNG / PDF
+// ═══════════════════════════════════════════
+async function exportPNG() {
+  showLoading('PNG を生成中...');
+  try {
+    const pages = await buildAllPages();
+    await delay(200);
+    const ts = Date.now();
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await html2canvas(pages[i], {
+        useCORS:true, scale:2, width:A4W, height:A4H, logging:false,
+      });
+      document.body.removeChild(pages[i]);
+      const suffix = pages.length > 1 ? `_p${i+1}` : '';
+      download(canvas.toDataURL('image/png'), `mapfolio_${ts}${suffix}.png`);
+    }
+    toast(`✅ PNG を保存しました${pages.length > 1 ? ` (${pages.length}ページ)` : ''}`);
+  } catch(e) { toast('エラー: ' + e.message); }
+  finally { hideLoading(); }
+}
+
+async function exportPDF() {
+  showLoading('PDF を生成中...');
+  try {
+    const pages = await buildAllPages();
+    await delay(200);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+    for (let i = 0; i < pages.length; i++) {
+      if (i > 0) pdf.addPage();
+      const canvas = await html2canvas(pages[i], {
+        useCORS:true, scale:2, width:A4W, height:A4H, logging:false,
+      });
+      document.body.removeChild(pages[i]);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, 297, 210);
+    }
+    pdf.save(`mapfolio_${Date.now()}.pdf`);
+    toast(`✅ PDF を保存しました${pages.length > 1 ? ` (${pages.length}ページ)` : ''}`);
+  } catch(e) { toast('エラー: ' + e.message); }
+  finally { hideLoading(); }
+}
+
+// ═══════════════════════════════════════════
+// Project management
+// ═══════════════════════════════════════════
+const LS_INDEX   = 'mapfolio_index';
+const LS_CURRENT = 'mapfolio_current';
+const LS_PFX     = 'mapfolio_proj_';
+
+// ── Serialise current state (pins without Leaflet markers) ──
+function serializeState() {
+  return {
+    version: 1,
+    name:         state.projectName,
+    savedAt:      new Date().toISOString(),
+    center:       { lat: state.lat, lng: state.lng, zoom: state.zoom },
+    radius:       state.radius,
+    layout:       state.layout,
+    style:        state.style,
+    locationName: state.locationName,
+    fontSizes:    { ...state.fontSizes },
+    showPinLabels: state.showPinLabels,
+    markdown:     document.getElementById('md-editor').value,
+    pins:         pins.map(p => ({ label: p.label, lat: p.lat, lng: p.lng, color: p.color || PIN_COLORS[0] })),
+  };
+}
+
+// ── Deserialise and restore full state ──
+function deserializeState(data) {
+  // Clear pins
+  pins.forEach(p => map.removeLayer(p.marker));
+  pins.length = 0;
+  nextPinId = 1;
+  autoPinAddrs.clear();
+
+  // Core state
+  state.lat          = data.center?.lat  ?? 35.6812;
+  state.lng          = data.center?.lng  ?? 139.7671;
+  state.zoom         = data.center?.zoom ?? 14;
+  state.radius       = data.radius       ?? 650;
+  state.layout       = data.layout       ?? 'right';
+  state.style        = data.style        ?? 'guide';
+  state.locationName = data.locationName ?? '';
+  state.projectName  = data.name         ?? '新規プロジェクト';
+  state.fontSizes    = { h1:36, h2:18, h3:14, body:12, ...(data.fontSizes ?? {}) };
+  state.showPinLabels = data.showPinLabels ?? false;
+
+  // Map
+  map.setView([state.lat, state.lng], state.zoom);
+  mainMarker.setLatLng([state.lat, state.lng]);
+  radiusCircle.setLatLng([state.lat, state.lng]);
+  radiusCircle.setRadius(state.radius);
+
+  // Markdown
+  document.getElementById('md-editor').value = data.markdown ?? '';
+
+  // Pins (silent — no toast per pin)
+  (data.pins ?? []).forEach(p => addPin(p.lat, p.lng, p.label, true, p.color ?? null));
+
+  // Sync all UI widgets
+  syncAllUI();
+}
+
+// ── Sync every UI widget to current state ──
+function syncAllUI() {
+  // Project name field
+  document.getElementById('proj-name-input').value = state.projectName;
+  // Coords / zoom
+  syncCoordDisplay();
+  // Radius
+  document.getElementById('radius-slider').value = state.radius;
+  document.getElementById('radius-val').textContent = state.radius + 'm';
+  // Layout buttons
+  document.querySelectorAll('.layout-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['right','left','above','below'][i] === state.layout);
+  });
+  const preview = document.getElementById('a4-preview');
+  preview.className = 'layout-' + state.layout;
+  const mapArea = document.querySelector('.preview-map-area');
+  const isCol = state.layout === 'right' || state.layout === 'left';
+  mapArea.style.width = isCol ? '58%' : '100%';
+  mapArea.style.height = isCol ? '100%' : '56%';
+  // Style tabs
+  document.querySelectorAll('.style-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['guide','memo','photo'][i] === state.style);
+  });
+  // Font sizes
+  ['h1','h2','h3','body'].forEach(k => {
+    const el = document.getElementById('fs-' + k);
+    if (el) el.value = state.fontSizes[k];
+  });
+  // Pin label toggle
+  const ltEl = document.getElementById('pin-label-toggle');
+  if (ltEl) ltEl.checked = state.showPinLabels;
+  // Preview content
+  updatePreview();
+  updatePreviewMeta();
+  applyFontSizesToPreview();
+  renderPinList();
+  renderPinColorPickers();
+  scheduleMapSnapshot();
+}
+
+// ── localStorage helpers ──
+function lsIndex() {
+  try { return JSON.parse(localStorage.getItem(LS_INDEX) || '[]'); }
+  catch { return []; }
+}
+
+function saveToLocal(silent = false) {
+  const data = serializeState();
+  let id = state.projectId;
+  if (!id) { id = 'proj_' + Date.now(); state.projectId = id; }
+
+  const entry = { id, name: data.name, savedAt: data.savedAt };
+  const idx = lsIndex();
+  const pos = idx.findIndex(e => e.id === id);
+  if (pos >= 0) idx[pos] = entry; else idx.unshift(entry);
+  localStorage.setItem(LS_INDEX, JSON.stringify(idx));
+  localStorage.setItem(LS_CURRENT, id);
+  try {
+    localStorage.setItem(LS_PFX + id, JSON.stringify(data));
+  } catch (e) {
+    toast('⚠️ 保存容量超過。古いプロジェクトを削除してください。'); return;
+  }
+
+  updateAutosaveStatus();
+  renderProjList();
+  if (!silent) toast('💾 保存しました');
+}
+
+function loadFromLocal(id) {
+  try {
+    const raw = localStorage.getItem(LS_PFX + id);
+    if (!raw) throw new Error('データなし');
+    const data = JSON.parse(raw);
+    state.projectId = id;
+    localStorage.setItem(LS_CURRENT, id);
+    deserializeState(data);
+    closeProjDropdown();
+    toast(`📂 "${data.name}" を開きました`);
+  } catch (e) { toast('読み込みエラー: ' + e.message); }
+}
+
+function deleteProject(id, e) {
+  e.stopPropagation();
+  const idx = lsIndex().filter(p => p.id !== id);
+  localStorage.setItem(LS_INDEX, JSON.stringify(idx));
+  localStorage.removeItem(LS_PFX + id);
+  if (state.projectId === id) {
+    if (idx.length) loadFromLocal(idx[0].id);
+    else             newProject();
+  }
+  renderProjList();
+}
+
+function newProject() {
+  pins.forEach(p => map.removeLayer(p.marker));
+  pins.length = 0; nextPinId = 1; autoPinAddrs.clear();
+  state.projectId   = null;
+  state.projectName = '新規プロジェクト';
+  state.lat = 35.6812; state.lng = 139.7671; state.zoom = 14;
+  state.radius = 650; state.layout = 'right'; state.style = 'guide';
+  state.locationName = ''; state.photoDataUrl = null;
+  state.fontSizes = { h1:36, h2:18, h3:14, body:12 };
+  state.showPinLabels = false;
+  document.getElementById('md-editor').value = '';
+  map.setView([state.lat, state.lng], 14);
+  mainMarker.setLatLng([state.lat, state.lng]);
+  radiusCircle.setLatLng([state.lat, state.lng]);
+  radiusCircle.setRadius(state.radius);
+  syncAllUI();
+  toast('📄 新規プロジェクト');
+}
+
+// ── Project dropdown ──
+function toggleProjDropdown(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('proj-dropdown');
+  const isOpen = dd.classList.contains('open');
+  if (!isOpen) renderProjList();
+  dd.classList.toggle('open', !isOpen);
+}
+function closeProjDropdown() {
+  document.getElementById('proj-dropdown').classList.remove('open');
+}
+document.addEventListener('click', () => closeProjDropdown());
+
+function renderProjList() {
+  const idx = lsIndex();
+  const inner = document.getElementById('proj-list-inner');
+  if (!idx.length) {
+    inner.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--muted);text-align:center">保存済みプロジェクトはありません</div>';
+    return;
+  }
+  inner.innerHTML = idx.map(p => {
+    const isCur = p.id === state.projectId;
+    const when  = relTime(p.savedAt);
+    return `<div class="proj-item${isCur?' current':''}" onclick="loadFromLocal('${p.id}')">
+      <div class="proj-item-icon">${isCur ? '▸' : '📄'}</div>
+      <div class="proj-item-info">
+        <div class="proj-item-name">${escHtml(p.name)}</div>
+        <div class="proj-item-meta">${when}</div>
+      </div>
+      <button class="proj-item-del" onclick="deleteProject('${p.id}',event)" title="削除">×</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Auto-save ──
+let lastSavedAt = null;
+function updateAutosaveStatus() {
+  lastSavedAt = new Date();
+  document.getElementById('autosave-status').textContent = '⏱ たった今保存';
+}
+setInterval(() => {
+  if (state.projectId) saveToLocal(true);
+  if (lastSavedAt) {
+    document.getElementById('autosave-status').textContent =
+      '⏱ ' + relTime(lastSavedAt.toISOString());
+  }
+}, 30000);
+// Refresh relative-time label every minute
+setInterval(() => {
+  if (lastSavedAt) {
+    document.getElementById('autosave-status').textContent =
+      '⏱ ' + relTime(lastSavedAt.toISOString());
+  }
+}, 60000);
+
+// ── JSON export / import ──
+function exportJSON() {
+  const data = serializeState();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.download = (state.projectName || 'mapfolio').replace(/[\/\\:*?"<>|]/g,'_') + '.mapfolio.json';
+  a.href = url; a.click();
+  URL.revokeObjectURL(url);
+  toast('⬇ 書き出しました');
+}
+
+function importJSON(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.version) throw new Error('Mapfolioファイルではありません');
+      state.projectId = null; // new slot on next save
+      deserializeState(data);
+      toast(`📂 "${data.name}" を読み込みました`);
+    } catch (err) { toast('読み込みエラー: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+// ── Helpers ──
+function relTime(iso) {
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60)   return 'たった今';
+  if (diff < 3600) return Math.floor(diff/60) + '分前';
+  if (diff < 86400)return Math.floor(diff/3600) + '時間前';
+  return Math.floor(diff/86400) + '日前';
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+function download(dataUrl, filename) {
+  const a = document.createElement('a');
+  a.download = filename; a.href = dataUrl; a.click();
+}
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2600);
+}
+function showLoading(msg) {
+  document.getElementById('loading-msg').textContent = msg || '処理中...';
+  document.getElementById('loading').classList.add('show');
+}
+function hideLoading() { document.getElementById('loading').classList.remove('show'); }
+
+// ═══════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════
+(function init() {
+  const DEFAULT_MD =
+`# 東京駅 丸の内駅舎
+
+赤レンガの駅舎が美しい、東京の玄関口。復原されたドーム天井と行幸通りの趣ある佇まいが、歴史と都市の現在を同時に見せてくれます。
+
+@東京都千代田区丸の内1丁目@
+
+## 紹介ポイント
+- 午前中は駅舎正面に光が入り、写真が撮りやすい
+- 丸の内仲通りや皇居外苑まで歩いて回れる
+- 地下街の飲食店も多く、雨の日の案内にも向いている
+
+> 地図は少し引き気味にして、丸の内エリア全体の位置関係が分かる縮図がおすすめです。`;
+
+  // ── Restore last session from localStorage ──
+  const lastId = localStorage.getItem(LS_CURRENT);
+  const idx    = lsIndex();
+  if (lastId && idx.find(e => e.id === lastId)) {
+    try {
+      const raw  = localStorage.getItem(LS_PFX + lastId);
+      const data = JSON.parse(raw);
+      state.projectId = lastId;
+      deserializeState(data);
+      updateAutosaveStatus();
+      map.whenReady(() => setTimeout(takeMapSnapshot, 1500));
+      return;
+    } catch { /* fall through to default */ }
+  }
+
+  // ── First launch: load demo content ──
+  document.getElementById('md-editor').value = DEFAULT_MD;
+  updatePreview();
+  updatePreviewMeta();
+  applyFontSizesToPreview();
+  renderPinList();
+  document.getElementById('preview-location').textContent = '東京駅';
+  map.whenReady(() => setTimeout(takeMapSnapshot, 1500));
+})();
+</script>
+</body>
+</html>
